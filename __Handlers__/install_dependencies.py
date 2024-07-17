@@ -1,6 +1,6 @@
 import subprocess
 import os
-from _Utils.colors import bcolors
+from __Utils__.colors import bcolors
 
 
 class InstallDepencies:

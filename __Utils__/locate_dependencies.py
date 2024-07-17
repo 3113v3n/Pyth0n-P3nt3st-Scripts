@@ -1,10 +1,15 @@
-from _Handlers.install_dependencies import run_os_commands
+from __Handlers__.install_dependencies import run_os_commands
 
 
 class LocateDependencies:
     def __init__(self) -> None:
         self.dependecies = [
             {"name": "bbot", "command": "pipx install bbot"},
+            {"name": "subfinder", "command": "sudo apt install subfinder"},
+            {
+                "name": "go",
+                "command": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+            },
             {
                 "name": "gowitness",
                 "command": "go install github.com/sensepost/gowitness@latest && sudo cp ~/go/bin/gowitness /usr/bin",
