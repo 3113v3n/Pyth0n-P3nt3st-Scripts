@@ -5,12 +5,9 @@ Python scripts to aid in pentest automation
 |---------------------------------|---------------------------------|
 | External Penetration Testing    | Enumerate subdomains            |
 |                                 |                                 |
-|---------------------------------|---------------------------------|
 | Internal Penetration Testing    | Enumerate IPs give CIDR         |
 |                                 | run netexec                     |
-|                                 | Compare Hashes obtained         |
+|                                 | Compare Hashes obtained         |   
 |                                 |                                 |
-|---------------------------------|---------------------------------|
 | Mobile Penetration Testing      | Static Analysis [iOS/Android]   |
-|                                 |                                 |
-|---------------------------------|---------------------------------|
+
