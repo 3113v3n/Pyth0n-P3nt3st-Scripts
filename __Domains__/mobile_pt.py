@@ -1,8 +1,9 @@
 class MobilePT:
     # class will be responsible for all mobile operations
-    def __init__(self, os_commands, package_name) -> None:
+    def __init__(self, os_commands,colors, package_name) -> None:
         self.package_name = package_name
         self.command = os_commands
+        self.colors = colors
 
     def find_package_in_device(self):
         self.command.run_os_commands(

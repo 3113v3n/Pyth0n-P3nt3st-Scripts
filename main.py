@@ -1,14 +1,28 @@
 from pprint import pprint
+
+# [Utils]
 from __Utils__.colors import bcolors
 from __Utils__.commands import Commands
 from __Utils__.validators import Validators
 from __Utils__.locate_dependencies import LocateDependencies
-from __Handlers__.install_dependencies import InstallDepencies
 
+# [Handlers]
+from __Handlers__.user_handler import UserInteraction
+from __Handlers__.dependency_handler import InstallDepencies
+
+# [Test Domains]
+from __Domains__.external_pt import ExternalPT
+from __Domains__.internal_pt import InternalPT
+from __Domains__.mobile_pt import MobilePT
+
+# Initializers
 command = Commands()
 dependencies = LocateDependencies(command)
-install_package = InstallDepencies(command)
+install_package = InstallDepencies(command, bcolors)
 validator_checks = Validators()
+user = UserInteraction(bcolors)
+# [penetration Testing domains]
+internal = InternalPT(command)
 
 
 def check_for_dependencies():
@@ -26,6 +40,18 @@ def check_for_dependencies():
     return ready_to_start
 
 
+def user_interactions():
+    # Get Domain to test
+    test_domain = user.get_user_domain()
+    # set Variables depending on selected domain
+    domain_vars = user.set_domain_variables(test_domain)
+    if test_domain == "internal":
+        internal.initialize_variables(domain_vars)
+        print(
+            f"Subnet: {internal.subnet}\nMode: {internal.mode}\nOutput File: {internal.output_file}"
+        )
+
+
 def main():
     """
     Run different modules depending on the various domains i.e Internal Mobile and External
@@ -35,6 +61,7 @@ def main():
     if check_for_dependencies():
         # start our pentest
         print("Starting our pentest")
+        user_interactions()
 
 
 if __name__ == "__main__":
