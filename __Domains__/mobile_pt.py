@@ -1,12 +1,10 @@
-from __Handlers__.install_dependencies import run_os_commands
-
-
 class MobilePT:
     # class will be responsible for all mobile operations
-    def __init__(self, apkname) -> None:
-        self.package_name = apkname
+    def __init__(self, os_commands, package_name) -> None:
+        self.package_name = package_name
+        self.command = os_commands
 
     def find_package_in_device(self):
-        run_os_commands(
+        self.command.run_os_commands(
             f"adb shell cmd package list packages | grep ${self.package_name}"
         )
