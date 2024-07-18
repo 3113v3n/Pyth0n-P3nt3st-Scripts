@@ -9,6 +9,7 @@ from __Utils__.locate_dependencies import LocateDependencies
 # [Handlers]
 from __Handlers__.user_handler import UserInteraction
 from __Handlers__.dependency_handler import InstallDepencies
+from __Handlers__.file_handler import FileHandler
 
 # [Test Domains]
 from __Domains__.external_pt import ExternalPT
@@ -21,6 +22,7 @@ dependencies = LocateDependencies(command)
 install_package = InstallDepencies(command, bcolors)
 validator_checks = Validators()
 user = UserInteraction(bcolors)
+filemanager = FileHandler()
 # [penetration Testing domains]
 internal = InternalPT(command)
 
@@ -42,25 +44,33 @@ def check_for_dependencies():
 
 def user_interactions():
     # Get Domain to test
-    test_domain = user.get_user_domain()
+    test_domain =user.get_user_domain()
     # set Variables depending on selected domain
     domain_vars = user.set_domain_variables(test_domain)
-    if test_domain == "internal":
-        internal.initialize_variables(domain_vars)
-        print(
-            f"Subnet: {internal.subnet}\nMode: {internal.mode}\nOutput File: {internal.output_file}"
-        )
+    # Update output directory
+    filemanager.set_domain(test_domain)
+
+    match test_domain:
+        case "internal":
+            # initialize variables that will be used to test different Internal PT modules
+            internal.initialize_variables(domain_vars)
+            print(internal.hosts)
+            
+        case "mobile":
+            # initialize variables that will be used to test different Mobile modules
+            pass
+        case "external":
+            # initialize variables that will be used to test different External PT modules
+            pass
 
 
 def main():
     """
     Run different modules depending on the various domains i.e Internal Mobile and External
     Start Our test scripts
-
     """
     if check_for_dependencies():
         # start our pentest
-        print("Starting our pentest")
         user_interactions()
 
 
