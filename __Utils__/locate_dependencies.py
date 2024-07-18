@@ -1,10 +1,13 @@
-from _Handlers.install_dependencies import run_os_commands
-
-
 class LocateDependencies:
-    def __init__(self) -> None:
-        self.dependecies = [
+    def __init__(self, os_commands) -> None:
+        self.command = os_commands
+        self.dependencies = [
             {"name": "bbot", "command": "pipx install bbot"},
+            {"name": "subfinder", "command": "sudo apt install subfinder"},
+            {
+                "name": "go",
+                "command": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+            },
             {
                 "name": "gowitness",
                 "command": "go install github.com/sensepost/gowitness@latest && sudo cp ~/go/bin/gowitness /usr/bin",
@@ -14,6 +17,10 @@ class LocateDependencies:
             {"name": "amass", "command": "sudo apt install amass"},
             {"name": "httpx-toolkit", "command": "sudo apt install httpx-toolkit"},
             {"name": "getallurls", "command": "sudo apt install getallurls"},
+            {
+                "name": "netexec",
+                "command": "sudo apt install pipx git && pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
+            },
             {
                 "name": "urlhunter",
                 "command": "go install -v github.com/utkusen/urlhunter@latest && sudo cp ~/go/bin/urlhunter /usr/bin",
@@ -43,17 +50,18 @@ class LocateDependencies:
         self.to_install = self.is_dependency_installed()
 
     def is_dependency_installed(self) -> list:
-        """Returns a list of objects containg missing packages that need to be installed and command to install them"""
-        missing_packages = []
-        for dependency in self.dependecies:
-            result = run_os_commands(f"which {dependency['name']}")
-            if result.returncode != 0:
-                missing_packages.append(dependency)
-        return missing_packages
+        """Returns a list of objects containg missing packages
+        that need to be installed and command to in
+        stall them"""
+
+        return [
+            package
+            for package in self.dependencies
+            if self.command.run_os_commands(f"which {package['name']}").returncode != 0
+        ]
 
     def update_dependencies(self, package) -> list:
         """Takes in package as a dictionary containing
         package name and command to install it
         """
-        self.dependecies.append(package)
-        return self.dependecies
+        self.dependencies
