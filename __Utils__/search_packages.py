@@ -1,7 +1,9 @@
-class LocateDependencies:
+class SearchPackages:
+    """Class contains dependencies necessary for script operation"""
+
     def __init__(self, os_commands) -> None:
         self.command = os_commands
-        self.dependencies = [
+        self.packages = [
             {"name": "bbot", "command": "pipx install bbot"},
             {"name": "subfinder", "command": "sudo apt install subfinder"},
             {
@@ -47,21 +49,21 @@ class LocateDependencies:
                 "command": "go install -v github.com/haccer/subjack@latest && sudo cp ~/go/bin/subjack /usr/bin",
             },
         ]
-        self.to_install = self.is_dependency_installed()
+        self.to_install = self.get_missing_packages()
 
-    def is_dependency_installed(self) -> list:
+    def get_missing_packages(self) -> list:
         """Returns a list of objects containg missing packages
         that need to be installed and command to in
         stall them"""
 
         return [
             package
-            for package in self.dependencies
+            for package in self.packages
             if self.command.run_os_commands(f"which {package['name']}").returncode != 0
         ]
 
-    def update_dependencies(self, package) -> list:
+    def update_packages(self, package) -> list:
         """Takes in package as a dictionary containing
         package name and command to install it
         """
-        self.dependencies
+        self.packages

@@ -6,6 +6,7 @@ class MobilePT:
         self.colors = colors
     
     def initialize_variables(self,data):
+        # Sets user provided values
         self.package_name = data["package_name"]
 
     def find_package_in_device(self):

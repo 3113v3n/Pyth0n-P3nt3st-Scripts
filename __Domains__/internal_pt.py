@@ -7,6 +7,7 @@ class InternalPT:
         self.run_os_command = os_command
 
     def initialize_variables(self, mode, output_file):
+        # Sets user provided values
         self.mode = mode
         self.output_file = output_file
 

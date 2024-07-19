@@ -4,11 +4,11 @@ from pprint import pprint
 from __Utils__.colors import bcolors
 from __Utils__.commands import Commands
 from __Utils__.validators import Validators
-from __Utils__.locate_dependencies import LocateDependencies
+from __Utils__.search_packages import SearchPackages
 
 # [Handlers]
-from __Handlers__.user_handler import UserInteraction
-from __Handlers__.dependency_handler import InstallDepencies
+from __Handlers__.user_handler import UserHandler
+from __Handlers__.package_handler import PackageHandler
 from __Handlers__.file_handler import FileHandler
 from __Handlers__.network_handler import NetworkHandler
 
@@ -18,13 +18,27 @@ from __Domains__.internal_pt import InternalPT
 from __Domains__.mobile_pt import MobilePT
 
 # Initializers
+## run os level commands
 command = Commands()
-dependencies = LocateDependencies(command)
-install_package = InstallDepencies(command, bcolors)
+
+## Find all dependencies needed for running the scripts
+dependencies = SearchPackages(command)
+
+## Installs all missinf dependencies
+install_package = PackageHandler(command, bcolors)
+
+## runs validation on user inputs
 validator_checks = Validators()
-user = UserInteraction(bcolors)
+
+## gathers user input
+user = UserHandler(bcolors)
+
+## Handles file management
 filemanager = FileHandler()
+
+## Handles network related operations
 network = NetworkHandler()
+
 
 # [penetration Testing domains]
 internal = InternalPT(command)
@@ -46,12 +60,14 @@ def check_for_dependencies():
 
 
 def user_interactions():
-    # Get Domain to test
+    # Get Domain to test [internal,mobile,external]
     test_domain = user.get_user_domain()
+   
     # set Variables depending on selected domain
     domain_vars = user.set_domain_variables(test_domain)
+
     # Update output directory
-    filemanager.set_domain(test_domain)
+    filemanager.update_output_directory(test_domain)
 
     match test_domain:
         case "internal":
@@ -60,8 +76,9 @@ def user_interactions():
             internal.initialize_variables(
                 mode=domain_vars["mode"], output_file=domain_vars["output"]
             )
-            pprint(network.scan_diff_subnets())
-
+            # TODO: [WORK IN PROGRESS]
+            print(network.get_all_ips())
+            
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
             pass
@@ -73,7 +90,6 @@ def user_interactions():
 def main():
     """
     Run different modules depending on the various domains i.e Internal Mobile and External
-    Start Our test scripts
     """
     if check_for_dependencies():
         # start our pentest

@@ -5,10 +5,12 @@ class FileHandler:
     """Handle File operations"""
 
     def __init__(self) -> None:
-        self.test_domain = ""
-        self.output_directory = "./output_directory"
+        self.test_domain = ""  # one of [internal,external,mobile]
+        self.output_directory = (
+            "./output_directory"  # directory to save our output files
+        )
 
-    def set_domain(self, domain):
+    def update_output_directory(self, domain):
         """
         Depending on the test domain provided
         we update the output directory for various file output
@@ -31,6 +33,7 @@ class FileHandler:
             file.write(content)
 
     def append_file(self, filename, content):
+        """Update existing file"""
         with open(filename, "a") as file:
             file.write(content)
 

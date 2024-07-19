@@ -7,4 +7,5 @@ class ExternalPT:
         self.color = color
 
     def initialize_variables(self, variables):
+        # set user provided variables
         self.target_domain = variables["target_domain"]

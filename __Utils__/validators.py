@@ -2,6 +2,7 @@ import re
 
 
 class Validators:
+    """Class runs validation checks on user provided input"""
     def __init__(self) -> None:
         pass
 
