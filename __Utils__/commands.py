@@ -3,6 +3,7 @@ import subprocess
 
 class Commands:
     """Class handles commands that will be used by the script"""
+
     def __init__(self) -> None:
         pass
 
@@ -18,4 +19,13 @@ class Commands:
         # if result.returncode == 0:
         #     print(result.stdout.strip())
         return result
-    
+
+    def auto_enter_commands(self, command):
+        """Automatically press enter when prompted by script"""
+        try:
+            cmd = subprocess.Popen(
+                command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
+            )
+            cmd.communicate(b"\n") # Simulate pressing enter on the keyboard
+        except TypeError:
+            print(str(TypeError))

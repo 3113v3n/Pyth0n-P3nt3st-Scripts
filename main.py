@@ -24,7 +24,7 @@ command = Commands()
 ## Find all dependencies needed for running the scripts
 dependencies = SearchPackages(command)
 
-## Installs all missinf dependencies
+## Installs all missing dependencies
 install_package = PackageHandler(command, bcolors)
 
 ## runs validation on user inputs
@@ -42,10 +42,11 @@ network = NetworkHandler()
 
 # [penetration Testing domains]
 internal = InternalPT(command)
+external = ExternalPT(command,bcolors)
 
 
-def check_for_dependencies():
-    # check if package list contains any packages
+def packages_present() -> bool:
+    # check if package list contains any missing packages
     if len(dependencies.to_install) == 0:
         print(f"{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         ready_to_start = True
@@ -62,7 +63,7 @@ def check_for_dependencies():
 def user_interactions():
     # Get Domain to test [internal,mobile,external]
     test_domain = user.get_user_domain()
-   
+
     # set Variables depending on selected domain
     domain_vars = user.set_domain_variables(test_domain)
 
@@ -77,21 +78,23 @@ def user_interactions():
                 mode=domain_vars["mode"], output_file=domain_vars["output"]
             )
             # TODO: [WORK IN PROGRESS]
-            print(network.get_all_ips())
-            
+            print(network.generate_possible_ips())
+
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
             pass
         case "external":
             # initialize variables that will be used to test different External PT modules
-            pass
+            out_put = filemanager.output_directory
+            external.initialize_variables(variables=domain_vars)
+            print(external.bbot_enum(out_put))
 
 
 def main():
     """
     Run different modules depending on the various domains i.e Internal Mobile and External
     """
-    if check_for_dependencies():
+    if packages_present():
         # start our pentest
         user_interactions()
 
