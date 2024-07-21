@@ -86,7 +86,7 @@ def get_network_info(subnet) -> dict:
     ip_info = {
         "ip_address": subnet.split("/")[0],
         "hosts": (2**bits),  # - 2
-        "cidr": int(network_mask),
+        "network_mask": int(network_mask),
         "host_bits": bits,
     }
     return ip_info

@@ -1,21 +1,21 @@
 from pprint import pprint
 
 # [Utils]
-from __Utils__.colors import bcolors
-from __Utils__.commands import Commands
-from __Utils__.validators import Validators
-from __Utils__.search_packages import SearchPackages
+from utils.colors import bcolors
+from utils.commands import Commands
+from utils.validators import Validators
+from utils.search_packages import SearchPackages
 
 # [Handlers]
-from __Handlers__.user_handler import UserHandler
-from __Handlers__.package_handler import PackageHandler
-from __Handlers__.file_handler import FileHandler
-from __Handlers__.network_handler import NetworkHandler
+from handlers.user_handler import UserHandler
+from handlers.package_handler import PackageHandler
+from handlers.file_handler import FileHandler
+from handlers.network_handler import NetworkHandler
 
 # [Test Domains]
-from __Domains__.external_pt import ExternalPT
-from __Domains__.internal_pt import InternalPT
-from __Domains__.mobile_pt import MobilePT
+from domains.external_pt import ExternalPT
+from domains.internal_pt import InternalPT
+from domains.mobile_pt import MobilePT
 
 # Initializers
 ## run os level commands
@@ -42,7 +42,7 @@ network = NetworkHandler()
 
 # [penetration Testing domains]
 internal = InternalPT(command)
-external = ExternalPT(command,bcolors)
+# external = ExternalPT(command,bcolors)
 
 
 def packages_present() -> bool:
@@ -85,9 +85,10 @@ def user_interactions():
             pass
         case "external":
             # initialize variables that will be used to test different External PT modules
-            out_put = filemanager.output_directory
-            external.initialize_variables(variables=domain_vars)
-            print(external.bbot_enum(out_put))
+            # out_put = filemanager.output_directory
+            # external.initialize_variables(variables=domain_vars)
+            # print(external.bbot_enum(out_put))
+            pass
 
 
 def main():

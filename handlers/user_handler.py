@@ -6,9 +6,9 @@ class UserHandler:
         self.default_test_domains = ["mobile", "internal", "external"]
         self.color = text_color
         self.not_valid_domain = False
-        self.domain_variables = (
-            {}
-        )  # Object containing values respective to diff test domains
+        self.domain_variables = {}
+        # Object containing values respective to diff test domains
+        self.domain = ""
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
