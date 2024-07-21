@@ -59,7 +59,7 @@ class SearchPackages:
         return [
             package
             for package in self.packages
-            if self.command.run_os_commands(f"which {package['name']}").returncode == 0
+            if self.command.run_os_commands(f"which {package['name']}").returncode != 0
         ]
 
     def update_packages(self, package) -> list:
