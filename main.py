@@ -4,7 +4,6 @@ from pprint import pprint
 from utils.colors import bcolors
 from utils.commands import Commands
 from utils.validators import Validators
-from utils.search_packages import SearchPackages
 
 # [Handlers]
 from handlers.user_handler import UserHandler
@@ -21,11 +20,8 @@ from domains.mobile_pt import MobilePT
 ## run os level commands
 command = Commands()
 
-## Find all dependencies needed for running the scripts
-dependencies = SearchPackages(command)
-
-## Installs all missing dependencies
-install_package = PackageHandler(command, bcolors)
+## Handle packages
+package = PackageHandler(command, bcolors)
 
 ## runs validation on user inputs
 validator_checks = Validators()
@@ -47,15 +43,15 @@ internal = InternalPT(command)
 
 def packages_present() -> bool:
     # check if package list contains any missing packages
-    if len(dependencies.to_install) == 0:
+    if len(package.to_install) == 0:
         print(f"{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         ready_to_start = True
     else:
         ready_to_start = False
         print(
-            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(dependencies.to_install)} package(s)..{bcolors.ENDC}"
+            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
         )
-        install_package.install_packages(dependencies.to_install)
+        package.install_packages(package.to_install)
     ready_to_start = True
     return ready_to_start
 
