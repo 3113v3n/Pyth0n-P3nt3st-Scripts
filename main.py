@@ -74,7 +74,7 @@ def user_interactions():
                 mode=domain_vars["mode"], output_file=domain_vars["output"]
             )
             # TODO: [WORK IN PROGRESS]
-            print(network.generate_possible_ips())
+            pprint(network.generate_possible_ips())
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
@@ -85,6 +85,8 @@ def user_interactions():
             # external.initialize_variables(variables=domain_vars)
             # print(external.bbot_enum(out_put))
             pass
+        case _:
+            return
 
 
 def main():

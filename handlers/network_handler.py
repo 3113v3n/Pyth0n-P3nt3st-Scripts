@@ -58,15 +58,38 @@ class NetworkHandler:
         except ValueError as e:
             return str(e)
 
-    def generate_possible_ips(self):
-        # Validate ip
-        # is_multicast => returns True is ip is reserved for multicast
-        
-        try:
-            ip_address = ipaddress.IPv4Address(self.user_ip_addr)
-        except ipaddress.AddressValueError as error:
-            return str(error)
+    def generate_possible_ips(self) -> list:
+        """
+        Splits the user provided IP into 4 octets and determines
+        which octet to iterate over depending on the remaining subnet bits        
+        """
+        octets = self.user_ip_addr.split(".")
+        # Host bits
+        if self.host_bits <= 8:
+            # Example: 192.168.10.X
+            base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
+            return [f"{base_ip}.{x}" for x in range(0, 256)]
 
+        # Host bits > 8 and <= 16
+        elif 16 >= self.host_bits > 8:
+            # Example: 192.168.X.X
+            base_ip = f"{octets[0]}.{octets[1]}"
+            return [f"{base_ip}.{x}.{y}" for x in range(0, 256) for y in range(0, 256)]
+
+        # Host bits > 16 and <= 24
+        elif 24 >= self.host_bits > 16:
+            # Example: 192.X.X.X
+            base_ip = f"{octets[0]}"
+            return [
+                f"{base_ip}.{x}.{y}.{z}"
+                for x in range(0, 256)
+                for y in range(0, 256)
+                for z in range(0, 256)
+            ]
+
+    def determine_live_hosts(self,ip_list):
+        """Determine which hosts are alive within the network"""
+        pass 
 
 def get_network_info(subnet) -> dict:
     """Function takes in network subnet and splits the provided
