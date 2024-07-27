@@ -33,11 +33,11 @@ user = UserHandler(bcolors)
 filemanager = FileHandler()
 
 ## Handles network related operations
-network = NetworkHandler()
+network = NetworkHandler(command)
 
 
 # [penetration Testing domains]
-internal = InternalPT(command)
+internal = InternalPT(command, bcolors, filemanager)
 # external = ExternalPT(command,bcolors)
 
 
@@ -74,7 +74,11 @@ def user_interactions():
                 mode=domain_vars["mode"], output_file=domain_vars["output"]
             )
             # TODO: [WORK IN PROGRESS]
-            pprint(network.generate_possible_ips())
+            possible_ips = network.generate_possible_ips()
+            command.clear_screen()
+            print(f"Scanning [ {network.hosts} ] hosts")
+
+            internal.save_live_hosts_to_host(possible_ips)
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

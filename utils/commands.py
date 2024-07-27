@@ -1,4 +1,6 @@
+import os
 import subprocess
+import platform
 
 
 class Commands:
@@ -26,6 +28,36 @@ class Commands:
             cmd = subprocess.Popen(
                 command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True
             )
-            cmd.communicate(b"\n") # Simulate pressing enter on the keyboard
+            cmd.communicate(b"\n")  # Simulate pressing enter on the keyboard
         except TypeError:
             print(str(TypeError))
+
+    def ping_hosts(self, hosts):
+        """
+        Returns True if host (str) responds to a ping request.
+        Remember that a host may not respond to a ping (ICMP) request even if the host name is valid.
+        """
+        # Option for the number of packets as a function of
+        param = "-n" if platform.system().lower() == "windows" else "-c"
+
+        try:
+            # Building the command. Ex: "ping -c 1 google.com"
+            command = ["ping", param, "1", hosts]
+
+            response = subprocess.run(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            return True
+        except subprocess.CalledProcessError:
+            # If ping fails (non-zero exit code), return False
+            return False
+
+        except Exception as e:
+            return False
+
+    def clear_screen(self):
+        """Clear screen"""
+        return os.system("clear")

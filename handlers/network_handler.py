@@ -4,13 +4,21 @@ import ipaddress
 class NetworkHandler:
     """Class will handle any logic necessary for network operations"""
 
-    def __init__(self) -> None:
-        self.subnet = ""  # subnet range
-        self.hosts = 0  # Number of hosts within the network
-        self.start_ip = ""  # IP to start scan from
-        self.network_mask = ""  # CIDR value [0-32]
-        self.user_ip_addr = ""  # user IP addr
-        self.host_bits = 0  # remaining usable host bits
+    def __init__(self, os_commands) -> None:
+        # subnet range
+        self.subnet = ""
+        # Number of hosts within the network
+        self.hosts = 0
+        # IP to start scan from
+        self.start_ip = ""
+        # CIDR value [0-32]
+        self.network_mask = ""
+        # user IP addr
+        self.user_ip_addr = ""
+        # remaining usable host bits
+        self.host_bits = 0
+        # Shell commands
+        self.os_commands = os_commands
 
     def initialize_network_variables(self, variables):
         # initialize the class variables with user variables
@@ -21,47 +29,23 @@ class NetworkHandler:
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
 
-    def get_all_ips(self):
-        """
-        Depending on the subnet provided, Scan the total number of hosts
-        alive starting from the first ip in the network range
-
-            Example: subnet = 192.168.24.10/24
-                    start_ip = 192.168.24.0 - 192.168.24.255
-
-            scan the remaining bits = 8
-            hosts = 255
-            hence scan 192.168.24.[0-255]
-        """
-        print(f"Total Hosts: {self.hosts}")
-        try:
-            interface = ipaddress.ip_interface(self.subnet)
-            ip = interface.ip
-            network = ipaddress.ip_network(
-                f"{ip}/{interface.network.prefixlen}", strict=False
-            )
-            all_ips = []
-            # [str(ip) for ip in network.hosts()] --> returns only usable hosts
-            if network.prefixlen <= 24:
-                for i in range(256):
-                    all_ips.append(
-                        str(
-                            ipaddress.IPv4Address(
-                                f"{ipaddress.IPv4Address(int(ip) & ~0xFF | i)}"
-                            )
-                        )
-                    )
-            else:
-                all_ips = [str(ip) for ip in network]
-
-            return all_ips
-        except ValueError as e:
-            return str(e)
-
     def generate_possible_ips(self) -> list:
         """
         Splits the user provided IP into 4 octets and determines
-        which octet to iterate over depending on the remaining subnet bits        
+        which octet to iterate over depending on the remaining subnet bits
+
+        Example /25
+
+            host_bits = 32 -25
+                = 7
+                xxxxxxxx.xxxxxxxx.xxxxxxxx.yyyyyyyy
+                scanning octet = octet[3]
+
+            /18
+            host_bits = 32 -18
+                = 14
+                xxxxxxxx.xxxxxxxx.yyyyyyyy.yyyyyyyy
+                scanning octet = octet[2] and octet[3]
         """
         octets = self.user_ip_addr.split(".")
         # Host bits
@@ -87,9 +71,6 @@ class NetworkHandler:
                 for z in range(0, 256)
             ]
 
-    def determine_live_hosts(self,ip_list):
-        """Determine which hosts are alive within the network"""
-        pass 
 
 def get_network_info(subnet) -> dict:
     """Function takes in network subnet and splits the provided

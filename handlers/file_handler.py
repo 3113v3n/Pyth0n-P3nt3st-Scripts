@@ -29,12 +29,12 @@ class FileHandler:
                 return
 
     def save_new_file(self, filename, content):
-        with open(f"{filename}", "w") as file:
+        with open(f"{self.output_directory}/{filename}", "w") as file:
             file.write(content)
 
     def append_file(self, filename, content):
         """Update existing file"""
-        with open(filename, "a") as file:
+        with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(content)
 
     def read_last_line(self, filename) -> str:
@@ -42,7 +42,7 @@ class FileHandler:
         Takes a filename containing a list of ips and returns
         the last ip address
         """
-        with open(filename, "rb") as file:
+        with open(f"{filename}", "rb") as file:
             try:  # catch OSError in case of one line file
                 file.seek(-2, os.SEEK_END)
                 while file.read(1) != b"\n":
