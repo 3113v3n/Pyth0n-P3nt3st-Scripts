@@ -19,25 +19,12 @@ class InternalPT:
         pass
 
     def save_live_hosts_to_host(self, hosts):
-        """Determine which hosts are alive within the network"""
-        alive_hosts = []
+        """Save Live Hosts to file"""
         for host in hosts:
-            response = self.run_os_command.ping_hosts(host)
-            if response:
-                # add hosts to list if ping is successful
-                # TODO: write these hosts to a file
-                print(
-                    f"{self.colors.OKGREEN}{self.colors.BOLD}[+] {host}{self.colors.ENDC}"
-                )
-                self.filemanager.save_new_file(self.output_file, host)
-                alive_hosts.append(host)
-            else:
-                print(
-                    f"{self.colors.FAIL}{self.colors.BOLD}[-] {host}{self.colors.ENDC}"
-                )
-            # TODO: display to the user scan progress
-            # print(f"Scanned {self.total_scanned_ips} / {self.hosts}")
-        return alive_hosts
+            self.filemanager.save_new_file(self.output_file, host)
+
+        # TODO: display to the user scan progress
+        # return alive_hosts
 
     def resume_scan_from_file(self, file):
         """Resumes scan from file with previously stored IPs"""

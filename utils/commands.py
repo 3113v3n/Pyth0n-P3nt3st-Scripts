@@ -6,8 +6,8 @@ import platform
 class Commands:
     """Class handles commands that will be used by the script"""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, color) -> None:
+        self.colors = color
 
     def run_os_commands(self, command):
         """Executes shell commands such as [apt and sudo]"""
@@ -32,7 +32,7 @@ class Commands:
         except TypeError:
             print(str(TypeError))
 
-    def ping_hosts(self, hosts):
+    def ping_hosts(self, host):
         """
         Returns True if host (str) responds to a ping request.
         Remember that a host may not respond to a ping (ICMP) request even if the host name is valid.
@@ -42,17 +42,21 @@ class Commands:
 
         try:
             # Building the command. Ex: "ping -c 1 google.com"
-            command = ["ping", param, "1", hosts]
+            command = ["ping", param, "1", host]
 
-            response = subprocess.run(
+            subprocess.run(
                 command,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
+            print(
+                f"{self.colors.OKGREEN}{self.colors.BOLD}[+] {host}{self.colors.ENDC}"
+            )
             return True
         except subprocess.CalledProcessError:
             # If ping fails (non-zero exit code), return False
+            print(f"{self.colors.FAIL}{self.colors.BOLD}[-] {host}{self.colors.ENDC}")
             return False
 
         except Exception as e:

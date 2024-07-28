@@ -18,7 +18,7 @@ from domains.mobile_pt import MobilePT
 
 # Initializers
 ## run os level commands
-command = Commands()
+command = Commands(bcolors)
 
 ## Handle packages
 package = PackageHandler(command, bcolors)
@@ -71,14 +71,17 @@ def user_interactions():
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(domain_vars)
             internal.initialize_variables(
-                mode=domain_vars["mode"], output_file=domain_vars["output"]
+                mode=domain_vars["mode"],
+                output_file=filemanager.generate_unique_name(domain_vars["output"]),
             )
             # TODO: [WORK IN PROGRESS]
-            possible_ips = network.generate_possible_ips()
             command.clear_screen()
-            print(f"Scanning [ {network.hosts} ] hosts")
 
-            internal.save_live_hosts_to_host(possible_ips)
+            alive_hosts = network.get_live_ips()
+            print(f"Scanned [ {network.hosts} ] hosts")
+            pprint(alive_hosts)
+
+            # internal.save_live_hosts_to_host(alive_hosts)
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

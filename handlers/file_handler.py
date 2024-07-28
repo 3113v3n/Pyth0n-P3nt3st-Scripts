@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from pathlib import Path
 
 
 class FileHandler:
@@ -29,13 +31,15 @@ class FileHandler:
                 return
 
     def save_new_file(self, filename, content):
-        with open(f"{self.output_directory}/{filename}", "w") as file:
-            file.write(content)
+        with open(
+            f"{self.output_directory}/{filename}", "a"
+        ) as file:
+            file.write(f"{content}\n")
 
     def append_file(self, filename, content):
         """Update existing file"""
         with open(f"{self.output_directory}/{filename}", "a") as file:
-            file.write(content)
+            file.write(f"{content}\n")
 
     def read_last_line(self, filename) -> str:
         """
@@ -51,3 +55,8 @@ class FileHandler:
                 file.seek(0)
             last_line = file.readline().decode()
         return last_line
+
+    def generate_unique_name(self, file) -> str:
+        timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
+        removed_extension = Path(file).stem
+        return f"{removed_extension}_{timestamp}.txt"

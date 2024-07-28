@@ -1,4 +1,6 @@
-import ipaddress
+import curses
+import time
+from tqdm import tqdm
 
 
 class NetworkHandler:
@@ -29,10 +31,11 @@ class NetworkHandler:
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
 
-    def generate_possible_ips(self) -> list:
+    def get_live_ips(self) -> list:
         """
         Splits the user provided IP into 4 octets and determines
         which octet to iterate over depending on the remaining subnet bits
+        and returns a list of hosts that respond successfully to ping command
 
         Example /25
 
@@ -52,13 +55,22 @@ class NetworkHandler:
         if self.host_bits <= 8:
             # Example: 192.168.10.X
             base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
-            return [f"{base_ip}.{x}" for x in range(0, 256)]
+            return [
+                f"{base_ip}.{x}"
+                for x in tqdm(range(256), desc="Scanning network", leave=False) #TODO : check on tqdm
+                if self.os_commands.ping_hosts(f"{base_ip}.{x}")
+            ]
 
         # Host bits > 8 and <= 16
         elif 16 >= self.host_bits > 8:
             # Example: 192.168.X.X
             base_ip = f"{octets[0]}.{octets[1]}"
-            return [f"{base_ip}.{x}.{y}" for x in range(0, 256) for y in range(0, 256)]
+            return [
+                f"{base_ip}.{x}.{y}"
+                for x in range(256)
+                for y in range(256)
+                if self.os_commands.ping_hosts(f"{base_ip}.{x}.{y}")
+            ]
 
         # Host bits > 16 and <= 24
         elif 24 >= self.host_bits > 16:
@@ -66,9 +78,10 @@ class NetworkHandler:
             base_ip = f"{octets[0]}"
             return [
                 f"{base_ip}.{x}.{y}.{z}"
-                for x in range(0, 256)
-                for y in range(0, 256)
-                for z in range(0, 256)
+                for x in range(256)
+                for y in range(256)
+                for z in range(256)
+                if self.os_commands.ping_hosts(f"{base_ip}.{x}.{y}.{z}")
             ]
 
 
