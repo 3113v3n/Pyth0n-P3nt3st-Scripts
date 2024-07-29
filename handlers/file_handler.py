@@ -11,7 +11,7 @@ class FileHandler:
         self.output_directory = (
             "./output_directory"  # directory to save our output files
         )
-        self.full_file_path = ""
+        self.full_file_path = ""  # full path to saved file
 
     def update_output_directory(self, domain):
         """

@@ -1,10 +1,14 @@
+from utils.colors import bcolors
+from utils.commands import Commands
+
+
 class ExternalPT:
     """Class will be responsible for handling external PT operations"""
 
-    def __init__(self, os_command, color) -> None:
+    def __init__(self) -> None:
         self.target_domain = ""
-        self.command = os_command
-        self.color = color
+        self.command = Commands()
+        self.color = bcolors
 
     def initialize_variables(self, variables):
         # set user provided variables

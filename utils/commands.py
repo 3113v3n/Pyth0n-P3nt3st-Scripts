@@ -6,8 +6,9 @@ import platform
 class Commands:
     """Class handles commands that will be used by the script"""
 
-    def __init__(self, color) -> None:
-        self.colors = color
+    def __init__(self) -> None:
+        pass
+       
 
     def run_os_commands(self, command):
         """Executes shell commands such as [apt and sudo]"""

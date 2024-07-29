@@ -2,8 +2,7 @@ from pprint import pprint
 
 # [Utils]
 from utils.colors import bcolors
-from utils.commands import Commands
-from utils.validators import Validators
+from utils.validators import InputValidators
 
 # [Handlers]
 from handlers.user_handler import UserHandler
@@ -17,70 +16,54 @@ from domains.internal_pt import InternalPT
 from domains.mobile_pt import MobilePT
 
 # Initializers
-## run os level commands
-command = Commands(bcolors)
-
+validator = InputValidators()
 ## Handle packages
-package = PackageHandler(command, bcolors)
-
-## runs validation on user inputs
-validator_checks = Validators()
-
-## gathers user input
-user = UserHandler(bcolors)
+package = PackageHandler()
 
 ## Handles file management
 filemanager = FileHandler()
 
+## gathers user input
+user = UserHandler(filemanager, validator, bcolors)
+
 ## Handles network related operations
-network = NetworkHandler(command)
+network = NetworkHandler()
 
 
 # [penetration Testing domains]
-internal = InternalPT(command, bcolors, filemanager)
-# external = ExternalPT(command,bcolors)
+internal = InternalPT(filemanager=filemanager, colors=bcolors)
 
 
 def packages_present() -> bool:
     # check if package list contains any missing packages
     if len(package.to_install) == 0:
         print(f"{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
-        ready_to_start = True
+        return True
     else:
-        ready_to_start = False
+
         print(
             f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
         )
         package.install_packages(package.to_install)
-    ready_to_start = True
-    return ready_to_start
+
+    return True
 
 
 def user_interactions():
-    # Get Domain to test [internal,mobile,external]
-    test_domain = user.get_user_domain()
 
-    # set Variables depending on selected domain
-    domain_vars = user.set_domain_variables(test_domain)
-
-    # Update output directory
-    filemanager.update_output_directory(test_domain)
-
-    match test_domain:
+    match user.domain:  # one of Internal | Mobile | External
         case "internal":
             # initialize variables that will be used to test different Internal PT modules
-            network.initialize_network_variables(domain_vars)
+            network.initialize_network_variables(user.domain_variables)
             internal.initialize_variables(
-                mode=domain_vars["mode"],
-                output_file=filemanager.generate_unique_name(domain_vars["output"]),
+                mode=user.domain_variables["mode"],
+                output_file=user.domain_variables["output"],
             )
             # TODO: [WORK IN PROGRESS]
 
-            live_hosts = network.get_live_ips()
-            internal.save_live_hosts_to_host(live_hosts)  # save file
-            print(
-                f"[+] File Location:\n{bcolors.OKGREEN}{filemanager.full_file_path}{bcolors.ENDC}"
-            )
+            internal.save_live_hosts_to_host(
+                network.get_live_ips()
+            )  # save live hosts to file
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

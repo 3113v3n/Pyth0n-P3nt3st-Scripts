@@ -1,13 +1,13 @@
 import curses
 import time
-from utils.progress_bar import ProgressBar
 from tqdm import tqdm
-
+from utils.progress_bar import ProgressBar
+from utils.commands import Commands
 
 class NetworkHandler:
     """Class will handle any logic necessary for network operations"""
 
-    def __init__(self, os_commands) -> None:
+    def __init__(self) -> None:
         # subnet range
         self.subnet = ""
         # Number of hosts within the network
@@ -21,7 +21,7 @@ class NetworkHandler:
         # remaining usable host bits
         self.host_bits = 0
         # Shell commands
-        self.os_commands = os_commands
+        self.os_commands = Commands()
         self.progress_bar = ""
 
     def initialize_network_variables(self, variables):
@@ -44,18 +44,12 @@ class NetworkHandler:
         which octet to iterate over depending on the remaining subnet bits
         and returns a list of hosts that respond successfully to ping command
 
-        Example /25
-
-            host_bits = 32 -25
-                = 7
-                xxxxxxxx.xxxxxxxx.xxxxxxxx.yyyyyyyy
-                scanning octet = octet[3]
-
-            /18
-            host_bits = 32 -18
-                = 14
-                xxxxxxxx.xxxxxxxx.yyyyyyyy.yyyyyyyy
-                scanning octet = octet[2] and octet[3]
+        Example:
+        /16
+        host_bits = 32 -18
+            = 14
+            xxxxxxxx.xxxxxxxx.yyyyyyyy.yyyyyyyy
+            scanning octet = octet[2] and octet[3]
         """
 
         octets = self.user_ip_addr.split(".")
@@ -63,7 +57,7 @@ class NetworkHandler:
         if self.host_bits <= 8:
             # Example: 192.168.10.X
             base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
-            for x in tqdm(range(100, 117), desc="Scanning Network", leave=False):
+            for x in tqdm(range(256), desc="Scanning Network", leave=False):
                 self.configure_progress_bar(
                     stdscr,
                     ip=f"{base_ip}.{x}",
@@ -98,15 +92,10 @@ class NetworkHandler:
 
 
 def get_network_info(subnet) -> dict:
-    """Function takes in network subnet and splits the provided
+    """
+    Function takes in network subnet and splits the provided
     Values into an ip address and subnet.
     It then returns a dictionary containing
-    {
-    ip address,
-    number of hosts,
-    cidr value,
-    number of host bits
-    }
     """
     # determine num of hosts from IP addr
     # 2^(remaining bits)-2 = usable_hosts

@@ -1,14 +1,22 @@
+from handlers.file_handler import FileHandler
+from utils.validators import InputValidators
+
+
 class UserHandler:
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(self, text_color) -> None:
+    def __init__(
+        self, filemanager: FileHandler, validator: InputValidators, bcolors
+    ) -> None:
         self.default_test_domains = ["mobile", "internal", "external"]
-        self.color = text_color
+        self.color = bcolors
         self.not_valid_domain = False
-        self.domain_variables = {}
+        self.filemanager = filemanager
+        self.validator = validator
         # Object containing values respective to diff test domains
-        self.domain = ""
+        self.domain = self.get_user_domain()
+        self.domain_variables = self.set_domain_variables(self.domain)
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
@@ -30,6 +38,8 @@ class UserHandler:
 
     def set_domain_variables(self, test_domain):
         """Update the variables object with reference to the test domain provisioned"""
+        # Update the output directory with respective test domain
+        self.filemanager.update_output_directory(test_domain)
         match test_domain:
             case "mobile":
                 # TODO: [UNDER DEVELOPMENT]
@@ -50,7 +60,14 @@ class UserHandler:
 
                 print(f"Running Internal PT modules")
                 subnet = input(f"\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
-                # TODO : validate subnet provided
+
+                # Validate subnet provided
+
+                while not self.validator.validate_cidr(subnet):
+                    subnet = input(
+                        f"\n[+] Please provide an IP in the following format [10.0.0.0/24]\n"
+                    )
+
                 mode = input(mode_text).lower()
 
                 # Ensure correct mode is selected by user

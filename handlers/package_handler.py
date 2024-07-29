@@ -1,9 +1,13 @@
+from utils.colors import bcolors
+from utils.commands import Commands
+
+
 class PackageHandler:
     """Handles package related actions such as installation of missing Packages"""
 
-    def __init__(self, os_commands, colors) -> None:
-        self.command = os_commands
-        self.colors = colors
+    def __init__(self) -> None:
+        self.command = Commands()
+        self.colors = bcolors
         self.packages = [
             {"name": "bbot", "command": "pipx install bbot"},
             {"name": "subfinder", "command": "sudo apt install subfinder"},
@@ -69,5 +73,5 @@ class PackageHandler:
             print(
                 f"[+] Installing the following package:\n{self.colors.OKCYAN}{package['name']}{self.colors.ENDC}\n"
             )
-            # self.command.run_os_commands(command=package["command"])
+            self.command.run_os_commands(command=package["command"])
         print(f"\n{self.colors.OKGREEN}[+] Installation complete{self.colors.ENDC}")
