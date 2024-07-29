@@ -3,6 +3,7 @@ import re
 
 class InputValidators:
     """Class runs validation checks on user provided input"""
+
     def __init__(self) -> None:
         self.something = "validators"
 

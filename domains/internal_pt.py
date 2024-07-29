@@ -23,11 +23,12 @@ class InternalPT:
 
     def save_live_hosts_to_host(self, hosts):
         """Save Live Hosts to file"""
-        for host in hosts:
-            self.filemanager.save_new_file(self.output_file, host)
-        print(
-            f"[+] File Location:\n{self.bcolors.OKGREEN}{self.filemanager.full_file_path}{self.bcolors.ENDC}"
-        )
+        if len(hosts) != 0:
+            for host in hosts:
+                self.filemanager.save_new_file(self.output_file, host)
+            print(
+                f"[+] File Location:\n{self.bcolors.OKGREEN}{self.filemanager.full_file_path}{self.bcolors.ENDC}"
+            )
 
     def resume_scan_from_file(self, file):
         """Resumes scan from file with previously stored IPs"""

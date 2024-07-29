@@ -1,4 +1,4 @@
-import os
+import os, glob
 from datetime import datetime
 from pathlib import Path
 
@@ -8,8 +8,9 @@ class FileHandler:
 
     def __init__(self) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
+        self.working_dir = os.getcwd()
         self.output_directory = (
-            "./output_directory"  # directory to save our output files
+            f"{self.working_dir}/output_directory"  # directory to save our output files
         )
         self.full_file_path = ""  # full path to saved file
 
@@ -49,10 +50,15 @@ class FileHandler:
         :param search_path: Directory to start the search from.
         :return: Full path of the file if found, None otherwise.
         """
-        for root, dirs, files in os.walk("."):
+        for root, dirs, files in os.walk(f"{self.output_directory}"):
+            #print(glob.glob(f"{filename}" + "*.txt"))
             if filename in files:
                 return os.path.join(root, filename)
         return None
+
+    def get_file_from_partial(self, partial_name):
+        """get full file name from a partial name provided"""
+        print(self.working_dir)
 
     def read_last_line(self, filename) -> str:
         """
