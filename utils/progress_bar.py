@@ -1,0 +1,47 @@
+import curses
+
+
+class ProgressBar:
+    def __init__(self, total) -> None:
+        self.total_scanned = 0
+        self.total_hosts = total
+        self.live_hosts = []
+        self.unresponsive_hosts = []
+
+    def update_ips(self, stdscr, ip, is_alive):
+        if is_alive:
+            self.live_hosts.append(ip)
+        else:
+            self.unresponsive_hosts.append(ip)
+        self.total_scanned += 1
+        self.display(stdscr)
+
+    def display(self, stdscr):
+        height, width = stdscr.getmaxyx()
+        output_height = height - 3
+        output_width = width * 3 // 4
+        stdscr.clear()
+
+        curses.curs_set(0)
+
+        # Initialize color pairs
+        curses.start_color()
+        curses.init_pair(
+            1, curses.COLOR_GREEN, curses.COLOR_BLACK
+        )  # Alive IPs - green text
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+        # Display Alive IPs
+        for idx, host in enumerate(self.live_hosts[-output_height:]):
+            stdscr.addstr(idx, 0, f"[+] {host} ", curses.color_pair(1))
+
+        # Display Dead IPs
+        for idx, dead_ip in enumerate(self.unresponsive_hosts[-output_height:]):
+            stdscr.addstr(
+                idx, output_width // 2, f"[-] {dead_ip}", curses.color_pair(2)
+            )
+
+        # Display Progress Bar
+        progress_message = f"Progress: {self.total_scanned}/{self.total_hosts}"
+        stdscr.addstr(height - 2, 0, progress_message)
+
+        stdscr.refresh()

@@ -11,6 +11,7 @@ class FileHandler:
         self.output_directory = (
             "./output_directory"  # directory to save our output files
         )
+        self.full_file_path = ""
 
     def update_output_directory(self, domain):
         """
@@ -31,15 +32,27 @@ class FileHandler:
                 return
 
     def save_new_file(self, filename, content):
-        with open(
-            f"{self.output_directory}/{filename}", "a"
-        ) as file:
+        self.full_file_path = f"{self.output_directory}/{filename}"
+        with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
     def append_file(self, filename, content):
         """Update existing file"""
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
+
+    def find_file(self, filename):
+        """
+        Searches for a file in the given directory and its subdirectories.
+
+        :param filename: Name of the file to search for.
+        :param search_path: Directory to start the search from.
+        :return: Full path of the file if found, None otherwise.
+        """
+        for root, dirs, files in os.walk("."):
+            if filename in files:
+                return os.path.join(root, filename)
+        return None
 
     def read_last_line(self, filename) -> str:
         """

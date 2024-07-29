@@ -75,13 +75,12 @@ def user_interactions():
                 output_file=filemanager.generate_unique_name(domain_vars["output"]),
             )
             # TODO: [WORK IN PROGRESS]
-            command.clear_screen()
 
-            alive_hosts = network.get_live_ips()
-            print(f"Scanned [ {network.hosts} ] hosts")
-            pprint(alive_hosts)
-
-            # internal.save_live_hosts_to_host(alive_hosts)
+            live_hosts = network.get_live_ips()
+            internal.save_live_hosts_to_host(live_hosts)  # save file
+            print(
+                f"[+] File Location:\n{bcolors.OKGREEN}{filemanager.full_file_path}{bcolors.ENDC}"
+            )
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

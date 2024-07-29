@@ -23,8 +23,6 @@ class InternalPT:
         for host in hosts:
             self.filemanager.save_new_file(self.output_file, host)
 
-        # TODO: display to the user scan progress
-        # return alive_hosts
 
     def resume_scan_from_file(self, file):
         """Resumes scan from file with previously stored IPs"""

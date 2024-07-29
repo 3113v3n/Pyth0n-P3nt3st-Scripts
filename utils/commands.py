@@ -18,8 +18,6 @@ class Commands:
             shell=True,
             text=True,
         )
-        # if result.returncode == 0:
-        #     print(result.stdout.strip())
         return result
 
     def auto_enter_commands(self, command):
@@ -50,13 +48,8 @@ class Commands:
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
-            print(
-                f"{self.colors.OKGREEN}{self.colors.BOLD}[+] {host}{self.colors.ENDC}"
-            )
             return True
         except subprocess.CalledProcessError:
-            # If ping fails (non-zero exit code), return False
-            print(f"{self.colors.FAIL}{self.colors.BOLD}[-] {host}{self.colors.ENDC}")
             return False
 
         except Exception as e:
