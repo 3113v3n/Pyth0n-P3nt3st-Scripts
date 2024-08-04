@@ -1,6 +1,7 @@
 import os, glob
 from datetime import datetime
 from pathlib import Path
+from pprint import pprint
 
 
 class FileHandler:
@@ -13,6 +14,7 @@ class FileHandler:
             f"{self.working_dir}/output_directory"  # directory to save our output files
         )
         self.full_file_path = ""  # full path to saved file
+        self.files = []
 
     def update_output_directory(self, domain):
         """
@@ -42,23 +44,36 @@ class FileHandler:
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def find_file(self, filename):
+    def find_files(self):
         """
         Searches for a file in the given directory and its subdirectories.
 
-        :param filename: Name of the file to search for.
         :param search_path: Directory to start the search from.
-        :return: Full path of the file if found, None otherwise.
+        :return: Full path of the files if found, None otherwise.
         """
-        for root, dirs, files in os.walk(f"{self.output_directory}"):
-            #print(glob.glob(f"{filename}" + "*.txt"))
-            if filename in files:
-                return os.path.join(root, filename)
-        return None
 
-    def get_file_from_partial(self, partial_name):
-        """get full file name from a partial name provided"""
-        print(self.working_dir)
+        for root, dirs, files in os.walk(f"{self.output_directory}"):
+            for file in files:
+                file_object = {"filename": "", "full_path": ""}
+                file_object["filename"] = file
+                file_object["full_path"] = os.path.join(root, file)
+                self.files.append(file_object)
+        # return self.files
+
+    def display_saved_files(self) -> list:
+        """Display to the user a list of files available"""
+        self.find_files()
+        for index in range(len(self.files)):
+            print(f"Enter [{index}] to select {self.files[index]['filename']}")
+        # prompt user for filename from the displayed list and use that to get the full path
+        return self.get_last_ip()
+
+    def get_last_ip(self):
+        """Returns the IP address from a file input"""
+        selected_file = input("\nPlease enter the file number displayed above: ")
+        self.full_file_path = self.files[int(selected_file)]["full_path"]
+        starting_ip = self.read_last_line(self.full_file_path)
+        return starting_ip
 
     def read_last_line(self, filename) -> str:
         """

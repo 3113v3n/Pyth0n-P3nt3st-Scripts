@@ -1,8 +1,9 @@
-import curses
+from curses import wrapper
 import time
 from tqdm import tqdm
 from utils.progress_bar import ProgressBar
 from utils.commands import Commands
+
 
 class NetworkHandler:
     """Class will handle any logic necessary for network operations"""
@@ -35,7 +36,7 @@ class NetworkHandler:
         self.progress_bar = ProgressBar(self.hosts)
 
     def get_live_ips(self) -> list:
-        curses.wrapper(self.show_progress)
+        wrapper(self.show_progress)
         return self.progress_bar.live_hosts
 
     def show_progress(self, stdscr):

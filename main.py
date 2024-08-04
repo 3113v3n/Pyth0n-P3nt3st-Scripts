@@ -31,7 +31,7 @@ network = NetworkHandler()
 
 
 # [penetration Testing domains]
-internal = InternalPT(filemanager=filemanager, colors=bcolors)
+internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
 
 
 def packages_present() -> bool:
@@ -60,10 +60,12 @@ def user_interactions():
                 output_file=user.domain_variables["output"],
             )
             # TODO: [WORK IN PROGRESS]
-
-            internal.save_live_hosts_to_host(
-                network.get_live_ips()
-            )  # save live hosts to file
+            if internal.mode == "scan":
+                internal.save_live_hosts_to_host(
+                    network.get_live_ips()
+                )  # save live hosts to file
+            elif internal.mode == "resume":
+                internal.resume_scan_from_file()
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
