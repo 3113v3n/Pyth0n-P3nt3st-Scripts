@@ -1,4 +1,5 @@
 import curses
+from handlers.file_handler import FileHandler
 
 
 class ProgressBar:
@@ -8,9 +9,10 @@ class ProgressBar:
         self.live_hosts = []
         self.unresponsive_hosts = []
 
-    def update_ips(self, stdscr, ip, is_alive):
+    def update_ips(self, filemanager: FileHandler, output_file, stdscr, ip, is_alive):
         if is_alive:
             self.live_hosts.append(ip)
+            filemanager.save_new_file(output_file, ip)
         else:
             self.unresponsive_hosts.append(ip)
         self.total_scanned += 1

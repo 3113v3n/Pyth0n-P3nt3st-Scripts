@@ -27,7 +27,7 @@ filemanager = FileHandler()
 user = UserHandler(filemanager, validator, bcolors)
 
 ## Handles network related operations
-network = NetworkHandler()
+network = NetworkHandler(filemanager)
 
 
 # [penetration Testing domains]
@@ -60,12 +60,8 @@ def user_interactions():
                 output_file=user.domain_variables["output"],
             )
             # TODO: [WORK IN PROGRESS]
-            if internal.mode == "scan":
-                internal.save_live_hosts_to_host(
-                    network.get_live_ips()
-                )  # save live hosts to file
-            elif internal.mode == "resume":
-                internal.resume_scan_from_file()
+            # Start scan to save live Ips
+            internal.save_live_hosts_to_file()
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

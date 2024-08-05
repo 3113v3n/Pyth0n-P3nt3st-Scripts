@@ -8,7 +8,7 @@ from utils.commands import Commands
 class NetworkHandler:
     """Class will handle any logic necessary for network operations"""
 
-    def __init__(self) -> None:
+    def __init__(self, filemanager) -> None:
         # subnet range
         self.subnet = ""
         # Number of hosts within the network
@@ -24,6 +24,7 @@ class NetworkHandler:
         # Shell commands
         self.os_commands = Commands()
         self.progress_bar = ""
+        self.filemanager = filemanager
 
     def initialize_network_variables(self, variables):
         # initialize the class variables with user variables
@@ -35,11 +36,37 @@ class NetworkHandler:
         self.host_bits = network_info["host_bits"]
         self.progress_bar = ProgressBar(self.hosts)
 
-    def get_live_ips(self) -> list:
-        wrapper(self.show_progress)
+    def get_live_ips(self, mode, output) -> list:
+        wrapper(self.show_progress, mode, output)
         return self.progress_bar.live_hosts
 
-    def show_progress(self, stdscr):
+    def show_progress(self, stdscr, mode, output):
+
+        octets = self.user_ip_addr.split(".")
+        if mode == "scan":
+            self.scan_network(
+                stdscr=stdscr,
+                octets=octets,
+                x_range=256,
+                y_range=256,
+                z_range=256,
+                output_file=output,
+            )
+        else:
+            # increment the scan start ip by 1 depending on the selected network range
+            x_plus_1 = int(octets[3]) + 1
+            y_plus_1 = int(octets[2]) + 1
+            z_plus_1 = int(octets[1]) + 1
+            self.scan_network(
+                stdscr=stdscr,
+                octets=octets,
+                x_range=(x_plus_1, 256),
+                y_range=(y_plus_1, 256),
+                z_range=(z_plus_1, 256),
+                output_file=output,
+            )
+
+    def scan_network(self, stdscr, octets, x_range, y_range, z_range, output_file):
         """
         Splits the user provided IP into 4 octets and determines
         which octet to iterate over depending on the remaining subnet bits
@@ -52,43 +79,46 @@ class NetworkHandler:
             xxxxxxxx.xxxxxxxx.yyyyyyyy.yyyyyyyy
             scanning octet = octet[2] and octet[3]
         """
-
-        octets = self.user_ip_addr.split(".")
         # Host bits
         if self.host_bits <= 8:
             # Example: 192.168.10.X
             base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
-            for x in tqdm(range(256), desc="Scanning Network", leave=False):
+            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
                 self.configure_progress_bar(
-                    stdscr,
-                    ip=f"{base_ip}.{x}",
+                    stdscr=stdscr, output_file=output_file, ip=f"{base_ip}.{x}"
                 )
         # Host bits > 8 and <= 16
         elif 16 >= self.host_bits > 8:
             # Example: 192.168.X.X
             base_ip = f"{octets[0]}.{octets[1]}"
-            for x in tqdm(range(256), desc="Scanning Network", leave=False):
-                for y in range(256):
+            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
+                for y in range(z_range):
                     self.configure_progress_bar(
-                        stdscr,
-                        ip=f"{base_ip}.{x}.{y}",
+                        stdscr=stdscr, output_file=output_file, ip=f"{base_ip}.{x}.{y}"
                     )
 
         # Host bits > 16 and <= 24
         elif 24 >= self.host_bits > 16:
             # Example: 192.X.X.X
             base_ip = f"{octets[0]}"
-            for x in tqdm(range(256), desc="Scanning Network", leave=False):
-                for y in range(256):
-                    for z in range(256):
+            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
+                for y in range(z_range):
+                    for z in range(y_range):
                         self.configure_progress_bar(
-                            stdscr,
+                            stdscr=stdscr,
+                            output_file=output_file,
                             ip=f"{base_ip}.{x}.{y}.{z}",
                         )
 
-    def configure_progress_bar(self, stdscr, ip):
+    def configure_progress_bar(self, stdscr, ip, output_file):
         is_alive = self.os_commands.ping_hosts(ip)
-        self.progress_bar.update_ips(stdscr=stdscr, ip=ip, is_alive=is_alive)
+        self.progress_bar.update_ips(
+            self.filemanager,
+            output_file=output_file,
+            stdscr=stdscr,
+            ip=ip,
+            is_alive=is_alive,
+        )
         time.sleep(0.01)
 
 
