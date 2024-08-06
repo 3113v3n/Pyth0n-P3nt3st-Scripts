@@ -23,16 +23,11 @@ class InternalPT:
         else:
             self.output_file = output_file
 
-    def save_live_hosts_to_file(self):
-        """Save Live Hosts to file"""
-        hosts = self.network.get_live_ips(self.mode,self.output_file)
-        # if len(hosts) != 0:
-        #     for host in hosts:
-        #         self.filemanager.save_new_file(self.output_file, host)
-        #     print(
-        #         f"[+] File Location:\n{self.bcolors.OKGREEN}{self.filemanager.full_file_path}{self.bcolors.ENDC}"
-        #     )
-
-    def resume_scan_from_file(self):
-        """Resumes scan from file with previously stored IPs"""
-        print(f"\n{self.mode}\n{self.output_file}")
+    def enumerate_hosts(self):
+        """Enumerates all possible hosts on a network using ICMP protocol
+        In order to increase your attack surface
+        """
+        self.network.get_live_ips(mode=self.mode, output=self.output_file)
+        print(
+            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC} \n{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.output_file}{self.bcolors.ENDC}"
+        )
