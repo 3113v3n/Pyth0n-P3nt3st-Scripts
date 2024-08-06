@@ -1,5 +1,3 @@
-from pprint import pprint
-
 # [Utils]
 from utils.colors import bcolors
 from utils.validators import InputValidators
@@ -21,7 +19,7 @@ validator = InputValidators()
 package = PackageHandler()
 
 ## Handles file management
-filemanager = FileHandler()
+filemanager = FileHandler(bcolors)
 
 ## gathers user input
 user = UserHandler(filemanager, validator, bcolors)
@@ -40,18 +38,16 @@ def packages_present() -> bool:
         print(f"{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         return True
     else:
-
         print(
             f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
         )
         package.install_packages(package.to_install)
-
     return True
 
 
 def user_interactions():
 
-    match user.domain:  # one of Internal | Mobile | External
+    match user.get_user_domain():  # one of Internal | Mobile | External
         case "internal":
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(user.domain_variables)
@@ -61,8 +57,7 @@ def user_interactions():
             )
             # TODO: [WORK IN PROGRESS]
             # Start scan to save live Ips
-            internal.save_live_hosts_to_file()
-
+            internal.enumerate_hosts()
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
             pass
