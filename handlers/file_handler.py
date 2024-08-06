@@ -2,12 +2,13 @@ import os, glob
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
+from utils.colors import bcolors
 
 
 class FileHandler:
     """Handle File operations"""
 
-    def __init__(self) -> None:
+    def __init__(self, colors: bcolors) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
@@ -15,6 +16,7 @@ class FileHandler:
         )
         self.full_file_path = ""  # full path to saved file
         self.files = []
+        self.colors = colors
 
     def update_output_directory(self, domain):
         """
@@ -41,7 +43,7 @@ class FileHandler:
 
     def append_file(self, filename, content):
         """Update existing file"""
-        with open(f"{self.output_directory}/{filename}", "a") as file:
+        with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
 
     def find_files(self):
@@ -60,13 +62,19 @@ class FileHandler:
                 self.files.append(file_object)
         # return self.files
 
-    def display_saved_files(self) -> list:
-        """Display to the user a list of files available"""
+    def display_saved_files(self) -> str:
+        """Display to the user a list of files available
+        and returns the last ip present in that file"""
         self.find_files()
-        for index in range(len(self.files)):
-            print(f"Enter [{index}] to select {self.files[index]['filename']}")
-        # prompt user for filename from the displayed list and use that to get the full path
-        return self.get_last_ip()
+        if len(self.files) != 0:
+            for index in range(len(self.files)):
+                print(
+                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index}{self.colors.ENDC}] to select {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
+                )
+                # prompt user for filename from the displayed list and use that to get the full path
+            return self.get_last_ip()
+        else:
+            return None
 
     def get_last_ip(self):
         """Returns the IP address from a file input"""
