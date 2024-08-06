@@ -3,16 +3,26 @@ from handlers.file_handler import FileHandler
 
 
 class ProgressBar:
+    """Display Scan Progress and saves the Live hosts to a file using the
+    Filehandler Module
+    """
+
     def __init__(self, total) -> None:
         self.total_scanned = 0
         self.total_hosts = total
         self.live_hosts = []
         self.unresponsive_hosts = []
 
-    def update_ips(self, filemanager: FileHandler, output_file, stdscr, ip, is_alive):
+    def update_ips(
+        self, filemanager: FileHandler, output_file, stdscr, ip, is_alive, mode
+    ):
         if is_alive:
             self.live_hosts.append(ip)
-            filemanager.save_new_file(output_file, ip)
+            if mode == "scan":
+                filemanager.save_new_file(output_file, ip)
+            elif mode == "resume":
+                # output file is different for resume functionality
+                filemanager.append_file(output_file, ip)
         else:
             self.unresponsive_hosts.append(ip)
         self.total_scanned += 1
