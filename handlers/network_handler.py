@@ -47,10 +47,11 @@ class NetworkHandler:
             self.scan_network(
                 stdscr=stdscr,
                 octets=octets,
-                x_range=256,
-                y_range=256,
-                z_range=256,
+                x_range=0,
+                y_range=0,
+                z_range=0,
                 output_file=output,
+                mode=mode,
             )
         else:
             # increment the scan start ip by 1 depending on the selected network range
@@ -60,13 +61,16 @@ class NetworkHandler:
             self.scan_network(
                 stdscr=stdscr,
                 octets=octets,
-                x_range=(x_plus_1, 256),
-                y_range=(y_plus_1, 256),
-                z_range=(z_plus_1, 256),
+                x_range=x_plus_1,
+                y_range=y_plus_1,
+                z_range=z_plus_1,
                 output_file=output,
+                mode=mode,
             )
 
-    def scan_network(self, stdscr, octets, x_range, y_range, z_range, output_file):
+    def scan_network(
+        self, stdscr, octets, x_range, y_range, z_range, output_file, mode
+    ):
         """
         Splits the user provided IP into 4 octets and determines
         which octet to iterate over depending on the remaining subnet bits
@@ -83,34 +87,41 @@ class NetworkHandler:
         if self.host_bits <= 8:
             # Example: 192.168.10.X
             base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
-            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
+            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
                 self.configure_progress_bar(
-                    stdscr=stdscr, output_file=output_file, ip=f"{base_ip}.{x}"
+                    stdscr=stdscr,
+                    output_file=output_file,
+                    ip=f"{base_ip}.{x}",
+                    mode=mode,
                 )
         # Host bits > 8 and <= 16
         elif 16 >= self.host_bits > 8:
             # Example: 192.168.X.X
             base_ip = f"{octets[0]}.{octets[1]}"
-            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
-                for y in range(z_range):
+            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
+                for y in range(z_range, 256):
                     self.configure_progress_bar(
-                        stdscr=stdscr, output_file=output_file, ip=f"{base_ip}.{x}.{y}"
+                        stdscr=stdscr,
+                        output_file=output_file,
+                        ip=f"{base_ip}.{x}.{y}",
+                        mode=mode,
                     )
 
         # Host bits > 16 and <= 24
         elif 24 >= self.host_bits > 16:
             # Example: 192.X.X.X
             base_ip = f"{octets[0]}"
-            for x in tqdm(range(x_range), desc="Scanning Network", leave=False):
-                for y in range(z_range):
-                    for z in range(y_range):
+            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
+                for y in range(z_range, 256):
+                    for z in range(y_range, 256):
                         self.configure_progress_bar(
                             stdscr=stdscr,
                             output_file=output_file,
                             ip=f"{base_ip}.{x}.{y}.{z}",
+                            mode=mode,
                         )
 
-    def configure_progress_bar(self, stdscr, ip, output_file):
+    def configure_progress_bar(self, stdscr, ip, output_file, mode):
         is_alive = self.os_commands.ping_hosts(ip)
         self.progress_bar.update_ips(
             self.filemanager,
@@ -118,6 +129,7 @@ class NetworkHandler:
             stdscr=stdscr,
             ip=ip,
             is_alive=is_alive,
+            mode=mode,
         )
         time.sleep(0.01)
 
