@@ -16,7 +16,5 @@ class ExternalPT:
 
     def bbot_enum(self, output_dir):
         self.command.auto_enter_commands(
-            f"bbot -t {self.target_domain} -f subdomain-enum\
-                email-enum cloud-enum web-basic -m nmap\
-                    gowitness nuclei --allow-deadly -o {output_dir}"
+            f"bbot -t {self.target_domain} -f subdomain-enum email-enum cloud-enum web-basic -m nmap gowitness nuclei --allow-deadly -o {output_dir}"
         )

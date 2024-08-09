@@ -29,9 +29,7 @@ class InternalPT:
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
         print(
-            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC} \n\
-                {self.bcolors.BOLD}{self.bcolors.OKGREEN}\
-                {self.output_file}{self.bcolors.ENDC}"
+            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.output_file}{self.bcolors.ENDC}"
         )
     # Using CrackmapExec / Netexec Module
     ## 1. enum shares

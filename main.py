@@ -39,8 +39,7 @@ def packages_present() -> bool:
         return True
     else:
         print(
-            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as\
-            we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
+            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
         )
         package.install_packages(package.to_install)
     return True

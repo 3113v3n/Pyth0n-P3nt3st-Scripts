@@ -70,10 +70,7 @@ class FileHandler:
         if len(self.files) != 0:
             for index in range(len(self.files)):
                 print(
-                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}\
-                        {index}{self.colors.ENDC}] to select \
-                        {self.colors.BOLD}{self.colors.WARNING}\
-                        {self.files[index]['filename']}{self.colors.ENDC}"
+                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index}{self.colors.ENDC}] to select  {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
                 )
                 # prompt user for filename from the displayed list and use that to get the full path
             return self.get_last_ip()
@@ -89,8 +86,7 @@ class FileHandler:
                 if 0<= selected_file < len(self.files):
                     break 
                 else: 
-                    print(f"{self.colors.FAIL}[!]The file number is out of range. \
-                        Please enter a valid number.{self.colors.ENDC}")
+                    print(f"{self.colors.FAIL}[!]The file number is out of range. Please enter a valid number.{self.colors.ENDC}")
             except ValueError:
                 print(f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}")
             

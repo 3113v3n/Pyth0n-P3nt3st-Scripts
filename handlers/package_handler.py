@@ -8,14 +8,8 @@ class PackageHandler:
     def __init__(self) -> None:
         self.command = Commands()
         self.colors = bcolors
-        self.mobile_packages=[
-            {"name":"dependencies",
-             "command":"apt-get -y install adb dex2jar \
-                 jadx nuclei radare2 sqlite3 sqlitebrowser\
-                     xmlstarlet apksigner zipalign\
-                     pip3 install frida-tools objection file-scraper"}
-        ]
-        self.external_packages = [
+        self.packages=[
+            # External
             {"name": "bbot", "command": "pipx install bbot"},
             {"name": "subfinder", "command": "sudo apt install subfinder"},
             {
@@ -33,52 +27,59 @@ class PackageHandler:
             {"name": "getallurls", "command": "sudo apt install getallurls"},
              {
                 "name": "urlhunter",
-                "command": "go install -v github.com/utkusen/urlhunter@latest && \
-                    sudo cp ~/go/bin/urlhunter /usr/bin",
+                "command": "go install -v github.com/utkusen/urlhunter@latest &&  sudo cp ~/go/bin/urlhunter /usr/bin"
             },
              {
                 "name": "chad",
-                "command": "pip3 install google-chad && \
-                    pip3 install --upgrade google-chad && playwright install chromium",
+                "command": "pip3 install google-chad && pip3 install --upgrade google-chad && playwright install chromium",
             },
             {
                 "name": "snallygaster",
-                "command": "pip3 install snallygaster && \
-                    sudo apt install python3-dnspython python3-urllib3 python3-bs4",
+                "command": "pip3 install snallygaster && sudo apt install python3-dnspython python3-urllib3 python3-bs4",
             },
             {"name": "parsero", "command": "sudo apt install parsero"},
             {
                 "name": "subzy",
-                "command": "go install -v github.com/luKaSikic/subzy@latest && \
-                    sudo cp ~/go/bin/subzy /usr/bin",
+                "command": "go install -v github.com/luKaSikic/subzy@latest && sudo cp ~/go/bin/subzy /usr/bin",
             },
             {
                 "name": "subjack",
-                "command": "go install -v github.com/haccer/subjack@latest && \
-                    sudo cp ~/go/bin/subjack /usr/bin",
+                "command": "go install -v github.com/haccer/subjack@latest && sudo cp ~/go/bin/subjack /usr/bin",
             },
-        ]
-        self.packages = [
-            
+            # Internal
             {
                 "name": "netexec",
-                "command": "sudo apt install pipx git && \
-                    pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
+                "command": "sudo apt install pipx git && pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
             },
            
             {
                 "name": "exiftool",
                 "command": "sudo apt-get -y install libimage-exiftool-perl",
             },
-            
+            # Mobile
+            {
+                "name":"apktool",
+                "command":"sudo apt -y install aapt \
+                wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool \
+                chmod +x apktool && cp apktool /usr/local/bin/apktool \
+                wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar \
+                chmod +x apktool.jar && cp apktool.jar /usr/local/bin/apktool.jar"
+            },
+            {"name":"dependencies",
+             "command":"apt-get -y install \
+                 adb dex2jar jadx nuclei radare2 sqlite3 \
+                     sqlitebrowser xmlstarlet apksigner \
+                         zipalign pip3 install frida-tools objection file-scraper"},
+           
         ]
         self.to_install = self.get_missing_packages()
+        
 
     def get_missing_packages(self) -> list:
         """Returns a list of objects containg missing packages
         that need to be installed and command to in
         stall them"""
-
+       
         return [
             package
             for package in self.packages
