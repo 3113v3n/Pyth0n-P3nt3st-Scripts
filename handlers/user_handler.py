@@ -39,7 +39,8 @@ class UserHandler:
             "allow resume scan from last scanned ip rather than last found ip address)\n"
             "\n Enter mode: ==> "
         )
-        self.wrong_choice = f"\n{self.color.FAIL}[!]{self.color.ENDC} Please select one of: [ {self.color.OKCYAN}SCAN | RESUME{self.color.ENDC} ]"
+        self.wrong_choice = f"\n{self.color.FAIL}[!]{self.color.ENDC} \
+            Please select one of: [ {self.color.OKCYAN}SCAN | RESUME{self.color.ENDC} ]"
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
@@ -52,16 +53,17 @@ class UserHandler:
         return self.domain
 
     def get_user_subnet(self):
-
-        print(f"Running Internal PT modules")
-        subnet = input(f"\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
-
         # Validate subnet provided
 
-        while not self.validator.validate_cidr(subnet):
-            subnet = input(
-                f"\n[+] Please provide an IP in the following format [10.0.0.0/24]\n"
-            )
+        while True:
+            try:
+                subnet = input(f"\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
+                if  self.validator.validate_cidr(subnet):
+                    break 
+                else:
+                    raise ValueError(" Invalid IP address format provided")
+            except ValueError as error:
+                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
         return subnet
 
     def set_domain_variables(self, test_domain):
@@ -81,6 +83,8 @@ class UserHandler:
                 self.domain_variables = {"package_name": package_name}
                 return self.domain_variables
             case "internal":
+                
+                print(f"Running Internal PT modules")
                 subnet = self.get_user_subnet()
                 mode = input(self.mode_text).lower()
 
@@ -107,7 +111,7 @@ class UserHandler:
                             f"{self.color.FAIL}[!] Cant use this module, {error}{self.color.ENDC}"
                         )
                         print(
-                            f"Defaulting to {self.color.OKCYAN}SCAN{self.color.ENDC} mode"
+                            f"\nDefaulting to {self.color.OKCYAN}SCAN{self.color.ENDC} mode"
                         )
                         mode = "scan"
                         subnet = self.get_user_subnet()

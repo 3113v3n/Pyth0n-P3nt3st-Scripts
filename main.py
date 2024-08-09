@@ -39,7 +39,8 @@ def packages_present() -> bool:
         return True
     else:
         print(
-            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
+            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as\
+            we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
         )
         package.install_packages(package.to_install)
     return True
@@ -73,7 +74,8 @@ def user_interactions():
 
 def main():
     """
-    Run different modules depending on the various domains i.e Internal Mobile and External
+    Run different modules depending on the various domains 
+    i.e Internal Mobile and External
     """
     if packages_present():
         # start our pentest

@@ -17,6 +17,7 @@ class FileHandler:
         self.full_file_path = ""  # full path to saved file
         self.files = []
         self.colors = colors
+        
 
     def update_output_directory(self, domain):
         """
@@ -69,7 +70,10 @@ class FileHandler:
         if len(self.files) != 0:
             for index in range(len(self.files)):
                 print(
-                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index}{self.colors.ENDC}] to select {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
+                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}\
+                        {index}{self.colors.ENDC}] to select \
+                        {self.colors.BOLD}{self.colors.WARNING}\
+                        {self.files[index]['filename']}{self.colors.ENDC}"
                 )
                 # prompt user for filename from the displayed list and use that to get the full path
             return self.get_last_ip()
@@ -78,8 +82,19 @@ class FileHandler:
 
     def get_last_ip(self):
         """Returns the IP address from a file input"""
-        selected_file = input("\nPlease enter the file number displayed above: ")
-        self.full_file_path = self.files[int(selected_file)]["full_path"]
+        while True:
+            # Error handling
+            try:
+                selected_file = int(input("\nPlease enter the file number displayed above: "))
+                if 0<= selected_file < len(self.files):
+                    break 
+                else: 
+                    print(f"{self.colors.FAIL}[!]The file number is out of range. \
+                        Please enter a valid number.{self.colors.ENDC}")
+            except ValueError:
+                print(f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}")
+            
+        self.full_file_path = self.files[selected_file]["full_path"]
         starting_ip = self.read_last_line(self.full_file_path)
         return starting_ip
 

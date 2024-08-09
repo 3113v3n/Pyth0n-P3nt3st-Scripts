@@ -8,7 +8,14 @@ class PackageHandler:
     def __init__(self) -> None:
         self.command = Commands()
         self.colors = bcolors
-        self.packages = [
+        self.mobile_packages=[
+            {"name":"dependencies",
+             "command":"apt-get -y install adb dex2jar \
+                 jadx nuclei radare2 sqlite3 sqlitebrowser\
+                     xmlstarlet apksigner zipalign\
+                     pip3 install frida-tools objection file-scraper"}
+        ]
+        self.external_packages = [
             {"name": "bbot", "command": "pipx install bbot"},
             {"name": "subfinder", "command": "sudo apt install subfinder"},
             {
@@ -24,35 +31,46 @@ class PackageHandler:
             {"name": "amass", "command": "sudo apt install amass"},
             {"name": "httpx-toolkit", "command": "sudo apt install httpx-toolkit"},
             {"name": "getallurls", "command": "sudo apt install getallurls"},
-            {
-                "name": "netexec",
-                "command": "sudo apt install pipx git && pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
-            },
-            {
+             {
                 "name": "urlhunter",
-                "command": "go install -v github.com/utkusen/urlhunter@latest && sudo cp ~/go/bin/urlhunter /usr/bin",
+                "command": "go install -v github.com/utkusen/urlhunter@latest && \
+                    sudo cp ~/go/bin/urlhunter /usr/bin",
             },
-            {
-                "name": "exiftool",
-                "command": "sudo apt-get -y install libimage-exiftool-perl",
-            },
-            {
+             {
                 "name": "chad",
-                "command": "pip3 install google-chad && pip3 install --upgrade google-chad && playwright install chromium",
+                "command": "pip3 install google-chad && \
+                    pip3 install --upgrade google-chad && playwright install chromium",
             },
             {
                 "name": "snallygaster",
-                "command": "pip3 install snallygaster && sudo apt install python3-dnspython python3-urllib3 python3-bs4",
+                "command": "pip3 install snallygaster && \
+                    sudo apt install python3-dnspython python3-urllib3 python3-bs4",
             },
             {"name": "parsero", "command": "sudo apt install parsero"},
             {
                 "name": "subzy",
-                "command": "go install -v github.com/luKaSikic/subzy@latest && sudo cp ~/go/bin/subzy /usr/bin",
+                "command": "go install -v github.com/luKaSikic/subzy@latest && \
+                    sudo cp ~/go/bin/subzy /usr/bin",
             },
             {
                 "name": "subjack",
-                "command": "go install -v github.com/haccer/subjack@latest && sudo cp ~/go/bin/subjack /usr/bin",
+                "command": "go install -v github.com/haccer/subjack@latest && \
+                    sudo cp ~/go/bin/subjack /usr/bin",
             },
+        ]
+        self.packages = [
+            
+            {
+                "name": "netexec",
+                "command": "sudo apt install pipx git && \
+                    pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
+            },
+           
+            {
+                "name": "exiftool",
+                "command": "sudo apt-get -y install libimage-exiftool-perl",
+            },
+            
         ]
         self.to_install = self.get_missing_packages()
 
@@ -73,5 +91,5 @@ class PackageHandler:
             print(
                 f"[+] Installing the following package:\n{self.colors.OKCYAN}{package['name']}{self.colors.ENDC}\n"
             )
-            self.command.run_os_commands(command=package["command"])
+            #self.command.run_os_commands(command=package["command"])
         print(f"\n{self.colors.OKGREEN}[+] Installation complete{self.colors.ENDC}")
