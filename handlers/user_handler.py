@@ -49,7 +49,7 @@ class UserHandler:
         while user_input not in self.default_test_domains:
             user_input = input(self.incase_of_error)
         self.domain = user_input.lower()
-        self.set_domain_variables(self.domain)
+        #self.set_domain_variables(self.domain)
         return self.domain
 
     def get_user_subnet(self):
@@ -58,8 +58,8 @@ class UserHandler:
         while True:
             try:
                 subnet = input(f"\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
-                if  self.validator.validate_cidr(subnet):
-                    break 
+                if self.validator.validate_cidr(subnet):
+                    break
                 else:
                     raise ValueError(" Invalid IP address format provided")
             except ValueError as error:
@@ -83,7 +83,7 @@ class UserHandler:
                 self.domain_variables = {"package_name": package_name}
                 return self.domain_variables
             case "internal":
-                
+
                 print(f"Running Internal PT modules")
                 subnet = self.get_user_subnet()
                 mode = input(self.mode_text).lower()

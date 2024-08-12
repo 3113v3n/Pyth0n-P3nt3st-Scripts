@@ -32,22 +32,25 @@ network = NetworkHandler(filemanager)
 internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
 
 
+user_test_domain = user.get_user_domain()
+
+
 def packages_present() -> bool:
     # check if package list contains any missing packages
-    if len(package.to_install) == 0:
-        print(f"{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
+    if len(package.get_missing_packages(user_test_domain)) == 0:
+        print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         return True
     else:
         print(
-            f"{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.to_install)} package(s)..{bcolors.ENDC}"
+            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.get_missing_packages(user_test_domain))} package(s)..{bcolors.ENDC}"
         )
-        package.install_packages(package.to_install)
+        package.install_packages(package.get_missing_packages(user_test_domain))
     return True
 
 
 def user_interactions():
-
-    match user.get_user_domain():  # one of Internal | Mobile | External
+    user.set_domain_variables(user_test_domain)
+    match user_test_domain:  # one of Internal | Mobile | External
         case "internal":
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(user.domain_variables)
@@ -73,7 +76,7 @@ def user_interactions():
 
 def main():
     """
-    Run different modules depending on the various domains 
+    Run different modules depending on the various domains
     i.e Internal Mobile and External
     """
     if packages_present():

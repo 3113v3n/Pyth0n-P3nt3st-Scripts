@@ -17,7 +17,6 @@ class FileHandler:
         self.full_file_path = ""  # full path to saved file
         self.files = []
         self.colors = colors
-        
 
     def update_output_directory(self, domain):
         """
@@ -82,14 +81,20 @@ class FileHandler:
         while True:
             # Error handling
             try:
-                selected_file = int(input("\nPlease enter the file number displayed above: "))
-                if 0<= selected_file < len(self.files):
-                    break 
-                else: 
-                    print(f"{self.colors.FAIL}[!]The file number is out of range. Please enter a valid number.{self.colors.ENDC}")
+                selected_file = int(
+                    input("\nPlease enter the file number displayed above: ")
+                )
+                if 0 <= selected_file < len(self.files):
+                    break
+                else:
+                    print(
+                        f"{self.colors.FAIL}[!]The file number is out of range. Please enter a valid number.{self.colors.ENDC}"
+                    )
             except ValueError:
-                print(f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}")
-            
+                print(
+                    f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}"
+                )
+
         self.full_file_path = self.files[selected_file]["full_path"]
         starting_ip = self.read_last_line(self.full_file_path)
         return starting_ip

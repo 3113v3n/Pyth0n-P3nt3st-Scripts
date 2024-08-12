@@ -17,7 +17,7 @@ class MobilePT:
         self.command.run_os_commands(
             f"adb shell cmd package list packages | grep ${self.package_name}"
         )
-    
+
     """ Bypass permission denied
     adb shell su -c 'cat ~/somefile.txt' > somefile.txt
 

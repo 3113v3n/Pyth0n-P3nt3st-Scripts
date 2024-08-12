@@ -31,12 +31,12 @@ class InternalPT:
         print(
             f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.output_file}{self.bcolors.ENDC}"
         )
+
     # Using CrackmapExec / Netexec Module
     ## 1. enum shares
     ## 2. enum users
     ## 3. Pass policy
     ## 4. Dumps
-    ## 5. SMB relay 
-    
+    ## 5. SMB relay
+
     # BloodHound
-     

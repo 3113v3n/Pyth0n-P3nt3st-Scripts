@@ -8,7 +8,7 @@ class PackageHandler:
     def __init__(self) -> None:
         self.command = Commands()
         self.colors = bcolors
-        self.packages=[
+        self.external_packages = [
             # External
             {"name": "bbot", "command": "pipx install bbot"},
             {"name": "subfinder", "command": "sudo apt install subfinder"},
@@ -25,11 +25,11 @@ class PackageHandler:
             {"name": "amass", "command": "sudo apt install amass"},
             {"name": "httpx-toolkit", "command": "sudo apt install httpx-toolkit"},
             {"name": "getallurls", "command": "sudo apt install getallurls"},
-             {
+            {
                 "name": "urlhunter",
-                "command": "go install -v github.com/utkusen/urlhunter@latest &&  sudo cp ~/go/bin/urlhunter /usr/bin"
+                "command": "go install -v github.com/utkusen/urlhunter@latest &&  sudo cp ~/go/bin/urlhunter /usr/bin",
             },
-             {
+            {
                 "name": "chad",
                 "command": "pip3 install google-chad && pip3 install --upgrade google-chad && playwright install chromium",
             },
@@ -46,44 +46,52 @@ class PackageHandler:
                 "name": "subjack",
                 "command": "go install -v github.com/haccer/subjack@latest && sudo cp ~/go/bin/subjack /usr/bin",
             },
+        ]
+        self.internal_packages = [
             # Internal
             {
                 "name": "netexec",
                 "command": "sudo apt install pipx git && pipx ensurepath && pipx install git+https://github.com/Pennyw0rth/NetExec",
             },
-           
             {
                 "name": "exiftool",
                 "command": "sudo apt-get -y install libimage-exiftool-perl",
             },
+        ]
+        self.mobile_packages = [
             # Mobile
             {
-                "name":"apktool",
-                "command":"sudo apt -y install aapt \
+                "name": "apktool",
+                "command": "sudo apt -y install aapt \
                 wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool \
                 chmod +x apktool && cp apktool /usr/local/bin/apktool \
                 wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar \
-                chmod +x apktool.jar && cp apktool.jar /usr/local/bin/apktool.jar"
+                chmod +x apktool.jar && cp apktool.jar /usr/local/bin/apktool.jar",
             },
-            {"name":"dependencies",
-             "command":"apt-get -y install \
+            {
+                "name": "dependencies",
+                "command": "apt-get -y install \
                  adb dex2jar jadx nuclei radare2 sqlite3 \
                      sqlitebrowser xmlstarlet apksigner \
-                         zipalign pip3 install frida-tools objection file-scraper"},
-           
+                         zipalign pip3 install frida-tools objection file-scraper",
+            },
         ]
-        self.to_install = self.get_missing_packages()
-        
 
-    def get_missing_packages(self) -> list:
+    def get_missing_packages(self, test_domain) -> list:
         """Returns a list of objects containg missing packages
         that need to be installed and command to in
         stall them"""
-       
+        if test_domain == "mobile":
+            packages = self.mobile_packages
+        elif test_domain == "internal":
+            packages = self.internal_packages
+        elif test_domain == "external":
+            packages = self.external_packages
+
         return [
             package
-            for package in self.packages
-            if self.command.run_os_commands(f"which {package['name']}").returncode != 0
+            for package in packages
+            if self.command.run_os_commands(f"which {package['name']}").returncode == 0
         ]
 
     def install_packages(self, packages):
@@ -92,5 +100,5 @@ class PackageHandler:
             print(
                 f"[+] Installing the following package:\n{self.colors.OKCYAN}{package['name']}{self.colors.ENDC}\n"
             )
-            #self.command.run_os_commands(command=package["command"])
+            # self.command.run_os_commands(command=package["command"])
         print(f"\n{self.colors.OKGREEN}[+] Installation complete{self.colors.ENDC}")
