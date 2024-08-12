@@ -113,6 +113,10 @@ class FileHandler:
                 file.seek(0)
             last_line = file.readline().decode()
         return last_line
+    
+    def read_all_lines(self,file):
+        with open(file,"r")as file:
+            return file.readlines()
 
     def generate_unique_name(self, file) -> str:
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")

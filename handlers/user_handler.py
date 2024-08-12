@@ -18,12 +18,12 @@ class UserHandler:
         self.domain_variables = ""
 
         self.OPTIONS = (
-            f"[ {self.color.HEADER}Mobile📱{self.color.ENDC} | "
-            f"{self.color.HEADER}Internal 🖥️{self.color.ENDC} | "
-            f"{self.color.HEADER}External 🌐{self.color.ENDC} ]\n"
+            f"\n1. {self.color.OKGREEN}Mobile   Penetration Testing   📱{self.color.ENDC}  "
+            f"\n2. {self.color.OKGREEN}Internal Penetration Testing   🖥️{self.color.ENDC} "
+            f"\n3. {self.color.OKGREEN}External Penetration Testing   🌐{self.color.ENDC} \n"
         )
         self.formatted_question = (
-            f"\nWhat domain do you want to test?" f"{self.OPTIONS}"
+            f"\nWhat task do you want to perform?" f"{self.OPTIONS}"
         )
         self.incase_of_error = (
             f"\n{self.color.FAIL}[!]{self.color.ENDC} Please choose one of: "

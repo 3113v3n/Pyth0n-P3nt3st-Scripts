@@ -38,5 +38,9 @@ class InternalPT:
     ## 3. Pass policy
     ## 4. Dumps
     ## 5. SMB relay
+    ## 6. Compare Hashes
+    
 
     # BloodHound
+    # secrets dump
+   
