@@ -1,17 +1,13 @@
 # [Utils]
-from utils.colors import bcolors
-from utils.validators import InputValidators
+from utils import bcolors, InputValidators
 
 # [Handlers]
-from handlers.user_handler import UserHandler
-from handlers.package_handler import PackageHandler
-from handlers.file_handler import FileHandler
-from handlers.network_handler import NetworkHandler
+from handlers import (
+    UserHandler, PackageHandler, FileHandler, NetworkHandler
+)
 
 # [Test Domains]
-from domains.external_pt import ExternalPT
-from domains.internal_pt import InternalPT
-from domains.mobile_pt import MobilePT
+from domains import (ExternalPT, InternalPT, MobilePT)
 
 # Initializers
 validator = InputValidators()
