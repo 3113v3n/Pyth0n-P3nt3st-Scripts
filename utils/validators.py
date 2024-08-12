@@ -1,10 +1,11 @@
 import re
 
 
-class Validators:
+class InputValidators:
     """Class runs validation checks on user provided input"""
+
     def __init__(self) -> None:
-        pass
+        self.something = "validators"
 
     def validate_cidr(self, cidr) -> bool:
         # 10.0.0.1/8
