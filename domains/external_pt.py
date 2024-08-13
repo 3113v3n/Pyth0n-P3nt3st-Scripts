@@ -1,4 +1,4 @@
-from utils import bcolors, Commands
+from utils.shared import bcolors, Commands
 
 
 class ExternalPT:

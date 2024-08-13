@@ -2,14 +2,13 @@ import os
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
-from utils import bcolors
 import pandas
 
 
 class FileHandler:
     """Handle File operations"""
 
-    def __init__(self, colors: bcolors) -> None:
+    def __init__(self, colors,validator) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
@@ -18,6 +17,7 @@ class FileHandler:
         self.full_file_path = ""  # full path to saved file
         self.files = []
         self.colors = colors
+        self.validator = validator
 
     def update_output_directory(self, domain):
         """
@@ -50,7 +50,7 @@ class FileHandler:
 
         data = pandas.DataFrame({"Live IP Addresses": [content]})
 
-        if os.path.exists(f"{self.full_file_path}"):
+        if self.validator.file_exists(f"{self.full_file_path}"):
             existing_df = pandas.read_csv(f"{self.full_file_path}")
 
             updated_df = pandas.concat([existing_df, data], ignore_index=True)

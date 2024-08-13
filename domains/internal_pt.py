@@ -10,14 +10,14 @@ class InternalPT:
         filemanager: FileHandler,
         network: NetworkHandler,
         colors: bcolors,
-        netexec: NetExec,
+
     ) -> None:
         self.output_file = "sample.txt"
         self.mode = "SCAN"
         self.filemanager = filemanager
         self.bcolors = colors
         self.network = network
-        self.nc = netexec
+       
 
     def initialize_variables(self, mode, output_file):
         # Sets user provided values
@@ -43,11 +43,9 @@ class InternalPT:
         ## 3. Pass policy
         ## 4. Dumps
         ## 5. SMB relay
-        def gen_smb_list(input, output):
-            return self.nc.gen_relay_list(input, output)
-
         ## 6. Compare Hashes
-        return {"relay-list": self.gen_smb_list}
+        pass
+        
 
     # BloodHound
     # secrets dump

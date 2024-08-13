@@ -1,6 +1,6 @@
 # [Utils]
 
-from utils import bcolors, InputValidators, NetExec, Commands
+from utils import bcolors, InputValidators, Commands
 
 # [Handlers]
 from handlers import UserHandler, PackageHandler, FileHandler, NetworkHandler
@@ -14,7 +14,7 @@ validator = InputValidators()
 package = PackageHandler(Commands, bcolors)
 
 ## Handles file management
-filemanager = FileHandler(bcolors)
+filemanager = FileHandler(bcolors,validator=validator)
 
 ## gathers user input
 user = UserHandler(filemanager, validator, bcolors)
@@ -22,11 +22,10 @@ user = UserHandler(filemanager, validator, bcolors)
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
-nc = NetExec()
 
 # [penetration Testing domains]
 internal = InternalPT(
-    netexec=nc, filemanager=filemanager, network=network, colors=bcolors
+     filemanager=filemanager, network=network, colors=bcolors
 )
 
 user_test_domain = user.get_user_domain()

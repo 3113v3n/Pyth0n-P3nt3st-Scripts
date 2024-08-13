@@ -1,13 +1,10 @@
-from handlers import FileHandler
-from utils import InputValidators
-
 
 class UserHandler:
     """Class will be responsible for handling user interactions with
     The different domains"""
 
     def __init__(
-        self, filemanager: FileHandler, validator: InputValidators, bcolors
+        self, filemanager,  validator, bcolors
     ) -> None:
         self.default_test_domains = ["mobile", "internal", "external"]
         self.color = bcolors

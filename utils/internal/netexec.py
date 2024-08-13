@@ -1,4 +1,4 @@
-from utils import Commands
+from utils.shared import Commands
 
 
 class NetExec(Commands):

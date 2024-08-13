@@ -1,8 +1,62 @@
-from curses import wrapper
+import curses 
 import time
 from tqdm import tqdm
 from handlers import FileHandler
-from utils.progress_bar import ProgressBar
+
+class ProgressBar:
+    """Display Scan Progress and saves the Live hosts to a file using the
+    Filehandler Module
+    """
+
+    def __init__(self, total) -> None:
+        self.total_scanned = 0
+        self.total_hosts = total
+        self.live_hosts = []
+        self.unresponsive_hosts = []
+
+    def update_ips(
+        self, filemanager: FileHandler, output_file, stdscr, ip, is_alive, mode
+    ):
+        if is_alive:
+
+            self.live_hosts.append(ip)
+            filemanager.save_to_csv(output_file, ip, mode)
+
+        else:
+            self.unresponsive_hosts.append(ip)
+        self.total_scanned += 1
+        self.display(stdscr)
+
+    def display(self, stdscr):
+        height, width = stdscr.getmaxyx()
+        output_height = height - 3
+        output_width = width * 3 // 4
+        stdscr.clear()
+
+        curses.curs_set(0)
+
+        # Initialize color pairs
+        curses.start_color()
+        curses.init_pair(
+            1, curses.COLOR_GREEN, curses.COLOR_BLACK
+        )  # Alive IPs - green text
+        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+        # Display Alive IPs
+        for idx, host in enumerate(self.live_hosts[-output_height:]):
+            stdscr.addstr(idx, 0, f"[+] {host} ", curses.color_pair(1))
+
+        # Display Dead IPs
+        for idx, dead_ip in enumerate(self.unresponsive_hosts[-output_height:]):
+            stdscr.addstr(
+                idx, output_width // 2, f"[-] {dead_ip}", curses.color_pair(2)
+            )
+
+        # Display Progress Bar
+        progress_message = f"Progress: {self.total_scanned}/{self.total_hosts}"
+        stdscr.addstr(height - 2, 0, progress_message)
+
+        stdscr.refresh()
+
 
 
 class NetworkHandler:
@@ -37,7 +91,7 @@ class NetworkHandler:
         self.progress_bar=ProgressBar(self.hosts)
 
     def get_live_ips(self, mode, output) -> list:
-        wrapper(self.show_progress, mode, output)
+        curses.wrapper(self.show_progress, mode, output)
         return self.progress_bar.live_hosts
 
     def show_progress(self, stdscr, mode, output):
@@ -55,9 +109,44 @@ class NetworkHandler:
             )
         else:
             # increment the scan start ip by 1 depending on the selected network range
-            x_plus_1 = int(octets[3]) + 1
-            y_plus_1 = int(octets[2]) + 1
-            z_plus_1 = int(octets[1]) + 1
+            x_value = int(octets[3]) 
+            y_value = int(octets[2])
+            z_value = int(octets[1])
+            x_plus_1 = x_value
+            y_plus_1 = y_value
+            z_plus_1 = z_value
+            """
+            192.[Z].[Y].[X]
+            in /16: 
+                If the last octet [ X ] is < 255 we retain the second last octet [ Y ] as is and increase
+                the X value by 1
+                otherwise, set the X value to zero and increase the Y value by 1
+                            
+            """
+            if self.host_bits <= 8:
+                if x_value <= 254:
+                    x_plus_1 = x_value + 1
+                    
+            elif 16 >= self.host_bits > 8:
+                if x_value >= 255:
+                    x_plus_1 = 0
+                    y_plus_1 = y_value + 1
+                else:
+                    x_plus_1 = x_value + 1 
+                                  
+            elif 24 >= self.host_bits > 16:
+              
+                if x_value >= 255:
+                    x_plus_1 = 0
+                    y_plus_1 = y_value + 1
+                    if y_value >= 255:
+                        y_plus_1 = 0
+                        z_plus_1 = z_value + 1
+                    
+                else: 
+                    x_plus_1 = x_value + 1
+                    
+            print(f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}")    
             self.scan_network(
                 stdscr=stdscr,
                 octets=octets,
@@ -70,19 +159,7 @@ class NetworkHandler:
 
     def scan_network(
         self, stdscr, octets, x_range, y_range, z_range, output_file, mode
-    ):
-        """
-        Splits the user provided IP into 4 octets and determines
-        which octet to iterate over depending on the remaining subnet bits
-        and returns a list of hosts that respond successfully to ping command
-
-        Example:
-        /16
-        host_bits = 32 -18
-            = 14
-            xxxxxxxx.xxxxxxxx.yyyyyyyy.yyyyyyyy
-            scanning octet = octet[2] and octet[3]
-        """
+    ):  
         # Host bits
         if self.host_bits <= 8:
             # Example: 192.168.10.X
@@ -98,12 +175,12 @@ class NetworkHandler:
         elif 16 >= self.host_bits > 8:
             # Example: 192.168.X.X
             base_ip = f"{octets[0]}.{octets[1]}"
-            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
-                for y in range(z_range, 256):
+            for y in tqdm(range(y_range, 256), desc="Scanning Network", leave=False):
+                for x in range(x_range, 256):
                     self.configure_progress_bar(
                         stdscr=stdscr,
                         output_file=output_file,
-                        ip=f"{base_ip}.{x}.{y}",
+                        ip=f"{base_ip}.{y}.{x}",
                         mode=mode,
                     )
 
@@ -111,13 +188,13 @@ class NetworkHandler:
         elif 24 >= self.host_bits > 16:
             # Example: 192.X.X.X
             base_ip = f"{octets[0]}"
-            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
-                for y in range(z_range, 256):
-                    for z in range(y_range, 256):
+            for z in tqdm(range(z_range, 256), desc="Scanning Network", leave=False):
+                for y in range(y_range, 256):
+                    for x in range(x_range, 256):
                         self.configure_progress_bar(
                             stdscr=stdscr,
                             output_file=output_file,
-                            ip=f"{base_ip}.{x}.{y}.{z}",
+                            ip=f"{base_ip}.{z}.{y}.{x}",
                             mode=mode,
                         )
 
