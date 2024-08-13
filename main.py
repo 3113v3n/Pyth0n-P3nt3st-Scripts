@@ -1,18 +1,17 @@
 # [Utils]
-from utils import bcolors, InputValidators
+
+from utils import bcolors, InputValidators, NetExec, Commands
 
 # [Handlers]
-from handlers import (
-    UserHandler, PackageHandler, FileHandler, NetworkHandler
-)
+from handlers import UserHandler, PackageHandler, FileHandler, NetworkHandler
 
 # [Test Domains]
-from domains import (ExternalPT, InternalPT, MobilePT)
+from domains import ExternalPT, InternalPT, MobilePT
 
 # Initializers
 validator = InputValidators()
 ## Handle packages
-package = PackageHandler()
+package = PackageHandler(Commands, bcolors)
 
 ## Handles file management
 filemanager = FileHandler(bcolors)
@@ -21,13 +20,17 @@ filemanager = FileHandler(bcolors)
 user = UserHandler(filemanager, validator, bcolors)
 
 ## Handles network related operations
-network = NetworkHandler(filemanager)
+network = NetworkHandler(filemanager, Commands)
 
+nc = NetExec()
 
 # [penetration Testing domains]
-internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
+internal = InternalPT(
+    netexec=nc, filemanager=filemanager, network=network, colors=bcolors
+)
 
 user_test_domain = user.get_user_domain()
+
 
 def packages_present() -> bool:
     # check if package list contains any missing packages
@@ -80,5 +83,9 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #hashes = HashUtil()
-    #hashes.compare_hash_from_dump("aad3b435b51404eeaad3b435b51404ee", "test-data/test.ntds")
+# internal.netexec_module()['relay-list'](
+#     "output_directory/internal/home_w1f1_13-08-2024-11:02:30.csv",
+#     "output_directory/internal/smb_relay.txt",
+# )
+# hashes = HashUtil()
+# hashes.compare_hash_from_dump("aad3b435b51404eeaad3b435b51404ee", "test-data/test.ntds")

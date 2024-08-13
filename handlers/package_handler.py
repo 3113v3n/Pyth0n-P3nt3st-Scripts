@@ -1,13 +1,9 @@
-from utils.colors import bcolors
-from utils.commands import Commands
-
-
 class PackageHandler:
     """Handles package related actions such as installation of missing Packages"""
 
-    def __init__(self) -> None:
-        self.command = Commands()
-        self.colors = bcolors
+    def __init__(self, command, colors) -> None:
+        self.command = command()
+        self.colors = colors
         self.external_packages = [
             # External
             {"name": "bbot", "command": "pipx install bbot"},
@@ -91,7 +87,7 @@ class PackageHandler:
         return [
             package
             for package in packages
-            if self.command.run_os_commands(f"which {package['name']}").returncode == 0
+            if self.command.run_os_commands(f"which {package['name']}").returncode != 0
         ]
 
     def install_packages(self, packages):

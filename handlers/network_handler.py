@@ -1,14 +1,14 @@
 from curses import wrapper
 import time
 from tqdm import tqdm
+from handlers import FileHandler
 from utils.progress_bar import ProgressBar
-from utils.commands import Commands
 
 
 class NetworkHandler:
     """Class will handle any logic necessary for network operations"""
 
-    def __init__(self, filemanager) -> None:
+    def __init__(self, filemanager: FileHandler, Commands) -> None:
         # subnet range
         self.subnet = ""
         # Number of hosts within the network
@@ -34,7 +34,7 @@ class NetworkHandler:
         self.user_ip_addr = network_info["ip_address"]
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
-        self.progress_bar = ProgressBar(self.hosts)
+        self.progress_bar=ProgressBar(self.hosts)
 
     def get_live_ips(self, mode, output) -> list:
         wrapper(self.show_progress, mode, output)
@@ -132,12 +132,13 @@ class NetworkHandler:
             mode=mode,
         )
         time.sleep(0.01)
-        
+
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
         # Using masscan to scan top20ports of nmap in a /24 range (less than 5min)
-        #masscan -p20,21-23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080 199.66.11.0/24 
+        # masscan -p20,21-23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080 199.66.11.0/24
         pass
+
 
 def get_network_info(subnet) -> dict:
     """

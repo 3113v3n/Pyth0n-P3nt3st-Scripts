@@ -1,8 +1,9 @@
-import os, glob
+import os
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
-from utils.colors import bcolors
+from utils import bcolors
+import pandas
 
 
 class FileHandler:
@@ -36,12 +37,29 @@ class FileHandler:
             case _:
                 return
 
-    def save_new_file(self, filename, content):
+    def save_txt_file(self, filename, content):
         self.full_file_path = f"{self.output_directory}/{filename}"
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def append_file(self, filename, content):
+    def save_to_csv(self, filename, content, mode):
+        if mode == "scan":
+            self.full_file_path = f"{self.output_directory}/{filename}"
+        else:
+            self.full_file_path = filename
+
+        data = pandas.DataFrame({"Live IP Addresses": [content]})
+
+        if os.path.exists(f"{self.full_file_path}"):
+            existing_df = pandas.read_csv(f"{self.full_file_path}")
+
+            updated_df = pandas.concat([existing_df, data], ignore_index=True)
+        else:
+            updated_df = data
+
+        updated_df.to_csv(f"{self.full_file_path}", index=False)
+
+    def append_to_txt(self, filename, content):
         """Update existing file"""
         with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
@@ -113,12 +131,12 @@ class FileHandler:
                 file.seek(0)
             last_line = file.readline().decode()
         return last_line
-    
-    def read_all_lines(self,file):
-        with open(file,"r")as file:
+
+    def read_all_lines(self, file):
+        with open(file, "r") as file:
             return file.readlines()
 
-    def generate_unique_name(self, file) -> str:
+    def generate_unique_name(self, file, extension) -> str:
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
         removed_extension = Path(file).stem
-        return f"{removed_extension}_{timestamp}.txt"
+        return f"{removed_extension}_{timestamp}.{extension}"

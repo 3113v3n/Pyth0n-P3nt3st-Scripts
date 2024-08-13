@@ -1,5 +1,5 @@
-from handlers.file_handler import FileHandler
-from utils.validators import InputValidators
+from handlers import FileHandler
+from utils import InputValidators
 
 
 class UserHandler:
@@ -18,9 +18,9 @@ class UserHandler:
         self.domain_variables = ""
 
         self.OPTIONS = (
-            f"\n1. {self.color.OKGREEN}Mobile   Penetration Testing   📱{self.color.ENDC}  "
-            f"\n2. {self.color.OKGREEN}Internal Penetration Testing   🖥️{self.color.ENDC} "
-            f"\n3. {self.color.OKGREEN}External Penetration Testing   🌐{self.color.ENDC} \n"
+            f"\n1. {self.color.OKGREEN}Mobile     📱{self.color.ENDC}  "
+            f"\n2. {self.color.OKGREEN}Internal   🖥️{self.color.ENDC} "
+            f"\n3. {self.color.OKGREEN}External   🌐{self.color.ENDC} \n"
         )
         self.formatted_question = (
             f"\nWhat task do you want to perform?" f"{self.OPTIONS}"
@@ -49,7 +49,7 @@ class UserHandler:
         while user_input not in self.default_test_domains:
             user_input = input(self.incase_of_error)
         self.domain = user_input.lower()
-        #self.set_domain_variables(self.domain)
+        # self.set_domain_variables(self.domain)
         return self.domain
 
     def get_user_subnet(self):
