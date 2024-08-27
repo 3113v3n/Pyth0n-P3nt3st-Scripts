@@ -177,3 +177,8 @@ class VulnerabilityAnalysis:
             ],
             output_file,
         )
+
+# TODO: append to existing VA scan
+# 1. Display existing files
+# 2. Select the desired file
+# 3. Append new values minus headers to existing file
