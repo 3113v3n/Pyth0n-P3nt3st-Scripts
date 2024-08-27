@@ -42,6 +42,7 @@ inorder to avoid resumming from the last recorded live IP.
     or alternatively leave it as it is, and scan will resume from (10.0.0.20)
 
 ```
+![Scan Progress](images/scan_progress.png)
 
 ## 2. Vulnerability Analysis
 
@@ -49,11 +50,11 @@ inorder to avoid resumming from the last recorded live IP.
 - To run the module simply enter [ **va** ] on the provided prompt
 - It requires 2 files
 
-```python
+```text
     Input file: The Nessus output file (xlsx)
     Output file: The Name of your analyzed file
 ```
-
+![Vulnerability Analysis](images/va.png)
 ## 3. External Penetration Testing
 
 [Coming Soon]
