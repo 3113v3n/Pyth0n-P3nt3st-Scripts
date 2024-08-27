@@ -28,12 +28,21 @@ class FileHandler:
         match domain:
             case "mobile":
                 self.output_directory = f"{self.output_directory}/mobile"
+                self.create_folder("mobile")
                 return self.output_directory
             case "internal":
                 self.output_directory = f"{self.output_directory}/internal"
+                self.create_folder("internal")
                 return self.output_directory
             case "external":
                 self.output_directory = f"{self.output_directory}/external"
+                self.create_folder("external")
+                return self.output_directory
+            case "va":
+                self.output_directory = (
+                    f"{self.output_directory}/vulnerability-assessment"
+                )
+                self.create_folder("vulnerability-assessment")
                 return self.output_directory
             case _:
                 return
@@ -50,9 +59,9 @@ class FileHandler:
         xls = pandas.ExcelFile(file)
         return pandas.read_excel(xls)
 
-    def write_to_multiple_sheets(self, data_frame_object,filename):
+    def write_to_multiple_sheets(self, data_frame_object, filename):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
-        filepath = f"{self.output_directory}/internal/{self.generate_unique_name(filename,extension='xlsx')}"
+        filepath = f"{self.output_directory}/{self.generate_unique_name(filename,extension='xlsx')}"
         with pandas.ExcelWriter(filepath) as writer:
             for dataframe in data_frame_object:
                 if not dataframe["dataframe"].empty:
@@ -82,6 +91,23 @@ class FileHandler:
         """Update existing file"""
         with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
+
+    def folder_exists(self, folder_name):
+        folder_exists = False
+        for folder, subfolder in os.walk("./output_directory"):
+            if folder_name in subfolder:
+                print(f"the folder exists at path {os.path.join(folder,folder_name)}")
+                folder_exists = True
+                break
+        return folder_exists
+
+    def create_folder(self, folder_name):
+
+        if not self.folder_exists(folder_name):
+            # os.getcwd()
+            folder_path = self.output_directory
+            os.makedirs(folder_path)
+            print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
 
     def find_files(self):
         """
