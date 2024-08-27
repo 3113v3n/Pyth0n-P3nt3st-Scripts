@@ -79,7 +79,12 @@ class VulnerabilityAnalysis:
                 )
             )
         ]
-        # 4. SSH Issues
+        # 4. Kaspersky
+        kaspersky = vulnerabilities[
+            vulnerabilities["Name"].str.contains(
+                self.regex_word("Kaspersky"), regex=True
+            )
+        ]
 
         # 5. Windows Service Permission
         insecure_service = vulnerabilities[
@@ -110,6 +115,46 @@ class VulnerabilityAnalysis:
             )
         ]
 
+        # 10. AD Misconfigurations
+        active_directory = vulnerabilities[
+            vulnerabilities["Name"].str.contains(
+                self.regex_word("AD Starter"), regex=True
+            )
+        ]
+
+        # 11. Microsoft
+        defender = vulnerabilities[
+            vulnerabilities["Synopsis"].str.contains(
+                self.regex_word("antimalware"), regex=True
+            )
+        ]
+
+        # 12. RDP misconfigs
+        rdp_misconfig = vulnerabilities[
+            (
+                vulnerabilities["Name"].str.contains(
+                    self.regex_word("Terminal Services"), regex=True
+                )
+            )
+            | (
+                vulnerabilities["Name"].str.contains(
+                    self.regex_word("Remote Desktop Protocol"), regex=True
+                )
+            )
+        ]
+
+        # 13. Compliance Checks
+        compliance = vulnerabilities[
+            vulnerabilities["Synopsis"].str.contains(
+                self.regex_word("Compliance checks"), regex=True
+            )
+        ]
+        # 14. SSH misconfig
+        ssh_misconfig = vulnerabilities[
+            vulnerabilities["Synopsis"].str.contains(
+                self.regex_word("SSH server"), regex=True
+            )
+        ]
         self.filemanager.write_to_multiple_sheets(
             [
                 {"dataframe": winverify, "sheetname": "winverify"},
@@ -118,11 +163,17 @@ class VulnerabilityAnalysis:
                 {"dataframe": ssl_issues, "sheetname": "SSL issues"},
                 {"dataframe": missing_patches, "sheetname": "Missing Security Updates"},
                 {"dataframe": unsupported, "sheetname": "Unsupported Software"},
+                {"dataframe": kaspersky, "sheetname": "Kaspersky Misconfigs"},
+                {"dataframe": ssh_misconfig, "sheetname": "SSH Misconfig"},
+                {"dataframe": rdp_misconfig, "sheetname": "RDP Misconfig"},
+                {"dataframe": defender, "sheetname": "Windows Defender"},
+                {"dataframe": active_directory, "sheetname": "AD misconfig"},
                 {
                     "dataframe": insecure_service,
                     "sheetname": "Insecure Windows Services",
                 },
                 {"dataframe": speculative, "sheetname": "Windows Speculative"},
+                {"dataframe": compliance, "sheetname": "Compliance checks"},
             ],
             output_file,
         )
