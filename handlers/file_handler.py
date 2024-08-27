@@ -94,7 +94,7 @@ class FileHandler:
 
     def folder_exists(self, folder_name):
         folder_exists = False
-        for folder, subfolder in os.walk("./output_directory"):
+        for folder, subfolder,files in os.walk("./output_directory"):
             if folder_name in subfolder:
                 print(f"the folder exists at path {os.path.join(folder,folder_name)}")
                 folder_exists = True
