@@ -1,5 +1,5 @@
 import re
-
+import os
 
 class InputValidators:
     """Class runs validation checks on user provided input"""
@@ -23,4 +23,5 @@ class InputValidators:
         return True
 
     def file_exists(self, filename) -> bool:
-        return True
+            if os.path.exists(filename):
+                return True

@@ -1,5 +1,5 @@
 import curses
-from handlers.file_handler import FileHandler
+from handlers import FileHandler
 
 
 class ProgressBar:
@@ -17,12 +17,10 @@ class ProgressBar:
         self, filemanager: FileHandler, output_file, stdscr, ip, is_alive, mode
     ):
         if is_alive:
+
             self.live_hosts.append(ip)
-            if mode == "scan":
-                filemanager.save_new_file(output_file, ip)
-            elif mode == "resume":
-                # output file is different for resume functionality
-                filemanager.append_file(output_file, ip)
+            filemanager.save_to_csv(output_file, ip, mode)
+
         else:
             self.unresponsive_hosts.append(ip)
         self.total_scanned += 1

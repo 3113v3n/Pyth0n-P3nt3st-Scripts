@@ -2,6 +2,5 @@
 **/.env
 **/__pycache__
 **/.trunk
-output_directory/external/*
-#output_directory/internal/*
-output_directory/mobile/*
+output_directory
+test-data

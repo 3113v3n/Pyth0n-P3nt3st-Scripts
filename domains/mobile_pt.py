@@ -1,6 +1,4 @@
-from utils.colors import bcolors
-from utils.commands import Commands
-
+from utils.shared import bcolors, Commands
 
 class MobilePT:
     # class will be responsible for all mobile operations
