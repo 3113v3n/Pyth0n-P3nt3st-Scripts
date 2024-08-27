@@ -83,6 +83,8 @@ class PackageHandler:
             packages = self.internal_packages
         elif test_domain == "external":
             packages = self.external_packages
+        else:
+            return []
 
         return [
             package

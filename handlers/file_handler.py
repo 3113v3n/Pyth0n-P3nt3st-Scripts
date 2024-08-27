@@ -1,14 +1,15 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from pprint import pprint
+
+# from pprint import pprint
 import pandas
 
 
 class FileHandler:
     """Handle File operations"""
 
-    def __init__(self, colors,validator) -> None:
+    def __init__(self, colors, validator) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
@@ -42,6 +43,24 @@ class FileHandler:
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
+    def read_csv(self, dataframe):
+        return pandas.read_csv(dataframe)
+
+    def read_excel_file(self, file):
+        xls = pandas.ExcelFile(file)
+        return pandas.read_excel(xls)
+
+    def write_to_multiple_sheets(self, data_frame_object,filename):
+        """Dataframe Object containing dataframes and their equivalent sheet names"""
+        filepath = f"{self.output_directory}/internal/{self.generate_unique_name(filename,extension='xlsx')}"
+        with pandas.ExcelWriter(filepath) as writer:
+            for dataframe in data_frame_object:
+                if not dataframe["dataframe"].empty:
+                    dataframe["dataframe"].to_excel(
+                        writer, sheet_name=dataframe["sheetname"], index=False
+                    )
+        print(f"Data has been written to {filepath}")
+
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
             self.full_file_path = f"{self.output_directory}/{filename}"
@@ -51,7 +70,7 @@ class FileHandler:
         data = pandas.DataFrame({"Live IP Addresses": [content]})
 
         if self.validator.file_exists(f"{self.full_file_path}"):
-            existing_df = pandas.read_csv(f"{self.full_file_path}")
+            existing_df = self.read_csv(f"{self.full_file_path}")
 
             updated_df = pandas.concat([existing_df, data], ignore_index=True)
         else:
@@ -72,7 +91,7 @@ class FileHandler:
         :return: Full path of the files if found, None otherwise.
         """
 
-        for root, dirs, files in os.walk(f"{self.output_directory}"):
+        for root, files in os.walk(f"{self.output_directory}"):
             for file in files:
                 file_object = {"filename": "", "full_path": ""}
                 file_object["filename"] = file

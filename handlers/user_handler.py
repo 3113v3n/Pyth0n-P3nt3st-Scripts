@@ -1,3 +1,4 @@
+# trunk-ignore-all(black)
 
 class UserHandler:
     """Class will be responsible for handling user interactions with
@@ -6,7 +7,7 @@ class UserHandler:
     def __init__(
         self, filemanager,  validator, bcolors
     ) -> None:
-        self.default_test_domains = ["mobile", "internal", "external"]
+        self.default_test_domains = ["mobile", "internal", "external","va"]
         self.color = bcolors
         self.not_valid_domain = False
         self.filemanager = filemanager
@@ -15,9 +16,10 @@ class UserHandler:
         self.domain_variables = ""
 
         self.OPTIONS = (
-            f"\n1. {self.color.OKGREEN}Mobile     📱{self.color.ENDC}  "
-            f"\n2. {self.color.OKGREEN}Internal   🖥️{self.color.ENDC} "
-            f"\n3. {self.color.OKGREEN}External   🌐{self.color.ENDC} \n"
+            f"\n1. {self.color.OKGREEN}Mobile                   [ Enter mobile   ]  📱{self.color.ENDC} "
+            f"\n2. {self.color.OKGREEN}Internal                 [ Enter internal ]  🖥️{self.color.ENDC} "
+            f"\n3. {self.color.OKGREEN}External                 [ Enter external ]  🌐{self.color.ENDC} "
+            f"\n4. {self.color.OKGREEN}Vulnerability Analysis   [ Enter VA ]        🔎{self.color.ENDC}\n"
         )
         self.formatted_question = (
             f"\nWhat task do you want to perform?" f"{self.OPTIONS}"
@@ -54,7 +56,7 @@ class UserHandler:
 
         while True:
             try:
-                subnet = input(f"\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
+                subnet = input("\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
                 if self.validator.validate_cidr(subnet):
                     break
                 else:
@@ -72,7 +74,7 @@ class UserHandler:
         match test_domain:
             case "mobile":
                 # TODO: [UNDER DEVELOPMENT]
-                print(f"Running Mobile scripts")
+                print("Running Mobile scripts")
                 package_name = input(
                     "Please provide the package name (com.example.packagename)\n"
                 )
@@ -80,8 +82,7 @@ class UserHandler:
                 self.domain_variables = {"package_name": package_name}
                 return self.domain_variables
             case "internal":
-
-                print(f"Running Internal PT modules")
+                print(" Running Internal PT modules ")
                 subnet = self.get_user_subnet()
                 mode = input(self.mode_text).lower()
 
@@ -113,12 +114,12 @@ class UserHandler:
                         mode = "scan"
                         subnet = self.get_user_subnet()
                         output_file = input(
-                            f"[+] Provide a name for your output file: "
+                            "[+] Provide a name for your output file: "
                         )
 
                 elif mode == "scan":
                     # TODO: file validations
-                    output_file = input(f"[+] Provide a name for your output file: ")
+                    output_file = input("[+] Provide a name for your output file: ")
 
                 self.domain_variables = {
                     "subnet": subnet,
@@ -128,12 +129,21 @@ class UserHandler:
                 return self.domain_variables
             case "external":
                 # TODO: [UNDER DEVELOPMENT !!]
-                print(f"\nRunning External PT modules")
+                print("\nRunning External PT modules")
                 website_domain = input("Enter domain to enumerate (example.domain.com)")
 
                 # TODO: strip https://
                 self.domain_variables = {"target_domain": website_domain}
 
+                return self.domain_variables
+            case "va":
+                print("Running Vulnerability Analysis on your file\n")
+                input_filename = input("[+] Please provide a full path to the file you want to analyze: \n")
+                output_filename = input("[+] Provide a name for your output file: ")
+                self.domain_variables = {
+                    "input_file":input_filename,
+                    "output":output_filename
+                }
                 return self.domain_variables
             case _:
                 print(
