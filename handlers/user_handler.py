@@ -1,13 +1,12 @@
 # trunk-ignore-all(black)
 
+
 class UserHandler:
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(
-        self, filemanager,  validator, bcolors
-    ) -> None:
-        self.default_test_domains = ["mobile", "internal", "external","va"]
+    def __init__(self, filemanager, validator, bcolors) -> None:
+        self.default_test_domains = ["mobile", "internal", "external", "va"]
         self.color = bcolors
         self.not_valid_domain = False
         self.filemanager = filemanager
@@ -113,9 +112,7 @@ class UserHandler:
                         )
                         mode = "scan"
                         subnet = self.get_user_subnet()
-                        output_file = input(
-                            "[+] Provide a name for your output file: "
-                        )
+                        output_file = input("[+] Provide a name for your output file: ")
 
                 elif mode == "scan":
                     # TODO: file validations
@@ -138,11 +135,13 @@ class UserHandler:
                 return self.domain_variables
             case "va":
                 print("Running Vulnerability Analysis on your file\n")
-                input_filename = input("[+] Please provide a full path to the file you want to analyze: \n")
+                input_filename = input(
+                    "[+] Please provide a full path to the file you want to analyze: \n"
+                )
                 output_filename = input("[+] Provide a name for your output file: ")
                 self.domain_variables = {
-                    "input_file":input_filename,
-                    "output":output_filename
+                    "input_file": input_filename,
+                    "output": output_filename,
                 }
                 return self.domain_variables
             case _:
