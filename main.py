@@ -11,7 +11,7 @@ from handlers import (
     UserHandler,
     VulnerabilityAnalysis,
 )
-from utils import Commands, InputValidators, bcolors
+from utils import Commands, InputValidators, bcolors, Config
 
 # [Utils]
 
@@ -25,7 +25,7 @@ package = PackageHandler(Commands, bcolors)
 filemanager = FileHandler(bcolors, validator=validator)
 
 ## gathers user input
-user = UserHandler(filemanager, validator, bcolors)
+user = UserHandler(filemanager, validator, bcolors,Config)
 
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)
@@ -37,7 +37,7 @@ vulnerability_analysis = VulnerabilityAnalysis(filemanager)
 # [penetration Testing domains]
 internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
 
-user_test_domain =  user.get_user_domain()
+user_test_domain = user.get_user_domain()
 
 
 def packages_present() -> bool:
@@ -69,8 +69,14 @@ def user_interactions():
 
         case "va":
 
-            formatted_vulns = vulnerability_analysis.analyze_csv(f"{user.domain_variables['input_file']}")
-            vulnerability_analysis.sort_vulnerabilities(formatted_vulns,f"{user.domain_variables['output']}")
+            formatted_vulns = vulnerability_analysis.analyze_csv(
+                f"{user.domain_variables['input_file']}"
+            )
+            vulnerability_analysis.sort_vulnerabilities(
+                formatted_vulns, f"{user.domain_variables['output']}"
+            )
+            #scan_again = input("Do you want to Analyze another file? [ Yes | No ] ")
+
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
             pass
@@ -95,7 +101,7 @@ def main():
 
 
 if __name__ == "__main__":
-     main()
+    main()
 
 # internal.netexec_module()['relay-list'](
 #     "output_directory/internal/home_w1f1_13-08-2024-11:02:30.csv",

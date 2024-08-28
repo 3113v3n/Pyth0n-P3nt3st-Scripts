@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from utils.shared import InputValidators
 
 # from pprint import pprint
 import pandas
@@ -9,7 +10,7 @@ import pandas
 class FileHandler:
     """Handle File operations"""
 
-    def __init__(self, colors, validator) -> None:
+    def __init__(self, colors, validator: InputValidators) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
@@ -68,7 +69,9 @@ class FileHandler:
                     dataframe["dataframe"].to_excel(
                         writer, sheet_name=dataframe["sheetname"], index=False
                     )
-        print(f"Data has been written to {filepath}")
+        print(
+            f"Data has been written to \n{self.colors.OKGREEN}{filepath}{self.colors.ENDC}"
+        )
 
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
@@ -92,18 +95,11 @@ class FileHandler:
         with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def folder_exists(self, folder_name):
-        folder_exists = False
-        for folder, subfolder,files in os.walk("./output_directory"):
-            if folder_name in subfolder:
-                print(f"the folder exists at path {os.path.join(folder,folder_name)}")
-                folder_exists = True
-                break
-        return folder_exists
-
     def create_folder(self, folder_name):
 
-        if not self.folder_exists(folder_name):
+        if not self.validator.directory_exists(
+            folder_name, search_path="./output_directory"
+        ):
             # os.getcwd()
             folder_path = self.output_directory
             os.makedirs(folder_path)

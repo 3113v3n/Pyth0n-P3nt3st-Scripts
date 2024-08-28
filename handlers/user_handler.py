@@ -1,51 +1,53 @@
 # trunk-ignore-all(black)
+from utils.shared import InputValidators, Config
 
 
 class UserHandler:
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(self, filemanager, validator, bcolors) -> None:
-        self.default_test_domains = ["mobile", "internal", "external", "va"]
+    def __init__(
+        self, filemanager, validator: InputValidators, bcolors, config: Config
+    ) -> None:
+        self.config = config
+        self.default_test_domains = []
         self.color = bcolors
         self.not_valid_domain = False
         self.filemanager = filemanager
         self.validator = validator
         self.domain = ""
         self.domain_variables = ""
-
-        self.OPTIONS = (
-            f"\n1. {self.color.OKGREEN}Mobile                   [ Enter mobile   ]  📱{self.color.ENDC} "
-            f"\n2. {self.color.OKGREEN}Internal                 [ Enter internal ]  🖥️{self.color.ENDC} "
-            f"\n3. {self.color.OKGREEN}External                 [ Enter external ]  🌐{self.color.ENDC} "
-            f"\n4. {self.color.OKGREEN}Vulnerability Analysis   [ Enter VA ]        🔎{self.color.ENDC}\n"
-        )
+        self.OPTIONS = self.set_test_options()
         self.formatted_question = (
-            f"\nWhat task do you want to perform?" f"{self.OPTIONS}"
+            f"\nWhat task do you want to perform?\n" f"{self.OPTIONS}\n"
         )
-        self.incase_of_error = (
-            f"\n{self.color.FAIL}[!]{self.color.ENDC} Please choose one of: "
-            f"{self.OPTIONS}"
-        )
-        self.mode_text = (
-            f"\n[+] What mode would you like to run the scan with [{self.color.OKCYAN} SCAN | RESUME {self.color.ENDC}]"
-            f"\n{self.color.OKCYAN}SCAN{self.color.ENDC} : scan new subnet\n"
-            f"{self.color.OKCYAN}RESUME{self.color.ENDC} : resume previous scan\n "
-            f"\n(In case you want to {self.color.BOLD}RESUME{self.color.ENDC} a scan,"
-            f"please remember to {self.color.BOLD}{self.color.WARNING}manually update "
-            f"the file{self.color.ENDC}{self.color.ENDC} \nwith the last scanned ip to "
-            "allow resume scan from last scanned ip rather than last found ip address)\n"
-            "\n Enter mode: ==> "
-        )
-        self.wrong_choice = f"\n{self.color.FAIL}[!]{self.color.ENDC} \
-            Please select one of: [ {self.color.OKCYAN}SCAN | RESUME{self.color.ENDC} ]"
+
+    def set_test_options(self):
+        # Create a list to store formatted options
+        OPTIONS = []
+        for option in self.config.test_domains:
+
+            # number to display on screen
+            number = self.config.test_domains.index(option) + 1
+            # Format each option with colors and spacing
+            formatted_option = (
+                # <30 align with width of 30 characters
+                f"{self.color.OKGREEN}{number}. {option['domain']:<30} "
+                f"[ Enter {option['alias']:<8}] {option['icon']}{self.color.ENDC}\n"
+            )
+            OPTIONS.append(formatted_option)
+            # set up default test domains
+            self.default_test_domains.append(option["alias"])
+
+        # Join the list into a single multi-line string
+        return "".join(OPTIONS)
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
 
         user_input = input(self.formatted_question)
         while user_input not in self.default_test_domains:
-            user_input = input(self.incase_of_error)
+            user_input = input(f"{self.config.domain_select_error}" f"{self.OPTIONS}\n")
         self.domain = user_input.lower()
         # self.set_domain_variables(self.domain)
         return self.domain
@@ -83,11 +85,11 @@ class UserHandler:
             case "internal":
                 print(" Running Internal PT modules ")
                 subnet = self.get_user_subnet()
-                mode = input(self.mode_text).lower()
+                mode = input(self.config.internal_mode_choice).lower()
 
                 # Ensure correct mode is selected by user
                 while mode not in ["scan", "resume"]:
-                    mode = input(self.wrong_choice)
+                    mode = input(self.config.internal_choice_error)
 
                 if mode == "resume":
                     try:
@@ -96,7 +98,7 @@ class UserHandler:
 
                         resume_ip = self.filemanager.display_saved_files()
 
-                        if resume_ip == None:
+                        if resume_ip is None:
                             raise ValueError("No Previously saved file present")
 
                         # output file
@@ -135,14 +137,38 @@ class UserHandler:
                 return self.domain_variables
             case "va":
                 print("Running Vulnerability Analysis on your file\n")
-                input_filename = input(
-                    "[+] Please provide a full path to the file you want to analyze: \n"
-                )
+
+                while True:
+
+                    try:
+                        input_filename = input(
+                            "\n[+] Please provide a full path to the file you want to analyze: [CSV]\n"
+                        )
+                        # check if provided file exists
+                        if self.validator.file_exists(input_filename):
+                            # check if the file provided is of required extension
+                            if self.validator.check_filetype(input_filename, "csv"):
+                                # Exit the loop if file is valid
+                                break
+                            else:
+                                raise ValueError(
+                                    "Invalid file extension, only accepting CSV "
+                                )
+                        else:
+                            raise FileNotFoundError("File Does not Exists")
+                    except FileNotFoundError as error:
+                        print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+
+                    except ValueError as error:
+                        print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+
+                # Proceed to get the output filename
                 output_filename = input("[+] Provide a name for your output file: ")
                 self.domain_variables = {
                     "input_file": input_filename,
                     "output": output_filename,
                 }
+
                 return self.domain_variables
             case _:
                 print(

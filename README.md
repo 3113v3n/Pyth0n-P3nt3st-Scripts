@@ -1,6 +1,7 @@
 # Pyth0n-P3nt3st-Scripts
 
-Python scripts to aid in pentest automation
+Python scripts to aid in pentest automation.
+- Start by installing all the dependencies in the requirements.txt
 
 | Domain                       | Script Target                      |
 | ---------------------------- | ---------------------------------- |
@@ -12,7 +13,7 @@ Python scripts to aid in pentest automation
 |                              |                                    |
 | Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]   |
 |                              |                                    |
-| Vulnerability Analysis       | 1. Analyze Nessus VA output (xlsx) |
+| Vulnerability Analysis       | 1. Analyze Nessus VA output (csv) |
 
 ## 1. Internal Penetration Testing
 

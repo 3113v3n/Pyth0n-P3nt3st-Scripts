@@ -1,11 +1,12 @@
 import re
 import os
 
+
 class InputValidators:
     """Class runs validation checks on user provided input"""
 
     def __init__(self) -> None:
-        self.something = "validators"
+        pass
 
     def validate_cidr(self, cidr) -> bool:
         # 10.0.0.1/8
@@ -19,9 +20,20 @@ class InputValidators:
         )
         return ipv4_pattern.match(addr) is not None
 
-    def directory_exists(self, path_to_directory) -> bool:
-        return True
+    def directory_exists(self, folder_name, search_path) -> bool:
+        folder_exists = False
+        for folder, subfolder, files in os.walk(search_path):
+            if folder_name in subfolder:
+                #print(f"the folder exists at path {os.path.join(folder,folder_name)}")
+                folder_exists = True
+                break
+        return folder_exists
 
     def file_exists(self, filename) -> bool:
-            if os.path.exists(filename):
-                return True
+        return os.path.isfile(filename)
+
+    def check_filetype(self, filename, filetype) -> bool:
+        if re.search(f"\.{filetype}$", filename):
+            return True
+        else:
+            return False

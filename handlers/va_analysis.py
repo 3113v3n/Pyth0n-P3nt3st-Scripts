@@ -30,15 +30,15 @@ class VulnerabilityAnalysis:
 
     def analyze_csv(self, csv_data):
         # read csv data and return analyzed file
-        self.data = self.filemanager.read_excel_file(csv_data)
+        self.data = self.filemanager.read_csv(csv_data)
 
         # lists of hosts that passed credential check
 
         credentialed_hosts = self.data[
             (self.data["Plugin Output"].notna())
             & (self.data["Plugin Output"].str.contains("Credentialed checks : yes"))
-        ]["Host"]
-        self.credentialed_hosts = list(credentialed_hosts.values)
+        ]["Host"].tolist()
+        self.credentialed_hosts = credentialed_hosts
 
         selected_columns = self.data[self.data["Host"].isin(self.credentialed_hosts)][
             self.headers
@@ -46,8 +46,9 @@ class VulnerabilityAnalysis:
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
         formated_vulns = selected_columns[
-            (self.data["Risk"].notna()) & (selected_columns["Risk"] != "Low")
+            (selected_columns["Risk"].notna()) & (selected_columns["Risk"] != "Low")
         ].reset_index(drop=True)
+        print(f"Credentialed Hosts: \n{self.credentialed_hosts}")
 
         return formated_vulns
 
@@ -155,6 +156,12 @@ class VulnerabilityAnalysis:
                 self.regex_word("SSH server"), regex=True
             )
         ]
+        # 15. Telnet
+        telnet = vulnerabilities[
+            vulnerabilities["Name"].str.contains(
+                self.regex_word("Telnet Server"), regex=True
+            )
+        ]
         self.filemanager.write_to_multiple_sheets(
             [
                 {"dataframe": winverify, "sheetname": "winverify"},
@@ -174,11 +181,16 @@ class VulnerabilityAnalysis:
                 },
                 {"dataframe": speculative, "sheetname": "Windows Speculative"},
                 {"dataframe": compliance, "sheetname": "Compliance checks"},
+                {"dataframe": telnet, "sheetname": "Unencrypted Telnet"},
             ],
             output_file,
         )
+
 
 # TODO: append to existing VA scan
 # 1. Display existing files
 # 2. Select the desired file
 # 3. Append new values minus headers to existing file
+# 5. Ask user the location to their scans
+# 6. Display all csv files
+# 7. Run individual analysis on each file
