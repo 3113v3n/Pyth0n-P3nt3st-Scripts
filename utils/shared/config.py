@@ -102,3 +102,4 @@ class Config:
         "Solution",
         "See Also",
     ]
+    column_mismatch_error = f"{bcolors.FAIL}{bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the same number of columns {bcolors.ENDC}"

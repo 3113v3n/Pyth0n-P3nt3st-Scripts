@@ -20,11 +20,11 @@ class InputValidators:
         )
         return ipv4_pattern.match(addr) is not None
 
-    def directory_exists(self, folder_name, search_path) -> bool:
+    def check_subdirectory_exists(self, folder_name, search_path) -> bool:
         folder_exists = False
         for folder, subfolder, files in os.walk(search_path):
             if folder_name in subfolder:
-                #print(f"the folder exists at path {os.path.join(folder,folder_name)}")
+                # print(f"the folder exists at path {os.path.join(folder,folder_name)}")
                 folder_exists = True
                 break
         return folder_exists
@@ -37,3 +37,6 @@ class InputValidators:
             return True
         else:
             return False
+
+    def check_folder_exists(self,folder_path):
+        return os.path.isdir(folder_path)

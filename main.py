@@ -80,14 +80,12 @@ def user_interactions():
             internal.enumerate_hosts()
 
         case "va":
-
             formatted_vulns = vulnerability_analysis.analyze_csv(
-                f"{user.domain_variables['input_file']}"
+                user.domain_variables["input_file"]
             )
-            # vulnerability_analysis.sort_vulnerabilities(
-            #     formatted_vulns, f"{user.domain_variables['output']}"
-            # )
-            
+            vulnerability_analysis.sort_vulnerabilities(
+                formatted_vulns, f"{user.domain_variables['output']}"
+            )
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules

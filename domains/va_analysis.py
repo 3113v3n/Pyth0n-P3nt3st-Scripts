@@ -1,14 +1,17 @@
 # trunk-ignore-all(isort)
 from handlers import FileHandler
 from utils.shared import Config
+#from pprint import pprint
+
 
 class VulnerabilityAnalysis:
-    def __init__(self, filemanager: FileHandler,config:Config) -> None:
+    def __init__(self, filemanager: FileHandler, config: Config) -> None:
         self.filemanager = filemanager
         self.data = []
         self.credentialed_hosts = []
         self.headers = config.va_headers
         self.selected_columns = []
+        self.config = config
 
     def percentage_null(self, dataframe):
         # determine percentage accuracy of the data
@@ -17,10 +20,7 @@ class VulnerabilityAnalysis:
             if null_rate > 0:
                 print(f"{i} null rate: {null_rate:.2f}%")
 
-    def analyze_csv(self, csv_data):
-        # read csv data and return analyzed file
-        self.data = self.filemanager.read_csv(csv_data)
-
+    def format_input_file(self):
         # lists of hosts that passed credential check
 
         credentialed_hosts = self.data[
@@ -41,12 +41,58 @@ class VulnerabilityAnalysis:
 
         return formated_vulns
 
+    def analyze_csv(self, csv_data):
+        """
+        Checks if the provided argument is a string containing a csv file or a tuple containing
+        a list of csv files and the index of the user selected file we then return a list
+        """
+
+        if isinstance(csv_data, tuple):
+            file_list = csv_data[0]
+            start_index = csv_data[1]
+            start_file = file_list[start_index]["full_path"]
+
+            # Read the first file as baseline
+            original_file = self.filemanager.read_csv(start_file)
+
+            # Check if baseline file is empty
+            if original_file.empty:
+                raise ValueError(f"Baseline file {original_file} is empty")
+
+            all_vulns = original_file
+
+            # Iterate through the list of files and append data from each file
+            for file in file_list:
+                if file["full_path"] != start_file:
+                    # Read CSV file without headers
+                    new_data = self.filemanager.read_csv(file["full_path"], header=None)
+
+                    # Check if new data is empty
+                    if new_data.empty:
+                        print(f"Skipping empty file : {file['full_path']}")
+                        continue
+
+                    # Ensure columns match
+                    if original_file.shape[1] != new_data.shape[1]:
+                        raise ValueError(self.config.column_mismatch_error)
+
+                    # Append new data to the original data
+                    all_vulns = self.filemanager.concat_dataframes(all_vulns, new_data)
+
+            self.data = all_vulns
+
+        else:
+            # read csv data and return analyzed file
+            self.data = self.filemanager.read_csv(csv_data)
+        return self.format_input_file()
+
     def regex_word(self, search_term, **kwargs):
         if "is_extra" in kwargs:
             return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
         return rf"\b{search_term}\b"
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
+        # pprint(vulnerabilities)
         # 1. SSL issues
         ssl_issues = vulnerabilities[
             vulnerabilities["Name"].str.contains(self.regex_word("SSL"), regex=True)
@@ -151,6 +197,7 @@ class VulnerabilityAnalysis:
                 self.regex_word("Telnet Server"), regex=True
             )
         ]
+
         self.filemanager.write_to_multiple_sheets(
             [
                 {"dataframe": winverify, "sheetname": "winverify"},
@@ -174,12 +221,3 @@ class VulnerabilityAnalysis:
             ],
             output_file,
         )
-
-
-# TODO: append to existing VA scan
-# 1. Display existing files
-# 2. Select the desired file
-# 3. Append new values minus headers to existing file
-# 5. Ask user the location to their scans
-# 6. Display all csv files
-# 7. Run individual analysis on each file

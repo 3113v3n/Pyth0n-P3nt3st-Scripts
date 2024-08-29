@@ -53,14 +53,16 @@ class FileHandler:
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def read_csv(self, dataframe):
+    def read_csv(self, dataframe, **kwargs):
+        if "header" in kwargs:
+            return pandas.read_csv(dataframe, header="infer")
         return pandas.read_csv(dataframe)
 
     def read_excel_file(self, file):
         xls = pandas.ExcelFile(file)
         return pandas.read_excel(xls)
 
-    def write_to_multiple_sheets(self, data_frame_object, filename):
+    def write_to_multiple_sheets(self, data_frame_object: object, filename: str):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename,extension='xlsx')}"
         with pandas.ExcelWriter(self.filepath) as writer:
@@ -73,6 +75,24 @@ class FileHandler:
             f"Data has been written to \n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}"
         )
 
+    def append_to_sheets(self, data_frame: object, file: str):
+        """Appends data to existing Workbook"""
+        with pandas.ExcelWriter(
+            file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+        ) as writer:
+            # Copy existing sheets to writer
+            for sheet_name in writer.book.sheetnames:
+                df = pandas.read_excel(file, sheet_name=sheet_name, engine="openpyxl")
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write new data frame to new sheet
+            data_frame["dataframe"].to_excel(
+                writer, sheet_name=data_frame["sheetname"], index=False
+            )
+
+    def concat_dataframes(self, existing, newdata):
+        """Concatenate two data Frames"""
+        return pandas.concat([existing, newdata], ignore_index=True, axis=0)
+
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
             self.filepath = f"{self.output_directory}/{filename}"
@@ -84,7 +104,7 @@ class FileHandler:
         if self.validator.file_exists(f"{self.filepath}"):
             existing_df = self.read_csv(f"{self.filepath}")
 
-            updated_df = pandas.concat([existing_df, data], ignore_index=True)
+            updated_df = self.concat_dataframes([existing_df, data])
         else:
             updated_df = data
 
@@ -97,7 +117,7 @@ class FileHandler:
 
     def create_folder(self, folder_name):
 
-        if not self.validator.directory_exists(
+        if not self.validator.check_subdirectory_exists(
             folder_name, search_path="./output_directory"
         ):
             # os.getcwd()
@@ -166,8 +186,10 @@ class FileHandler:
             try:
                 selected_file = int(input(f"\n{input_str}"))
                 if 0 <= selected_file < len(self.files):
-                    print(f"{self.colors.OKGREEN}Selected file ==> {self.colors.ENDC}{self.files[selected_file]}")
-                    
+                    print(
+                        f"{self.colors.OKGREEN}Selected file ==> {self.colors.ENDC}{self.files[selected_file]}"
+                    )
+
                     break
                 else:
                     print(
@@ -180,11 +202,16 @@ class FileHandler:
         return selected_file
 
     def select_analyze_file(self):
-        """During VA analysis, display all CSV files to analyze and select the one to start from"""
+        """
+        During VA analysis, display all CSV files to analyze and select the one to start from
+        retun Tuple containing the list of CSV files and the index to start scan
+        """
         selected = self.common_loop(
             "Please enter the file number you would like scan first : "
         )
-        self.filepath = self.files[selected]["full_path"]
+        # self.filepath = self.files[selected]["full_path"]
+
+        return (self.files, selected)
 
     def get_last_ip(self):
         """Returns the IP address from a file input"""
