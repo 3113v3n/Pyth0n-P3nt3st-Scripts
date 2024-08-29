@@ -33,7 +33,7 @@ class InternalPT:
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
         print(
-            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.full_file_path}{self.bcolors.ENDC}"
+            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.filepath}{self.bcolors.ENDC}"
         )
 
     def netexec_module(self):

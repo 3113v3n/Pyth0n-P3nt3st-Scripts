@@ -1,7 +1,7 @@
 from pprint import pprint
 
 # [Test Domains]
-from domains import InternalPT
+from domains import VulnerabilityAnalysis, InternalPT
 
 # [Handlers]
 from handlers import (
@@ -9,7 +9,10 @@ from handlers import (
     NetworkHandler,
     PackageHandler,
     UserHandler,
-    VulnerabilityAnalysis,
+    MobileInterface,
+    ExternalInterface,
+    InternalInterface,
+    VulnerabilityInterface,
 )
 from utils import Commands, InputValidators, bcolors, Config
 
@@ -19,19 +22,28 @@ from utils import Commands, InputValidators, bcolors, Config
 # Initializers
 validator = InputValidators()
 ## Handle packages
-package = PackageHandler(Commands, bcolors,Config)
+package = PackageHandler(Commands, bcolors, Config)
 
 ## Handles file management
 filemanager = FileHandler(bcolors, validator=validator)
 
 ## gathers user input
-user = UserHandler(filemanager, validator, bcolors,Config)
+user = UserHandler(
+    filemanager,
+    validator,
+    bcolors,
+    Config,
+    MobileInterface,
+    InternalInterface,
+    ExternalInterface,
+    VulnerabilityInterface,
+)
 
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
 ## Vulnerability Analysis
-vulnerability_analysis = VulnerabilityAnalysis(filemanager,Config)
+vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
 
 
 # [penetration Testing domains]
@@ -72,10 +84,10 @@ def user_interactions():
             formatted_vulns = vulnerability_analysis.analyze_csv(
                 f"{user.domain_variables['input_file']}"
             )
-            vulnerability_analysis.sort_vulnerabilities(
-                formatted_vulns, f"{user.domain_variables['output']}"
-            )
-            #scan_again = input("Do you want to Analyze another file? [ Yes | No ] ")
+            # vulnerability_analysis.sort_vulnerabilities(
+            #     formatted_vulns, f"{user.domain_variables['output']}"
+            # )
+            
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
@@ -102,6 +114,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 # internal.netexec_module()['relay-list'](
 #     "output_directory/internal/home_w1f1_13-08-2024-11:02:30.csv",

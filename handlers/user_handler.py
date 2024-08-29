@@ -1,5 +1,9 @@
 # trunk-ignore-all(black)
 from utils.shared import InputValidators, Config
+from .mobile_ui_handler import MobileInterface
+from .internal_ui_handler import InternalInterface
+from .external_ui_handler import ExternalInterface
+from .vulnerability_ui import VulnerabilityInterface
 
 
 class UserHandler:
@@ -7,10 +11,22 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-        self, filemanager, validator: InputValidators, bcolors, config: Config
+        self,
+        filemanager,
+        validator: InputValidators,
+        bcolors,
+        config: Config,
+        mobile_ui: MobileInterface,
+        internal_ui: InternalInterface,
+        external_ui: ExternalInterface,
+        va_ui: VulnerabilityInterface,
     ) -> None:
         self.config = config
         self.default_test_domains = []
+        self.mobile_interface = mobile_ui
+        self.internal_interface = internal_ui
+        self.external_interface = external_ui
+        self.vulnerability_interface = va_ui
         self.color = bcolors
         self.not_valid_domain = False
         self.filemanager = filemanager
@@ -75,101 +91,21 @@ class UserHandler:
         match test_domain:
             case "mobile":
                 # TODO: [UNDER DEVELOPMENT]
-                print("Running Mobile scripts")
-                package_name = input(
-                    "Please provide the package name (com.example.packagename)\n"
-                )
-                # TODO: validate input is valid string
-                self.domain_variables = {"package_name": package_name}
-                return self.domain_variables
+                self.domain_variables = self.mobile_interface.user_interaction()
             case "internal":
-                print(" Running Internal PT modules ")
-                subnet = self.get_user_subnet()
-                mode = input(self.config.internal_mode_choice).lower()
-
-                # Ensure correct mode is selected by user
-                while mode not in ["scan", "resume"]:
-                    mode = input(self.config.internal_choice_error)
-
-                if mode == "resume":
-                    try:
-                        # returns an ip address if a file exists
-                        # returns None if no file exists
-
-                        resume_ip = self.filemanager.display_saved_files()
-
-                        if resume_ip is None:
-                            raise ValueError("No Previously saved file present")
-
-                        # output file
-                        output_file = self.filemanager.full_file_path
-                        subnet = f"{resume_ip}/{subnet.split('/')[1]}"
-
-                    except ValueError as error:
-                        print(
-                            f"{self.color.FAIL}[!] Cant use this module, {error}{self.color.ENDC}"
-                        )
-                        print(
-                            f"\nDefaulting to {self.color.OKCYAN}SCAN{self.color.ENDC} mode"
-                        )
-                        mode = "scan"
-                        subnet = self.get_user_subnet()
-                        output_file = input("[+] Provide a name for your output file: ")
-
-                elif mode == "scan":
-                    # TODO: file validations
-                    output_file = input("[+] Provide a name for your output file: ")
-
-                self.domain_variables = {
-                    "subnet": subnet,
-                    "mode": mode,
-                    "output": output_file,
-                }
-                return self.domain_variables
+                self.domain_variables = self.internal_interface.user_interaction(
+                    get_subnet=self.get_user_subnet(),
+                    color=self.color,
+                    filemanager=self.filemanager,
+                    config=self.config,
+                )
             case "external":
                 # TODO: [UNDER DEVELOPMENT !!]
-                print("\nRunning External PT modules")
-                website_domain = input("Enter domain to enumerate (example.domain.com)")
-
-                # TODO: strip https://
-                self.domain_variables = {"target_domain": website_domain}
-
-                return self.domain_variables
+                self.domain_variables = self.external_interface.user_interaction()
             case "va":
-                print("Running Vulnerability Analysis on your file\n")
-
-                while True:
-
-                    try:
-                        input_filename = input(
-                            "\n[+] Please provide a full path to the file you want to analyze: [CSV]\n"
-                        )
-                        # check if provided file exists
-                        if self.validator.file_exists(input_filename):
-                            # check if the file provided is of required extension
-                            if self.validator.check_filetype(input_filename, "csv"):
-                                # Exit the loop if file is valid
-                                break
-                            else:
-                                raise ValueError(
-                                    "Invalid file extension, only accepting CSV "
-                                )
-                        else:
-                            raise FileNotFoundError("File Does not Exists")
-                    except FileNotFoundError as error:
-                        print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
-
-                    except ValueError as error:
-                        print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
-
-                # Proceed to get the output filename
-                output_filename = input("[+] Provide a name for your output file: ")
-                self.domain_variables = {
-                    "input_file": input_filename,
-                    "output": output_filename,
-                }
-
-                return self.domain_variables
+                self.domain_variables = self.vulnerability_interface.user_interaction(
+                    self.validator, self.color,self.filemanager
+                )
             case _:
                 print(
                     f"{self.color.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.color.ENDC}"
