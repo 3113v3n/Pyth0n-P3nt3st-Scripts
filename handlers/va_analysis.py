@@ -1,24 +1,13 @@
 # trunk-ignore-all(isort)
 from handlers import FileHandler
-
+from utils.shared import Config
 
 class VulnerabilityAnalysis:
-    def __init__(self, filemanager: FileHandler) -> None:
+    def __init__(self, filemanager: FileHandler,config:Config) -> None:
         self.filemanager = filemanager
         self.data = []
         self.credentialed_hosts = []
-        self.headers = [
-            "CVE",
-            "Risk",
-            "Host",
-            "Protocol",
-            "Port",
-            "Name",
-            "Synopsis",
-            "Description",
-            "Solution",
-            "See Also",
-        ]
+        self.headers = config.va_headers
         self.selected_columns = []
 
     def percentage_null(self, dataframe):

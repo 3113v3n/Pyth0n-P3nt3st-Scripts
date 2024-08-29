@@ -19,7 +19,7 @@ from utils import Commands, InputValidators, bcolors, Config
 # Initializers
 validator = InputValidators()
 ## Handle packages
-package = PackageHandler(Commands, bcolors)
+package = PackageHandler(Commands, bcolors,Config)
 
 ## Handles file management
 filemanager = FileHandler(bcolors, validator=validator)
@@ -31,7 +31,7 @@ user = UserHandler(filemanager, validator, bcolors,Config)
 network = NetworkHandler(filemanager, Commands)
 
 ## Vulnerability Analysis
-vulnerability_analysis = VulnerabilityAnalysis(filemanager)
+vulnerability_analysis = VulnerabilityAnalysis(filemanager,Config)
 
 
 # [penetration Testing domains]

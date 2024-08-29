@@ -113,18 +113,21 @@ class FileHandler:
         :return: Full path of the files if found, None otherwise.
         """
 
-        for root, files in os.walk(f"{self.output_directory}"):
+        for root, dirs, files in os.walk(f"{self.output_directory}"):
+
             for file in files:
                 file_object = {"filename": "", "full_path": ""}
                 file_object["filename"] = file
                 file_object["full_path"] = os.path.join(root, file)
                 self.files.append(file_object)
+
         # return self.files
 
     def display_saved_files(self) -> str:
         """Display to the user a list of files available
         and returns the last ip present in that file"""
         self.find_files()
+
         if len(self.files) != 0:
             for index in range(len(self.files)):
                 print(
