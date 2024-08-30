@@ -123,132 +123,104 @@ class VulnerabilityAnalysis:
         return rf"\b{search_term}\b"
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
-        # pprint(vulnerabilities)
-        # 1. SSL issues
-        ssl_issues = vulnerabilities[
-            vulnerabilities["Name"].str.contains(self.regex_word("SSL"), regex=True)
+        conditions = self.config.filter_conditions(
+            vulnerabilities, regex_word=self.regex_word
+        )
+        # Show remaining data after filtering
+        unfiltered = vulnerabilities[
+            ~conditions["ssl_condition"]
+            & ~conditions["missing_patch_condition"]
+            & ~conditions["unsupported_software"]
+            & ~conditions["kaspersky_condition"]
+            & ~conditions["insecure_condition"]
+            & ~conditions["winverify_condition"]
+            & ~conditions["unquoted_condition"]
+            & ~conditions["smb_condition"]
+            & ~conditions["speculative_condition"]
+            & ~conditions["AD_condition"]
+            & ~conditions["defender_condition"]
+            & ~conditions["rdp_condition"]
+            & ~conditions["compliance_condition"]
+            & ~conditions["ssh_condition"]
+            & ~conditions["telnet_condition"]
+            & ~conditions["information_condition"]
         ]
+        # 1. SSL issues
+        ssl_issues = vulnerabilities[conditions["ssl_condition"]]
 
         # 2. Missing Patches and Security Updates
-        missing_patches = vulnerabilities[
-            vulnerabilities["Solution"].str.contains(
-                self.regex_word("Update"), regex=True
-            )
-            | (vulnerabilities["Solution"].str.contains(self.regex_word("patches")))
-        ]
+        missing_patches = vulnerabilities[conditions["missing_patch_condition"]]
         # 3. Unsupported Software
         """ Capture only vulnerabilities that require Upgrade """
-        unsupported = vulnerabilities[
-            (
-                vulnerabilities["Solution"].str.contains(
-                    self.regex_word("Upgrade", is_extra=True, second_term="Update"),
-                    regex=True,
-                )
-            )
-        ]
+        unsupported = vulnerabilities[conditions["unsupported_software"]]
         # 4. Kaspersky
-        kaspersky = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("Kaspersky"), regex=True
-            )
-        ]
+        kaspersky = vulnerabilities[conditions["kaspersky_condition"]]
 
         # 5. Windows Service Permission
-        insecure_service = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("Insecure Windows Service"), regex=True
-            )
-        ]
+        insecure_service = vulnerabilities[conditions["insecure_condition"]]
         # 6. WinVerify
-        winverify = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("WinVerifyTrust"), regex=True
-            )
-        ]
+        winverify = vulnerabilities[conditions["winverify_condition"]]
         # 7. Unquoted Service Path
-        unquoted = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("Unquoted Service Path"), regex=True
-            )
-        ]
+        unquoted = vulnerabilities[conditions["unquoted_condition"]]
         # 8. SMB misconfiguration
-        smb_issues = vulnerabilities[
-            vulnerabilities["Name"].str.contains(self.regex_word("SMB"), regex=True)
-        ]
+        smb_issues = vulnerabilities[conditions["smb_condition"]]
         # 9. Windows Speculative
-        speculative = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("Windows Speculative"), regex=True
-            )
-        ]
+        speculative = vulnerabilities[conditions["speculative_condition"]]
 
         # 10. AD Misconfigurations
-        active_directory = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("AD Starter"), regex=True
-            )
-        ]
+        active_directory = vulnerabilities[conditions["AD_condition"]]
 
         # 11. Microsoft
-        defender = vulnerabilities[
-            vulnerabilities["Synopsis"].str.contains(
-                self.regex_word("antimalware"), regex=True
-            )
-        ]
+        defender = vulnerabilities[conditions["defender_condition"]]
 
         # 12. RDP misconfigs
-        rdp_misconfig = vulnerabilities[
-            (
-                vulnerabilities["Name"].str.contains(
-                    self.regex_word("Terminal Services"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Name"].str.contains(
-                    self.regex_word("Remote Desktop Protocol"), regex=True
-                )
-            )
-        ]
+        rdp_misconfig = vulnerabilities[conditions["rdp_condition"]]
 
         # 13. Compliance Checks
-        compliance = vulnerabilities[
-            vulnerabilities["Synopsis"].str.contains(
-                self.regex_word("Compliance checks"), regex=True
-            )
-        ]
+        compliance = vulnerabilities[conditions["compliance_condition"]]
         # 14. SSH misconfig
-        ssh_misconfig = vulnerabilities[
-            vulnerabilities["Synopsis"].str.contains(
-                self.regex_word("SSH server"), regex=True
-            )
-        ]
+        ssh_misconfig = vulnerabilities[conditions["ssh_condition"]]
         # 15. Telnet
-        telnet = vulnerabilities[
-            vulnerabilities["Name"].str.contains(
-                self.regex_word("Telnet Server"), regex=True
-            )
+        telnet = vulnerabilities[conditions["telnet_condition"]]
+        # 16. Info Disclosure
+        information_disclosure = vulnerabilities[conditions["information_condition"]]
+
+        found_vulns = [
+            {"dataframe": winverify, "sheetname": "winverify"},
+            {"dataframe": unquoted, "sheetname": "Unquoted Service"},
+            {"dataframe": smb_issues, "sheetname": "SMB Issues"},
+            {"dataframe": ssl_issues, "sheetname": "SSL issues"},
+            {"dataframe": missing_patches, "sheetname": "Missing Security Updates"},
+            {"dataframe": unsupported, "sheetname": "Unsupported Software"},
+            {"dataframe": kaspersky, "sheetname": "Kaspersky Misconfigs"},
+            {"dataframe": ssh_misconfig, "sheetname": "SSH Misconfig"},
+            {"dataframe": rdp_misconfig, "sheetname": "RDP Misconfig"},
+            {"dataframe": defender, "sheetname": "Windows Defender"},
+            {"dataframe": active_directory, "sheetname": "AD misconfig"},
+            {
+                "dataframe": insecure_service,
+                "sheetname": "Insecure Windows Services",
+            },
+            {"dataframe": speculative, "sheetname": "Windows Speculative"},
+            {"dataframe": compliance, "sheetname": "Compliance checks"},
+            {"dataframe": telnet, "sheetname": "Unencrypted Telnet"},
+            {
+                "dataframe": information_disclosure,
+                "sheetname": "Information Disclosure",
+            },
         ]
+        unfiltered_vulns = [{"dataframe": unfiltered, "sheetname": "Unfiltered"}]
+        if not unfiltered.empty:
+            self.filemanager.write_to_multiple_sheets(
+                unfiltered_vulns,
+                "Unfiltered Vulnerabilities",
+            )
 
         self.filemanager.write_to_multiple_sheets(
-            [
-                {"dataframe": winverify, "sheetname": "winverify"},
-                {"dataframe": unquoted, "sheetname": "Unquoted Service"},
-                {"dataframe": smb_issues, "sheetname": "SMB Issues"},
-                {"dataframe": ssl_issues, "sheetname": "SSL issues"},
-                {"dataframe": missing_patches, "sheetname": "Missing Security Updates"},
-                {"dataframe": unsupported, "sheetname": "Unsupported Software"},
-                {"dataframe": kaspersky, "sheetname": "Kaspersky Misconfigs"},
-                {"dataframe": ssh_misconfig, "sheetname": "SSH Misconfig"},
-                {"dataframe": rdp_misconfig, "sheetname": "RDP Misconfig"},
-                {"dataframe": defender, "sheetname": "Windows Defender"},
-                {"dataframe": active_directory, "sheetname": "AD misconfig"},
-                {
-                    "dataframe": insecure_service,
-                    "sheetname": "Insecure Windows Services",
-                },
-                {"dataframe": speculative, "sheetname": "Windows Speculative"},
-                {"dataframe": compliance, "sheetname": "Compliance checks"},
-                {"dataframe": telnet, "sheetname": "Unencrypted Telnet"},
-            ],
+            found_vulns,
             output_file,
         )
+
+
+# TODO:
+# 1 return unfiltered Dataframe for manual analysis

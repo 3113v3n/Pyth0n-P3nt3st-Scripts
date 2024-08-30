@@ -104,7 +104,7 @@ class FileHandler:
         if self.validator.file_exists(f"{self.filepath}"):
             existing_df = self.read_csv(f"{self.filepath}")
 
-            updated_df = self.concat_dataframes([existing_df, data])
+            updated_df = self.concat_dataframes(existing_df, data)
         else:
             updated_df = data
 
