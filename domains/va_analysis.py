@@ -1,7 +1,8 @@
 # trunk-ignore-all(isort)
 from handlers import FileHandler
 from utils.shared import Config
-#from pprint import pprint
+
+# from pprint import pprint
 
 
 class VulnerabilityAnalysis:
@@ -30,7 +31,7 @@ class VulnerabilityAnalysis:
         self.credentialed_hosts = credentialed_hosts
 
         selected_columns = self.data[self.data["Host"].isin(self.credentialed_hosts)][
-            self.headers
+            self.headers[:-1]
         ]
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
@@ -51,35 +52,65 @@ class VulnerabilityAnalysis:
             file_list = csv_data[0]
             start_index = csv_data[1]
             start_file = file_list[start_index]["full_path"]
+            try:
+                # Read the first file as baseline
+                original_file = self.filemanager.read_csv(start_file)
+                print(
+                    f"original file {start_file} has {len(original_file.columns)} columns "
+                )
+                # Check if baseline file is empty
+                if original_file.empty:
+                    raise ValueError(
+                        f"Baseline file {file_list[start_index]['filename']} is empty"
+                    )
 
-            # Read the first file as baseline
-            original_file = self.filemanager.read_csv(start_file)
+                # Check missing columns in basefile
+                missing_columns = list(
+                    set(self.config.va_headers) - set(original_file.columns)
+                )
+                # Check if files have missing columns
+                if missing_columns:
+                    raise KeyError(
+                        f"The following columns are missing from the {start_file} \n{missing_columns}"
+                    )
 
-            # Check if baseline file is empty
-            if original_file.empty:
-                raise ValueError(f"Baseline file {original_file} is empty")
+                all_vulns = original_file
 
-            all_vulns = original_file
+                # Iterate through the list of files and append data from each file
+                for file in file_list:
+                    if file["full_path"] != start_file:
+                        # Read CSV file without headers
+                        new_data = self.filemanager.read_csv(
+                            file["full_path"], header=None
+                        )
 
-            # Iterate through the list of files and append data from each file
-            for file in file_list:
-                if file["full_path"] != start_file:
-                    # Read CSV file without headers
-                    new_data = self.filemanager.read_csv(file["full_path"], header=None)
+                        # Check if new data is empty
+                        if new_data.empty:
+                            print(f"Skipping empty file : {file['filename']}")
+                            continue
 
-                    # Check if new data is empty
-                    if new_data.empty:
-                        print(f"Skipping empty file : {file['full_path']}")
-                        continue
+                        # Ensure columns match
+                        if original_file.shape[1] != new_data.shape[1]:
+                            print(
+                                f"New file {file['filename']} has {len(new_data.columns)} columns "
+                            )
+                            raise ValueError(self.config.column_mismatch_error)
+                        missing_columns = list(
+                            set(self.config.va_headers) - set(new_data.columns)
+                        )
+                        # Check if other files have missing columns
+                        if missing_columns:
+                            raise KeyError(
+                                f"The following columns are missing from the {file['full_path']} \n{missing_columns}"
+                            )
+                        # Append new data to the original data
+                        all_vulns = self.filemanager.concat_dataframes(
+                            all_vulns, new_data
+                        )
 
-                    # Ensure columns match
-                    if original_file.shape[1] != new_data.shape[1]:
-                        raise ValueError(self.config.column_mismatch_error)
-
-                    # Append new data to the original data
-                    all_vulns = self.filemanager.concat_dataframes(all_vulns, new_data)
-
-            self.data = all_vulns
+                self.data = all_vulns
+            except (ValueError, KeyError) as error:
+                print(error)
 
         else:
             # read csv data and return analyzed file

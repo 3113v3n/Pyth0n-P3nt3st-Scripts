@@ -38,5 +38,7 @@ class InputValidators:
         else:
             return False
 
-    def check_folder_exists(self,folder_path):
-        return os.path.isdir(folder_path)
+    def check_folder_exists(self, folder_path):
+        # handle trailing slash issue
+        norm_path = os.path.normpath(folder_path)
+        return os.path.isdir(norm_path)
