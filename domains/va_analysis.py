@@ -2,7 +2,7 @@
 from handlers import FileHandler
 from utils.shared import Config
 
-# from pprint import pprint
+from pprint import pprint
 
 
 class VulnerabilityAnalysis:
@@ -38,9 +38,12 @@ class VulnerabilityAnalysis:
         formated_vulns = selected_columns[
             (selected_columns["Risk"].notna()) & (selected_columns["Risk"] != "Low")
         ].reset_index(drop=True)
-        print(f"Credentialed Hosts: \n{self.credentialed_hosts}")
+        pprint(f"Credentialed Hosts: \n{self.credentialed_hosts}")
 
         return formated_vulns
+
+    def get_missing_columns(self, dataframe):
+        return list(set(self.config.va_headers) - set(dataframe.columns))
 
     def analyze_csv(self, csv_data):
         """
@@ -48,73 +51,63 @@ class VulnerabilityAnalysis:
         a list of csv files and the index of the user selected file we then return a list
         """
 
-        if isinstance(csv_data, tuple):
-            file_list = csv_data[0]
-            start_index = csv_data[1]
-            start_file = file_list[start_index]["full_path"]
-            try:
-                # Read the first file as baseline
-                original_file = self.filemanager.read_csv(start_file)
-                print(
-                    f"original file {start_file} has {len(original_file.columns)} columns "
+        # if isinstance(csv_data, tuple):
+        file_list = csv_data[0]
+        start_index = csv_data[1]
+        start_file = file_list[start_index]["full_path"]
+        try:
+            # Read the first file as baseline
+            original_file = self.filemanager.read_csv(start_file)
+            # print(
+            #     f"original file {start_file} has {len(original_file.columns)} columns "
+            # )
+            # Check if baseline file is empty
+            if original_file.empty:
+                raise ValueError(
+                    f"Baseline file {file_list[start_index]['filename']} is empty"
                 )
-                # Check if baseline file is empty
-                if original_file.empty:
-                    raise ValueError(
-                        f"Baseline file {file_list[start_index]['filename']} is empty"
-                    )
 
-                # Check missing columns in basefile
-                missing_columns = list(
-                    set(self.config.va_headers) - set(original_file.columns)
+            # Check missing columns in basefile
+            missing_columns = self.get_missing_columns(original_file)
+
+            # Check if files have missing columns
+            if missing_columns:
+                raise KeyError(
+                    f"The following columns are missing from the {start_file} \n{missing_columns}"
                 )
-                # Check if files have missing columns
-                if missing_columns:
-                    raise KeyError(
-                        f"The following columns are missing from the {start_file} \n{missing_columns}"
-                    )
 
-                all_vulns = original_file
+            all_vulns = original_file
 
-                # Iterate through the list of files and append data from each file
-                for file in file_list:
-                    if file["full_path"] != start_file:
-                        # Read CSV file without headers
-                        new_data = self.filemanager.read_csv(
-                            file["full_path"], header=None
+            # Iterate through the list of files and append data from each file
+            for file in file_list:
+                if file["full_path"] != start_file:
+                    # Read CSV file without headers
+                    new_data = self.filemanager.read_csv(file["full_path"], header=None)
+
+                    # Check if new data is empty
+                    if new_data.empty:
+                        print(f"Skipping empty file : {file['filename']}")
+                        continue
+
+                    # Ensure columns match
+                    if original_file.shape[1] != new_data.shape[1]:
+                        print(
+                            f"New file {file['filename']} has {len(new_data.columns)} columns "
                         )
-
-                        # Check if new data is empty
-                        if new_data.empty:
-                            print(f"Skipping empty file : {file['filename']}")
-                            continue
-
-                        # Ensure columns match
-                        if original_file.shape[1] != new_data.shape[1]:
-                            print(
-                                f"New file {file['filename']} has {len(new_data.columns)} columns "
-                            )
-                            raise ValueError(self.config.column_mismatch_error)
-                        missing_columns = list(
-                            set(self.config.va_headers) - set(new_data.columns)
+                        raise ValueError(self.config.column_mismatch_error)
+                    missing_columns = self.get_missing_columns(new_data)
+                    # Check if other files have missing columns
+                    if missing_columns:
+                        raise KeyError(
+                            f"The following columns are missing from the {file['full_path']} \n{missing_columns}"
                         )
-                        # Check if other files have missing columns
-                        if missing_columns:
-                            raise KeyError(
-                                f"The following columns are missing from the {file['full_path']} \n{missing_columns}"
-                            )
-                        # Append new data to the original data
-                        all_vulns = self.filemanager.concat_dataframes(
-                            all_vulns, new_data
-                        )
+                    # Append new data to the original data
+                    all_vulns = self.filemanager.concat_dataframes(all_vulns, new_data)
 
-                self.data = all_vulns
-            except (ValueError, KeyError) as error:
-                print(error)
+            self.data = all_vulns
+        except (ValueError, KeyError) as error:
+            print(error)
 
-        else:
-            # read csv data and return analyzed file
-            self.data = self.filemanager.read_csv(csv_data)
         return self.format_input_file()
 
     def regex_word(self, search_term, **kwargs):
@@ -144,6 +137,8 @@ class VulnerabilityAnalysis:
             & ~conditions["ssh_condition"]
             & ~conditions["telnet_condition"]
             & ~conditions["information_condition"]
+            & ~conditions["web_condition"]
+            & ~conditions["rce_condition"]
         ]
         # 1. SSL issues
         ssl_issues = vulnerabilities[conditions["ssl_condition"]]
@@ -151,7 +146,6 @@ class VulnerabilityAnalysis:
         # 2. Missing Patches and Security Updates
         missing_patches = vulnerabilities[conditions["missing_patch_condition"]]
         # 3. Unsupported Software
-        """ Capture only vulnerabilities that require Upgrade """
         unsupported = vulnerabilities[conditions["unsupported_software"]]
         # 4. Kaspersky
         kaspersky = vulnerabilities[conditions["kaspersky_condition"]]
@@ -184,6 +178,14 @@ class VulnerabilityAnalysis:
         telnet = vulnerabilities[conditions["telnet_condition"]]
         # 16. Info Disclosure
         information_disclosure = vulnerabilities[conditions["information_condition"]]
+        # 17, Web Issues
+        web_issues = vulnerabilities[conditions["web_condition"]]
+        # 18. Remote Code execution
+        rce = vulnerabilities[
+            conditions["rce_condition"]
+            & ~conditions["missing_patch_condition"]
+            & ~conditions["unsupported_software"]
+        ]
 
         found_vulns = [
             {"dataframe": winverify, "sheetname": "winverify"},
@@ -196,6 +198,7 @@ class VulnerabilityAnalysis:
             {"dataframe": ssh_misconfig, "sheetname": "SSH Misconfig"},
             {"dataframe": rdp_misconfig, "sheetname": "RDP Misconfig"},
             {"dataframe": defender, "sheetname": "Windows Defender"},
+            {"dataframe": rce, "sheetname": "RCE"},
             {"dataframe": active_directory, "sheetname": "AD misconfig"},
             {
                 "dataframe": insecure_service,
@@ -208,6 +211,7 @@ class VulnerabilityAnalysis:
                 "dataframe": information_disclosure,
                 "sheetname": "Information Disclosure",
             },
+            {"dataframe": web_issues, "sheetname": "Web Issues"},
         ]
         unfiltered_vulns = [{"dataframe": unfiltered, "sheetname": "Unfiltered"}]
         if not unfiltered.empty:
@@ -222,5 +226,4 @@ class VulnerabilityAnalysis:
         )
 
 
-# TODO:
-# 1 return unfiltered Dataframe for manual analysis
+# TODO:# trunk-ignore-all(isort)
