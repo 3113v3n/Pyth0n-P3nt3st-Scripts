@@ -4,16 +4,7 @@ from pprint import pprint
 from domains import VulnerabilityAnalysis, InternalPT
 
 # [Handlers]
-from handlers import (
-    FileHandler,
-    NetworkHandler,
-    PackageHandler,
-    UserHandler,
-    MobileInterface,
-    ExternalInterface,
-    InternalInterface,
-    VulnerabilityInterface,
-)
+from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
 from utils import Commands, InputValidators, bcolors, Config
 
 # [Utils]
@@ -28,16 +19,7 @@ package = PackageHandler(Commands, bcolors, Config)
 filemanager = FileHandler(bcolors, validator=validator)
 
 ## gathers user input
-user = UserHandler(
-    filemanager,
-    validator,
-    bcolors,
-    Config,
-    MobileInterface,
-    InternalInterface,
-    ExternalInterface,
-    VulnerabilityInterface,
-)
+user = UserHandler(filemanager, validator, bcolors, Config)
 
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)

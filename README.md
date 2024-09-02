@@ -49,10 +49,10 @@ inorder to avoid resumming from the last recorded live IP.
 
 - This module runs an automated analysis on a **Nessus Advanced scan** and summarizes the vulnerabilities discovered
 - To run the module simply enter [ **va** ] on the provided prompt
-- It requires 2 files
+- It requires 2 parameters:
 
 ```text
-    Input file: The Nessus output file (xlsx)
+    Path to Scanned files: The Nessus output file (csv)
     Output file: The Name of your analyzed file
 ```
 ![Vulnerability Analysis](images/va.png)
