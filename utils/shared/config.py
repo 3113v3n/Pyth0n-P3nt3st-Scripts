@@ -139,6 +139,11 @@ class Config:
                 )
             )
             | (
+                vulnerabilities["Description"].str.contains(
+                    regex_word("no longer supported"), regex=True
+                )
+            )
+            | (
                 vulnerabilities["Name"].str.contains(
                     regex_word("unsupported"), regex=True
                 )
@@ -147,8 +152,14 @@ class Config:
                 vulnerabilities["Solution"].str.contains(
                     regex_word("unsupported"), regex=True
                 )
-            )| (
+            )
+            | (
                 vulnerabilities["Solution"].str.contains(
+                    regex_word("Unsupported Version"), regex=True
+                )
+            )
+            | (
+                vulnerabilities["Name"].str.contains(
                     regex_word("Unsupported Version"), regex=True
                 )
             ),
@@ -209,5 +220,18 @@ class Config:
             "information_condition": (vulnerabilities["Name"].notna())
             & vulnerabilities["Name"].str.contains(
                 regex_word("Information Disclosure"), regex=True
+            ),
+            "web_condition": (vulnerabilities["Name"].notna())
+            & (vulnerabilities["Name"].str.contains(regex_word("Web"), regex=True))
+            | (
+                vulnerabilities["Description"].str.contains(
+                    regex_word("web server"), regex=True
+                )
+            ),
+            "rce_condition": (vulnerabilities["Description"].notna())
+            & (
+                vulnerabilities["Description"].str.contains(
+                    regex_word("remote code execution"), regex=True
+                )
             ),
         }
