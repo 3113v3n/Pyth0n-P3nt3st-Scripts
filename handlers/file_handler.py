@@ -72,7 +72,7 @@ class FileHandler:
                         writer, sheet_name=dataframe["sheetname"], index=False
                     )
         print(
-            f"Data has been written to \n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}"
+            f"Data has been written to :\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
         )
 
     def append_to_sheets(self, data_frame: object, file: str):
@@ -186,9 +186,6 @@ class FileHandler:
             try:
                 selected_file = int(input(f"\n{input_str}"))
                 if 0 <= selected_file < len(self.files):
-                    print(
-                        f"{self.colors.OKGREEN}Selected file ==> {self.colors.ENDC}{self.files[selected_file]}"
-                    )
 
                     break
                 else:
