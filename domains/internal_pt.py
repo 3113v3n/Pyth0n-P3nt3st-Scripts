@@ -1,5 +1,5 @@
 from handlers import FileHandler, NetworkHandler
-from utils import bcolors, NetExec
+from utils import bcolors #, NetExec
 
 
 class InternalPT:

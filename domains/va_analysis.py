@@ -2,7 +2,7 @@
 from handlers import FileHandler
 from utils.shared import Config
 
-from pprint import pprint
+#from pprint import pprint
 
 
 class VulnerabilityAnalysis:
@@ -11,76 +11,75 @@ class VulnerabilityAnalysis:
         self.data = []
         self.credentialed_hosts = []
         self.headers = config.va_headers
-        self.selected_columns = []
-        self.config = config
+        self.selected_columns = []  # columns to showcase on our final excel
+        self.config = config  # contains constants to be used accross the program
 
-    def percentage_null(self, dataframe):
-        # determine percentage accuracy of the data
+    def percentage_null_fields(self, dataframe):
+        # determine percentage accuracy of the data by showing null fields
         for i in dataframe.columns:
             null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
             if null_rate > 0:
                 print(f"{i} null rate: {null_rate:.2f}%")
 
-    def format_input_file(self):
+    def format_input_file(self)->list:
         # lists of hosts that passed credential check
-
-        credentialed_hosts = self.data[
-            (self.data["Plugin Output"].notna())
-            & (self.data["Plugin Output"].str.contains("Credentialed checks : yes"))
-        ]["Host"].tolist()
+        # filter hosts with credential check successful
+        credentialed_hosts = self.data[ (self.data["Plugin Output"].notna())
+            & (
+                self.data["Plugin Output"].str.contains(
+                    "Credentialed checks : yes"
+                )
+            )]["Host"].tolist()
         self.credentialed_hosts = credentialed_hosts
 
         selected_columns = self.data[self.data["Host"].isin(self.credentialed_hosts)][
-            self.headers[:-1]
+            self.headers[:-1]  # ignore the last item in our headers list
         ]
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
-        formated_vulns = selected_columns[
+        formated_vulnerabilities = selected_columns[
             (selected_columns["Risk"].notna()) & (selected_columns["Risk"] != "Low")
         ].reset_index(drop=True)
-        pprint(f"Credentialed Hosts: \n{self.credentialed_hosts}")
+        print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
-        return formated_vulns
+        return formated_vulnerabilities
 
-    def get_missing_columns(self, dataframe):
-        return list(set(self.config.va_headers) - set(dataframe.columns))
+    def get_missing_columns(self, dataframe, filename):
+        # compare the headers from our defined headers and provided dataframe
+        missing_columns = list(set(self.config.va_headers) - set(dataframe.columns))
+        if missing_columns:
+            raise KeyError(
+                f"The following columns are missing from the {filename} \n{missing_columns}"
+            )
 
     def analyze_csv(self, csv_data):
         """
         Checks if the provided argument is a string containing a csv file or a tuple containing
         a list of csv files and the index of the user selected file we then return a list
+
+        ( [list_of_csv_files], index_of_selected_file )
         """
 
         # if isinstance(csv_data, tuple):
         file_list = csv_data[0]
-        start_index = csv_data[1]
-        start_file = file_list[start_index]["full_path"]
+        starting_index = csv_data[1]
+        starting_file = file_list[starting_index]["full_path"]
         try:
             # Read the first file as baseline
-            original_file = self.filemanager.read_csv(start_file)
-            # print(
-            #     f"original file {start_file} has {len(original_file.columns)} columns "
-            # )
+            filename = file_list[starting_index]["filename"]
+            original_file = self.filemanager.read_csv(starting_file)
+
             # Check if baseline file is empty
             if original_file.empty:
-                raise ValueError(
-                    f"Baseline file {file_list[start_index]['filename']} is empty"
-                )
+                raise ValueError(f"Baseline file {filename} is empty")
 
             # Check missing columns in basefile
-            missing_columns = self.get_missing_columns(original_file)
-
-            # Check if files have missing columns
-            if missing_columns:
-                raise KeyError(
-                    f"The following columns are missing from the {start_file} \n{missing_columns}"
-                )
-
-            all_vulns = original_file
+            self.get_missing_columns(original_file, filename)
+            all_vulnerabilities = original_file
 
             # Iterate through the list of files and append data from each file
             for file in file_list:
-                if file["full_path"] != start_file:
+                if file["full_path"] != starting_file:
                     # Read CSV file without headers
                     new_data = self.filemanager.read_csv(file["full_path"], header=None)
 
@@ -95,16 +94,15 @@ class VulnerabilityAnalysis:
                             f"New file {file['filename']} has {len(new_data.columns)} columns "
                         )
                         raise ValueError(self.config.column_mismatch_error)
-                    missing_columns = self.get_missing_columns(new_data)
-                    # Check if other files have missing columns
-                    if missing_columns:
-                        raise KeyError(
-                            f"The following columns are missing from the {file['full_path']} \n{missing_columns}"
-                        )
-                    # Append new data to the original data
-                    all_vulns = self.filemanager.concat_dataframes(all_vulns, new_data)
 
-            self.data = all_vulns
+                    # Check if other files have missing columns
+                    self.get_missing_columns(new_data, file["filename"])
+                    # Append new data to the original data
+                    all_vulnerabilities = self.filemanager.concat_dataframes(
+                        all_vulnerabilities, new_data
+                    )
+
+            self.data = all_vulnerabilities
         except (ValueError, KeyError) as error:
             print(error)
 
@@ -187,7 +185,7 @@ class VulnerabilityAnalysis:
             & ~conditions["unsupported_software"]
         ]
 
-        found_vulns = [
+        found_vulnerabilities = [
             {"dataframe": winverify, "sheetname": "winverify"},
             {"dataframe": unquoted, "sheetname": "Unquoted Service"},
             {"dataframe": smb_issues, "sheetname": "SMB Issues"},
@@ -213,17 +211,16 @@ class VulnerabilityAnalysis:
             },
             {"dataframe": web_issues, "sheetname": "Web Issues"},
         ]
-        unfiltered_vulns = [{"dataframe": unfiltered, "sheetname": "Unfiltered"}]
+        unfiltered_vulnerabilities = [
+            {"dataframe": unfiltered, "sheetname": "Unfiltered"}
+        ]
         if not unfiltered.empty:
             self.filemanager.write_to_multiple_sheets(
-                unfiltered_vulns,
+                unfiltered_vulnerabilities,
                 "Unfiltered Vulnerabilities",
             )
 
         self.filemanager.write_to_multiple_sheets(
-            found_vulns,
+            found_vulnerabilities,
             output_file,
         )
-
-
-# TODO:# trunk-ignore-all(isort)
