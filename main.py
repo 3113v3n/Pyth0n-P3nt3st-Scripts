@@ -1,17 +1,11 @@
 from pprint import pprint
 
 # [Test Domains]
-from domains import InternalPT
+from domains import VulnerabilityAnalysis, InternalPT
 
 # [Handlers]
-from handlers import (
-    FileHandler,
-    NetworkHandler,
-    PackageHandler,
-    UserHandler,
-    VulnerabilityAnalysis,
-)
-from utils import Commands, InputValidators, bcolors
+from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
+from utils import Commands, InputValidators, bcolors, Config
 
 # [Utils]
 
@@ -19,25 +13,25 @@ from utils import Commands, InputValidators, bcolors
 # Initializers
 validator = InputValidators()
 ## Handle packages
-package = PackageHandler(Commands, bcolors)
+package = PackageHandler(Commands, bcolors, Config)
 
 ## Handles file management
 filemanager = FileHandler(bcolors, validator=validator)
 
 ## gathers user input
-user = UserHandler(filemanager, validator, bcolors)
+user = UserHandler(filemanager, validator, bcolors, Config)
 
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
 ## Vulnerability Analysis
-vulnerability_analysis = VulnerabilityAnalysis(filemanager)
+vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
 
 
 # [penetration Testing domains]
 internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
 
-user_test_domain =  user.get_user_domain()
+user_test_domain = user.get_user_domain()
 
 
 def packages_present() -> bool:
@@ -68,9 +62,13 @@ def user_interactions():
             internal.enumerate_hosts()
 
         case "va":
+            formatted_vulns = vulnerability_analysis.analyze_csv(
+                user.domain_variables["input_file"]
+            )
+            vulnerability_analysis.sort_vulnerabilities(
+                formatted_vulns, f"{user.domain_variables['output']}"
+            )
 
-            formatted_vulns = vulnerability_analysis.analyze_csv(f"{user.domain_variables['input_file']}")
-            vulnerability_analysis.sort_vulnerabilities(formatted_vulns,f"{user.domain_variables['output']}")
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
             pass
@@ -95,7 +93,8 @@ def main():
 
 
 if __name__ == "__main__":
-     main()
+    main()
+
 
 # internal.netexec_module()['relay-list'](
 #     "output_directory/internal/home_w1f1_13-08-2024-11:02:30.csv",
