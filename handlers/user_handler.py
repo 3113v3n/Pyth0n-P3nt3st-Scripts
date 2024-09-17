@@ -49,14 +49,25 @@ class UserHandler:
     ## User Interactions
 
     def mobile_ui_interaction(self):
+        while True:
+            try:
+                print("Running Mobile scripts")
+                package_path = input(
+                    "Please provide the Path to your mobile application(s)\n"
+                ).strip()
+                # Show list of apks available
+                if not self.validator.check_folder_exists(package_path):
+                    raise ValueError("No Such Folder exists")
+                applications = self.filemanager.display_saved_files(
+                    package_path, display_applications=True
+                )
 
-        print("Running Mobile scripts")
-        package_name = input(
-            "Please provide the package name (com.example.packagename)\n"
-        )
-        # TODO: validate input is valid string
-
-        return {"package_name": package_name}
+                if applications:
+                    return applications
+                else:
+                    raise FileExistsError("No Files Present in the provided Directory")
+            except (ValueError, FileExistsError) as error:
+                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
 
     def va_ui_interaction(self):
         print("Running Vulnerability Analysis Module\n")

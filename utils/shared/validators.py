@@ -32,11 +32,9 @@ class InputValidators:
     def file_exists(self, filename) -> bool:
         return os.path.isfile(filename)
 
-    def check_filetype(self, filename, filetype) -> bool:
-        if re.search(f"\.{filetype}$", filename):
-            return True
-        else:
-            return False
+    def check_filetype(self, filename:str, filetype:str) -> bool:
+        pattern = re.compile(rf'\.{re.escape(filetype)}$', re.IGNORECASE)
+        return bool(pattern.search(filename))
 
     def check_folder_exists(self, folder_path):
         # handle trailing slash issue

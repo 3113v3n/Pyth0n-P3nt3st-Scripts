@@ -20,6 +20,9 @@ class Commands:
             text=True,
         )
         return result
+    
+    def get_process_output(self,command):
+        return subprocess.getoutput(command)
 
     def auto_enter_commands(self, command):
         """Automatically press enter when prompted by script"""

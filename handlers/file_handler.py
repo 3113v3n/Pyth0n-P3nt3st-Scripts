@@ -75,6 +75,19 @@ class FileHandler:
             f"Data has been written to :\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
         )
 
+    def get_filename_without_extension(self,filepath):
+        # Get the filename with extension
+        filename_with_ext = os.path.basename(filepath)
+        # Split the filename and extension
+        filename_without_ext, _ = os.path.splitext(filename_with_ext)
+        return filename_without_ext
+
+    def get_file_extension(self, filename):
+        # Split the filename into root and extension
+        root, ext = os.path.splitext(filename)
+        # Return the extension, excluding the dot
+        return ext.lstrip(".")
+
     def append_to_sheets(self, data_frame: object, file: str):
         """Appends data to existing Workbook"""
         with pandas.ExcelWriter(
@@ -115,13 +128,16 @@ class FileHandler:
         with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def create_folder(self, folder_name):
+    def create_folder(self, folder_name, search_path="./output_directory"):
+
+        self.output_directory = f"{search_path}/{folder_name}"
 
         if not self.validator.check_subdirectory_exists(
-            folder_name, search_path="./output_directory"
+            folder_name, search_path=search_path
         ):
             # os.getcwd()
             folder_path = self.output_directory
+            print(self.output_directory)
             os.makedirs(folder_path)
             print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
 
@@ -133,7 +149,7 @@ class FileHandler:
         :return: Full path of the files if found, None otherwise.
         """
 
-        for root, dirs, files in os.walk(search_path):
+        for root, _, files in os.walk(search_path):
 
             for file in files:
                 file_object = {"filename": "", "full_path": ""}
@@ -153,9 +169,19 @@ class FileHandler:
             for file in self.files
             if self.validator.check_filetype(file["filename"], "csv")
         ]
-
+        app_files = [
+            file
+            for file in self.files
+            if self.validator.check_filetype(file["filename"], "apk")
+            or self.validator.check_filetype(file["filename"], "ipa")
+        ]
+        # filter out CSV files only
         if "display_csv" in kwargs:
             self.files = csv_files
+
+        # allow user to view only apks and ios
+        elif "display_applications" in kwargs:
+            self.files = app_files
 
         if len(self.files) != 0:
             display_strs = []  # list to collect all display strings
@@ -169,13 +195,17 @@ class FileHandler:
             for display_str in display_strs:
                 print(display_str)
 
-            # Handle users choice
             ## Resume scan
-            if "display_csv" not in kwargs:
-                return self.get_last_ip()
-            else:
+            if "display_csv" in kwargs:
                 ## Display files to perform VA analysis
                 return self.select_analyze_file()
+
+            elif "display_applications" in kwargs:
+                return self.analyze_applications()
+
+            else:
+                # Handle users choice
+                return self.get_last_ip()
 
         else:
             return None
@@ -209,6 +239,10 @@ class FileHandler:
         # self.filepath = self.files[selected]["full_path"]
 
         return (self.files, selected)
+
+    def analyze_applications(self):
+        selected_apk = self.common_loop("Select the application to scan ")
+        return self.files[selected_apk]
 
     def get_last_ip(self):
         """Returns the IP address from a file input"""

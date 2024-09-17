@@ -1,11 +1,11 @@
 from pprint import pprint
 
 # [Test Domains]
-from domains import VulnerabilityAnalysis, InternalPT
+from domains import InternalPT, MobilePT, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, InputValidators, bcolors, Config
+from utils import Commands, Config, InputValidators, bcolors, MobileCommands
 
 # [Utils]
 
@@ -24,12 +24,13 @@ user = UserHandler(filemanager, validator, bcolors, Config)
 ## Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
-## Vulnerability Analysis
-vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
-
+## Mobile Commands
+mobile_commands = MobileCommands(Commands, filemanager)
 
 # [penetration Testing domains]
 internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
+vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
+mobile = MobilePT(mobile_commands)
 
 user_test_domain = user.get_user_domain()
 
@@ -71,7 +72,9 @@ def user_interactions():
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
-            pass
+            application_dict = user.domain_variables
+            mobile.initialize_variables(application_dict)
+            mobile.inspect_application_files()
         case "external":
             # initialize variables that will be used to test different External PT modules
             # out_put = filemanager.output_directory

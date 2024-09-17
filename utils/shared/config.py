@@ -4,10 +4,10 @@ from .colors import bcolors
 class Config:
 
     test_domains = [
-        # {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
-        {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
+        {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
+       # {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
         # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
+        #{"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
     ]
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
@@ -74,6 +74,10 @@ class Config:
     ]
     mobile_packages = [
         # Mobile
+        ## Install on Device
+        # 1. WiFi ADB
+        # 2. Magisk Frida / SQlite
+        # 3. Drozer
         {
             "name": "apktool",
             "command": "sudo apt -y install aapt \
@@ -87,8 +91,9 @@ class Config:
             "command": "apt-get -y install \
                  adb dex2jar jadx nuclei radare2 sqlite3 \
                      sqlitebrowser xmlstarlet apksigner \
-                         zipalign pip3 install frida-tools objection file-scraper",
+                         zipalign && pip3 install frida-tools objection file-scraper",
         },
+        {"name": "java", "command": "sudo apt install default-jdk -y"},
     ]
     va_headers = [
         "CVE",
