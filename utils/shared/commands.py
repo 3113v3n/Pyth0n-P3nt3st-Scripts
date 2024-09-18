@@ -8,10 +8,10 @@ class Commands:
 
     def __init__(self) -> None:
         pass
-       
 
     def run_os_commands(self, command):
         """Executes shell commands such as [apt and sudo]"""
+
         result = subprocess.run(
             command,
             stdout=subprocess.PIPE,
@@ -20,8 +20,8 @@ class Commands:
             text=True,
         )
         return result
-    
-    def get_process_output(self,command):
+
+    def get_process_output(self, command):
         return subprocess.getoutput(command)
 
     def auto_enter_commands(self, command):
@@ -57,6 +57,7 @@ class Commands:
             return False
 
         except Exception as e:
+            print(e)
             return False
 
     def clear_screen(self):
