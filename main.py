@@ -25,12 +25,12 @@ user = UserHandler(filemanager, validator, bcolors, Config)
 network = NetworkHandler(filemanager, Commands)
 
 ## Mobile Commands
-mobile_commands = MobileCommands(Commands, filemanager, validator)
+mobile_commands = MobileCommands(Commands, filemanager, validator,bcolors,Config)
 
 # [penetration Testing domains]
 internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
 vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
-mobile = MobilePT(mobile_commands, filemanager)
+mobile = MobilePT(mobile_commands)
 
 user_test_domain = user.get_user_domain()
 

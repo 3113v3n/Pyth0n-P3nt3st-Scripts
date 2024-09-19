@@ -39,5 +39,5 @@ class PackageHandler:
                 f"[+] Installing the following package:\n{self.colors.OKCYAN}{package['name']}{self.colors.ENDC}\n"
             )
             # Install Missing packages
-            self.command.run_os_commands(command=package["command"])
+            #self.command.run_os_commands(command=package["command"])
         print(f"\n{self.colors.OKGREEN}[+] Installation complete{self.colors.ENDC}")

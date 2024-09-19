@@ -75,7 +75,7 @@ class FileHandler:
             f"Data has been written to :\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
         )
 
-    def get_filename_without_extension(self,filepath):
+    def get_filename_without_extension(self, filepath):
         # Get the filename with extension
         filename_with_ext = os.path.basename(filepath)
         # Split the filename and extension
@@ -123,6 +123,9 @@ class FileHandler:
 
         updated_df.to_csv(f"{self.filepath}", index=False)
 
+    def get_file_basename(self, full_file_path):
+        return os.path.basename(full_file_path)
+
     def append_to_txt(self, filename, content):
         """Update existing file"""
         with open(f"{filename}", "a") as file:
@@ -139,7 +142,7 @@ class FileHandler:
             folder_path = self.output_directory
             print(self.output_directory)
             os.makedirs(folder_path)
-            #print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
+            # print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
 
     def find_files(self, search_path):
         """
