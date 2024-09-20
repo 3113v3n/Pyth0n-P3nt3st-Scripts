@@ -51,9 +51,9 @@ class UserHandler:
     def mobile_ui_interaction(self):
         while True:
             try:
-                print("Running Mobile scripts")
+                print("Running Mobile scripts\n")
                 package_path = input(
-                    "Please provide the Path to your mobile application(s)\n"
+                    "Please provide the Path to your mobile application(s)\nPath to File:  "
                 ).strip()
                 # Show list of apks available
                 if not self.validator.check_folder_exists(package_path):

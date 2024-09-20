@@ -140,7 +140,6 @@ class FileHandler:
         ):
             # os.getcwd()
             folder_path = self.output_directory
-            print(self.output_directory)
             os.makedirs(folder_path)
             # print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
 
