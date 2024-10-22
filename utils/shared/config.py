@@ -5,9 +5,9 @@ class Config:
 
     test_domains = [
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
-       # {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
-        # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        #{"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
+        {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
+        {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
+        # {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
     ]
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
@@ -87,13 +87,22 @@ class Config:
                 chmod +x apktool.jar && cp apktool.jar /usr/local/bin/apktool.jar",
         },
         {
+            "name": "go",
+            "command": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+        },
+        {
             "name": "dependencies",
             "command": "apt-get -y install \
-                 adb dex2jar jadx nuclei radare2 sqlite3 \
+                 adb dex2jar jadx nuclei radare2 libusbmuxd-tools sqlite3 \
                      sqlitebrowser xmlstarlet apksigner \
                          zipalign && pip3 install frida-tools objection file-scraper",
         },
         {"name": "java", "command": "sudo apt install default-jdk -y"},
+        {
+            "name": "property-lister",
+            "command": "pip3 install --upgrade property-lister",
+        },
+        {"name": "plistutil", "command": "apt-get -y install plistutil"},
     ]
     va_headers = [
         "CVE",

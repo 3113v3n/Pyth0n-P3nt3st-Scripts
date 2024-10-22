@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from utils.shared import InputValidators
+import zipfile
 
 # from pprint import pprint
 import pandas
@@ -279,3 +280,4 @@ class FileHandler:
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
         removed_extension = Path(file).stem
         return f"{removed_extension}_{timestamp}.{extension}"
+    

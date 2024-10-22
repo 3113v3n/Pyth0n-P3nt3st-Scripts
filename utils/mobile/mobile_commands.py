@@ -24,7 +24,9 @@ class MobileCommands:
         self.commands.run_os_commands(f"adb push {certificate} /storage/emulated/0/")
 
     def pull_package_with_keyword(self, keyword):
-        pkg_cmd = f"adb shell pm list packages '{keyword}'|head -n 1|cut -d ':' -f2"
+        pkg_cmd = (
+            f"adb shell pm list packages | grep '{keyword}'|head -n 1|cut -d ':' -f2"
+        )
         pkg = self.commands.get_process_output(pkg_cmd).strip()
 
         if pkg:
@@ -54,23 +56,46 @@ class MobileCommands:
         base_dir = self.filemanager.output_directory
         self.file_type = self.filemanager.get_file_extension(package)  # ipa / apk
         filename_without_ext = self.filemanager.get_filename_without_extension(package)
-        self.file_name = filename_without_ext
+        self.file_name = self.validator.remove_spaces(filename_without_ext)
+
         if self.file_type == "apk":
             self.filemanager.create_folder(
                 "Android", search_path="./output_directory/mobile"
             )
             self.output_dir = f"{base_dir}/Android"
             self.folder_name = f"{self.output_dir}/{filename_without_ext}"
-            print(f"\n Decompiling the {package} application ...")
-            command = f"apktool d {package} -o {self.folder_name}"
-            self.commands.run_os_commands(command)
+            self.folder_name = self.validator.remove_spaces(self.folder_name)
+
+            if not self.validator.check_folder_exists(self.folder_name):
+                print(f"\n Decompiling the {self.file_name} application ...")
+                command = f"apktool d '{package}' -o {self.folder_name}"
+                self.commands.run_os_commands(command)
+                print("Decompiling successful")
             return self.folder_name
 
         elif self.file_type == "ipa":
             self.filemanager.create_folder(
                 "iOS", search_path="./output_directory/mobile"
             )
+
             self.output_dir = f"{base_dir}/iOS"
+            self.folder_name = f"{self.output_dir}/{self.file_name}"
+
+            if not self.validator.check_folder_exists(self.folder_name):
+                print(f"Decompiling {self.file_name} ...")
+                command = f"unzip '{package}' -d {self.folder_name}"
+                try:
+                    print(f"Running command: {command}")
+                    result = self.commands.run_os_commands(command)
+                    if result.returncode == 0:
+                        print("Decompiling successful")
+                    else:
+                        raise FileNotFoundError
+
+                except (Exception, FileNotFoundError) as error:
+                    print(f"Error during unzip: {error}")
+
+            return self.folder_name
 
         # 3. Clean up after all scans are complete
 
@@ -137,10 +162,12 @@ class MobileCommands:
         self.decode_base64(output)
 
     def create_temp_file(self, folder_path):
-        print(f"Creating in-memory temp data from folder:\n {folder_path}")
+        print(f"Creating in-memory temp data from folder: {folder_path}")
         temp_data_list = []
+        folder = Path(self.folder_name)
+        
 
-        for file in folder_path.rglob("*"):
+        for file in folder.rglob("*"):
             if file.is_file():
                 command = f"rabin2 -zzzqq  {file}"
                 try:
@@ -168,7 +195,7 @@ class MobileCommands:
                 string = string.strip()
                 if string:  # Check if string is not empty
                     try:
-                        command = f"echo '{string}' | base64 -d | grep -PI '[\s\S]+'"
+                        command = f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
                         decoded = self.commands.run_os_commands(command)
 
                         if decoded.stdout:
@@ -240,6 +267,56 @@ class MobileCommands:
         content = re.sub(r"\\t", "\t", content)
         return content
 
+    def mobile_scripts(
+        self,
+        decompiled_folder,
+        hardcoded_filename,
+        platform,
+        basename,
+        output_dir,
+        base64_name,
+    ):
+        if platform == "ipa":
+            self.ios_specific_scan(decompiled_folder, basename, output_dir)
+        ## Run scripts that are common to both iOS and Android
+
+        self.find_hardcoded_data(decompiled_folder, hardcoded_filename)
+        self.get_base64_strings(output_dir, base64_name, platform)
+        self.get_deeplinks(decompiled_folder, basename)
+        self.scan_with_nuclei(decompiled_folder, output_dir, platform)
+
+    def ios_specific_scan(self, decompiled_app_folder, file_basename, output_dir):
+        # iOS specific script
+        # property dump
+        self.ios_prop_dump(decompiled_app_folder, output_dir)
+        # get url scheme
+        self.ios_URL_scheme(decompiled_app_folder, basename=file_basename)
+        # find files
+        self.find_files(appFolder=decompiled_app_folder)
+
+    def ios_URL_scheme(self, decomplied_folder, basename):
+        filename = f"{basename}_iOS_URL_schemes.txt"
+        plist_file = self.validator.find_specific_file("Info.plist", decomplied_folder)
+
+        command = f"xmlstarlet sel -t -v 'plist/dict/array/dict[key = \"CFBundleURLSchemes\"]/array/string' -nl {plist_file}"
+        results = self.commands.run_os_commands(command)
+
+        with open(filename, "w") as output_file:
+            url_schemes = sorted(set(results.stdout.splitlines))
+            for scheme in url_schemes:
+                output_file.write(f"{scheme}\n")
+
+    def ios_prop_dump(self, decompiled_folder, output_dir):
+        print("dumping ios files")
+        db_command = (
+            f"property-lister -db {decompiled_folder} -o {output_dir}/results_db"
+        )
+        pl_command = (
+            f"property-lister -pl {decompiled_folder} -o {output_dir}/results_pl"
+        )
+        self.commands.run_os_commands(db_command)
+        self.commands.run_os_commands(pl_command)
+
     def inspect_application_files(self, application: str):
         platform = ""
 
@@ -253,7 +330,7 @@ class MobileCommands:
         basename = f"{output_name}_{platform}"
         hardcoded = f"{basename}_hardcoded.txt"
 
-        self.common_scripts(
+        self.mobile_scripts(
             decompiled_folder=folder_name,
             hardcoded_filename=hardcoded,
             platform=platform,
@@ -266,23 +343,50 @@ class MobileCommands:
             f"[+] Application scanning complete, your all files are located here:\n{self.color.OKGREEN}{self.output_dir}{self.color.ENDC}"
         )
 
-    def common_scripts(
-        self,
-        decompiled_folder,
-        hardcoded_filename,
-        platform,
-        basename,
-        output_dir,
-        base64_name,
+    def install_nuclei_template(
+        self, install_path="./output_directory/mobile/mobile-nuclei-templates"
     ):
-        # Run scripts that are common to both iOS and Android
-        self.find_hardcoded_data(decompiled_folder, hardcoded_filename)
-        self.get_base64_strings(output_dir, base64_name, platform)
-        self.get_deeplinks(decompiled_folder, basename)
+        template_dir = Path(f"{install_path}")
+        absolute_path = str(template_dir.resolve())
 
-    def ios_specific_scan(self):
-        # iOS specific script
-        # find files
-        # get url scheme
-        # property dump
-        pass
+        # os.environ["GOBIN"] = absolute_path
+        if not self.validator.check_folder_exists(absolute_path):
+            print(
+                f"Templates folder not present, Cloning templates into {absolute_path}"
+            )
+            github_repo = "https://github.com/optiv/mobile-nuclei-templates.git"
+            command = f"git clone {github_repo} {absolute_path}"
+
+            try:
+
+                self.commands.run_os_commands(command)
+                print("[+] Nuclei template Installed successfully")
+
+            except Exception as e:
+                print(f"Error during Installation {e}")
+                return False
+
+        return True
+
+    def scan_with_nuclei(self, application_folder, output_dir, platform):
+
+        nuclei_dir = "./output_directory/mobile/mobile-nuclei-templates"
+        out_file = f"{output_dir}/{self.file_name}_nuclei_keys_results.txt"
+        android_output = f"{output_dir}/{self.file_name}_nuclei_android_results.txt"
+
+        # Check if template exists and install
+        if not self.install_nuclei_template(nuclei_dir):
+            return
+
+        nuclei_command = (
+            f"echo {application_folder} | nuclei -t {nuclei_dir}/Keys -o {out_file}"
+        )
+        android_nuclei = f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform} -o {android_output}"
+        try:
+            print(f"Running command: {nuclei_command}")
+            self.commands.run_os_commands(nuclei_command)
+            if platform == "apk":
+                self.commands.run_os_commands(android_nuclei)
+
+        except Exception as e:
+            print(f"Error running command: {e}")

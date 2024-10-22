@@ -21,6 +21,15 @@ class Commands:
         )
         return result
 
+    def run_git_cmd(self, git_command):
+        try:
+            print(f"runing command:\n{git_command}\n\n")
+            subprocess.run(git_command, check=True)
+            print("Nuclei template Installed successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install Nuclei templates: {e}")
+            return False
+
     def get_process_output(self, command):
         return subprocess.getoutput(command)
 
