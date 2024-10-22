@@ -165,7 +165,6 @@ class MobileCommands:
         print(f"Creating in-memory temp data from folder: {folder_path}")
         temp_data_list = []
         folder = Path(self.folder_name)
-        
 
         for file in folder.rglob("*"):
             if file.is_file():
@@ -381,11 +380,12 @@ class MobileCommands:
         nuclei_command = (
             f"echo {application_folder} | nuclei -t {nuclei_dir}/Keys -o {out_file}"
         )
-        android_nuclei = f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform} -o {android_output}"
+
         try:
-            print(f"Running command: {nuclei_command}")
+
             self.commands.run_os_commands(nuclei_command)
-            if platform == "apk":
+            if platform == "android":
+                android_nuclei = f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform.title()} -o {android_output}"
                 self.commands.run_os_commands(android_nuclei)
 
         except Exception as e:
