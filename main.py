@@ -37,16 +37,21 @@ user_test_domain = user.get_user_domain()
 
 def packages_present() -> bool:
     # check if package list contains any missing packages
-    if len(package.get_missing_packages(user_test_domain)) == 0:
+    missing_packages = package.get_missing_packages(user_test_domain)
+
+    num_of_packages = 0
+
+    if len(missing_packages) == 0:
         print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         return True
     else:
-        num_of_packages = len(package.get_missing_packages(user_test_domain))
+        num_of_packages += len(missing_packages)
         print(
             f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s)..{bcolors.ENDC}"
         )
-        package.install_packages(package.get_missing_packages(user_test_domain))
-    return True
+        # update to run check again
+
+    return package.install_packages(missing_packages)
 
 
 def user_interactions():
@@ -91,7 +96,8 @@ def main():
     Run different modules depending on the various domains
     i.e Internal Mobile and External
     """
-    if packages_present():
+
+    if not packages_present():  #TODO: change this back to True
         # start our pentest
         user_interactions()
 
