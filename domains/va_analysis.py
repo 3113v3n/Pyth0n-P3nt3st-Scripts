@@ -60,7 +60,8 @@ class VulnerabilityAnalysis:
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
         formated_vulnerabilities = selected_columns[
-            (selected_columns["Risk"].notna()) & (selected_columns["Risk"] != "Low")
+
+            (csv_filter_operations(selected_columns, "Risk", "notnull")) & (selected_columns["Risk"] != "Low")
             ].reset_index(drop=True)
         print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
@@ -137,7 +138,7 @@ class VulnerabilityAnalysis:
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
         conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word=self.regex_word
+            vulnerabilities, regex_word= self.regex_word
         )
         # Show remaining data after filtering
         unfiltered = vulnerabilities[

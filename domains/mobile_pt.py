@@ -1,7 +1,7 @@
 from utils.mobile import MobileCommands
 
 
-class MobilePT:
+class MobileAssessment:
     # class will be responsible for all mobile operations
     def __init__(self, commands: MobileCommands) -> None:
         self.package_name = ""

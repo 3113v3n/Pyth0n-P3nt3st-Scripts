@@ -1,8 +1,9 @@
 from handlers import FileHandler, NetworkHandler
-from utils import bcolors  #, NetExec
+from utils import bcolors  # NetExec
+from handlers.file_handler import generate_unique_name
 
 
-class InternalPT:
+class InternalAssessment:
     """class will be responsible for handling all Internal PT"""
 
     def __init__(
@@ -22,7 +23,7 @@ class InternalPT:
         # Sets user provided values
         self.mode = mode
         if mode == "scan":
-            self.output_file = self.filemanager.generate_unique_name(output_file, "csv")
+            self.output_file = generate_unique_name(output_file, "csv")
         else:
             self.output_file = output_file
 
@@ -31,8 +32,9 @@ class InternalPT:
         In order to increase your attack surface
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
+        location = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.filepath}"
         print(
-            f"[+] {self.bcolors.BOLD}Your File is located at:{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.filepath}{self.bcolors.ENDC}"
+            f"[+] {self.bcolors.BOLD}Your File is located at: {location}{self.bcolors.ENDC}"
         )
 
     def netexec_module(self):

@@ -1,36 +1,36 @@
 from pprint import pprint
 
 # [Test Domains]
-from domains import InternalPT, MobilePT, VulnerabilityAnalysis
+from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, Config, InputValidators, bcolors, MobileCommands
+from utils import Commands, Config, InputValidators, bcolors, MobileCommands, ProgressBar
 
 # [Utils]
 
 
 # Initializers
 validator = InputValidators()
-## Handle packages
+# Handle packages
 package = PackageHandler(Commands, bcolors, Config)
 
-## Handles file management
+# Handles file management
 filemanager = FileHandler(bcolors, validator=validator)
 
-## gathers user input
+# gathers user input
 user = UserHandler(filemanager, validator, bcolors, Config)
 
-## Handles network related operations
+# Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
-## Mobile Commands
-mobile_commands = MobileCommands(Commands, filemanager, validator,bcolors,Config)
+# Mobile Commands
+mobile_commands = MobileCommands(Commands, filemanager, validator, bcolors, Config)
 
 # [penetration Testing domains]
-internal = InternalPT(filemanager=filemanager, network=network, colors=bcolors)
+internal = InternalAssessment(filemanager=filemanager, network=network, colors=bcolors)
 vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
-mobile = MobilePT(mobile_commands)
+mobile = MobileAssessment(mobile_commands)
 
 user_test_domain = user.get_user_domain()
 
@@ -41,8 +41,9 @@ def packages_present() -> bool:
         print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         return True
     else:
+        num_of_packages = len(package.get_missing_packages(user_test_domain))
         print(
-            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {len(package.get_missing_packages(user_test_domain))} package(s)..{bcolors.ENDC}"
+            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s)..{bcolors.ENDC}"
         )
         package.install_packages(package.get_missing_packages(user_test_domain))
     return True
@@ -53,7 +54,7 @@ def user_interactions():
     match user_test_domain:  # one of Internal | Mobile | External
         case "internal":
             # initialize variables that will be used to test different Internal PT modules
-            network.initialize_network_variables(user.domain_variables)
+            network.initialize_network_variables(user.domain_variables, ProgressBar)
             internal.initialize_variables(
                 mode=user.domain_variables["mode"],
                 output_file=user.domain_variables["output"],
@@ -63,17 +64,17 @@ def user_interactions():
             internal.enumerate_hosts()
 
         case "va":
-            formatted_vulns = vulnerability_analysis.analyze_csv(
+            formatted_issues = vulnerability_analysis.analyze_csv(
                 user.domain_variables["input_file"]
             )
             vulnerability_analysis.sort_vulnerabilities(
-                formatted_vulns, f"{user.domain_variables['output']}"
+                formatted_issues, f"{user.domain_variables['output']}"
             )
 
         case "mobile":
             # initialize variables that will be used to test different Mobile modules
-            application_dict = user.domain_variables
-            mobile.initialize_variables(application_dict)
+            mobile_object = user.domain_variables
+            mobile.initialize_variables(mobile_object)
             mobile.inspect_application_files()
         case "external":
             # initialize variables that will be used to test different External PT modules
@@ -97,11 +98,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# internal.netexec_module()['relay-list'](
-#     "output_directory/internal/home_w1f1_13-08-2024-11:02:30.csv",
-#     "output_directory/internal/smb_relay.txt",
-# )
-# hashes = HashUtil()
-# hashes.compare_hash_from_dump("aad3b435b51404eeaad3b435b51404ee", "test-data/test.ntds")
