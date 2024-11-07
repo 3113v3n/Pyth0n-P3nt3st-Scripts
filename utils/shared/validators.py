@@ -24,7 +24,6 @@ class InputValidators:
         folder_exists = False
         for _, subfolder, _ in os.walk(search_path):
             if folder_name in subfolder:
-                # print(f"the folder exists at path {os.path.join(folder,folder_name)}")
                 folder_exists = True
                 break
         return folder_exists

@@ -38,7 +38,7 @@ def get_file_extension(filename):
 def append_to_sheets(data_frame: object, file: str):
     """Appends data to existing Workbook"""
     with pandas.ExcelWriter(
-            file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+        file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
     ) as writer:
         # Copy existing sheets to writer
         for sheet_name in writer.book.sheetnames:
@@ -113,26 +113,26 @@ class FileHandler:
         """
         match domain:
             case "mobile":
-                self.output_directory = f"{self.output_directory}/mobile"
+                self.output_directory = f"{self.output_directory}/Mobile"
                 # create folder if not existent
-                self.create_folder("mobile")
+                self.create_folder("Mobile")
                 return self.output_directory
             case "internal":
-                self.output_directory = f"{self.output_directory}/internal"
+                self.output_directory = f"{self.output_directory}/Internal"
                 # create folder if not existent
-                self.create_folder("internal")
+                self.create_folder("Internal")
                 return self.output_directory
             case "external":
-                self.output_directory = f"{self.output_directory}/external"
+                self.output_directory = f"{self.output_directory}/External"
                 # create folder if not existent
-                self.create_folder("external")
+                self.create_folder("External")
                 return self.output_directory
             case "va":
                 self.output_directory = (
-                    f"{self.output_directory}/vulnerability-assessment"
+                    f"{self.output_directory}/Vulnerability_Assessment"
                 )
                 # create folder if not existent
-                self.create_folder("vulnerability-assessment")
+                self.create_folder("Vulnerability_Assessment")
                 return self.output_directory
             case _:
                 return
@@ -162,10 +162,11 @@ class FileHandler:
             self.filepath = filename
 
         file_header = ""
-        if filename != "unresponsive_hosts":
-            file_header += f"Live Host IP Addresses"
+        if filename != "unresponsive_hosts.txt":
+            file_header += "Live Host IP Addresses"
         else:
             file_header += "Unresponsive IP Addresses"
+            self.filepath = f"{self.output_directory}/unresponsive_hosts.txt"
 
         data = pandas.DataFrame({file_header: [content]})
 
@@ -183,7 +184,7 @@ class FileHandler:
         self.output_directory = f"{search_path}/{folder_name}"
 
         if not self.validator.check_subdirectory_exists(
-                folder_name, search_path=search_path
+            folder_name, search_path=search_path
         ):
             folder_path = self.output_directory
             os.makedirs(folder_path)
@@ -216,7 +217,7 @@ class FileHandler:
             file
             for file in self.files
             if self.validator.check_filetype(file["filename"], "apk")
-               or self.validator.check_filetype(file["filename"], "ipa")
+            or self.validator.check_filetype(file["filename"], "ipa")
         ]
         # filter out CSV files only
         if "display_csv" in kwargs:
