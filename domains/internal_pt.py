@@ -1,15 +1,15 @@
 from handlers import FileHandler, NetworkHandler
-from utils import bcolors #, NetExec
+from utils import bcolors  #, NetExec
 
 
 class InternalPT:
     """class will be responsible for handling all Internal PT"""
 
     def __init__(
-        self,
-        filemanager: FileHandler,
-        network: NetworkHandler,
-        colors: bcolors,
+            self,
+            filemanager: FileHandler,
+            network: NetworkHandler,
+            colors: bcolors,
 
     ) -> None:
         self.output_file = "sample.txt"
@@ -17,7 +17,6 @@ class InternalPT:
         self.filemanager = filemanager
         self.bcolors = colors
         self.network = network
-       
 
     def initialize_variables(self, mode, output_file):
         # Sets user provided values
@@ -45,7 +44,6 @@ class InternalPT:
         ## 5. SMB relay
         ## 6. Compare Hashes
         pass
-        
 
     # BloodHound
     # secrets dump

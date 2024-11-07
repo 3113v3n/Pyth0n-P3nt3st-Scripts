@@ -13,7 +13,7 @@ class PackageHandler:
 
     def get_missing_packages(self, test_domain) -> list:
         """
-        Returns a list of objects containg missing packages
+        Returns a list of objects containing missing packages
         that need to be installed and command to in
         stall them
         """

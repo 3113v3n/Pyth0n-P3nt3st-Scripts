@@ -7,11 +7,11 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-        self,
-        filemanager,
-        validator: InputValidators,
-        bcolors,
-        config: Config,
+            self,
+            filemanager,
+            validator: InputValidators,
+            bcolors,
+            config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -30,7 +30,6 @@ class UserHandler:
         # Create a list to store formatted options
         OPTIONS = []
         for option in self.config.test_domains:
-
             # number to display on screen
             number = self.config.test_domains.index(option) + 1
             # Format each option with colors and spacing
@@ -46,7 +45,7 @@ class UserHandler:
         # Join the list into a single multi-line string
         return "".join(OPTIONS)
 
-    ## User Interactions
+    ## ceUser Interactions
 
     def mobile_ui_interaction(self):
         while True:
