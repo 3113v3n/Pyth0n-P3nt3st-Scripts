@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 from pathlib import Path
+from utils.shared import InputValidators
+import zipfile
 
 # from pprint import pprint
 import pandas
@@ -9,13 +11,13 @@ import pandas
 class FileHandler:
     """Handle File operations"""
 
-    def __init__(self, colors, validator) -> None:
+    def __init__(self, colors, validator: InputValidators) -> None:
         self.test_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
             f"{self.working_dir}/output_directory"  # directory to save our output files
         )
-        self.full_file_path = ""  # full path to saved file
+        self.filepath = ""  # full path to saved file
         self.files = []
         self.colors = colors
         self.validator = validator
@@ -48,68 +50,101 @@ class FileHandler:
                 return
 
     def save_txt_file(self, filename, content):
-        self.full_file_path = f"{self.output_directory}/{filename}"
+        self.filepath = f"{self.output_directory}/{filename}"
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def read_csv(self, dataframe):
+    def read_csv(self, dataframe, **kwargs):
+        if "header" in kwargs:
+            return pandas.read_csv(dataframe, header="infer")
         return pandas.read_csv(dataframe)
 
     def read_excel_file(self, file):
         xls = pandas.ExcelFile(file)
         return pandas.read_excel(xls)
 
-    def write_to_multiple_sheets(self, data_frame_object, filename):
+    def write_to_multiple_sheets(self, data_frame_object: object, filename: str):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
-        filepath = f"{self.output_directory}/{self.generate_unique_name(filename,extension='xlsx')}"
-        with pandas.ExcelWriter(filepath) as writer:
+        self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename,extension='xlsx')}"
+        with pandas.ExcelWriter(self.filepath) as writer:
             for dataframe in data_frame_object:
                 if not dataframe["dataframe"].empty:
                     dataframe["dataframe"].to_excel(
                         writer, sheet_name=dataframe["sheetname"], index=False
                     )
-        print(f"Data has been written to {filepath}")
+        print(
+            f"Data has been written to :\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
+        )
+
+    def get_filename_without_extension(self, filepath):
+        # Get the filename with extension
+        filename_with_ext = os.path.basename(filepath)
+        # Split the filename and extension
+        filename_without_ext, _ = os.path.splitext(filename_with_ext)
+        return filename_without_ext
+
+    def get_file_extension(self, filename):
+        # Split the filename into root and extension
+        root, ext = os.path.splitext(filename)
+        # Return the extension, excluding the dot
+        return ext.lstrip(".")
+
+    def append_to_sheets(self, data_frame: object, file: str):
+        """Appends data to existing Workbook"""
+        with pandas.ExcelWriter(
+            file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+        ) as writer:
+            # Copy existing sheets to writer
+            for sheet_name in writer.book.sheetnames:
+                df = pandas.read_excel(file, sheet_name=sheet_name, engine="openpyxl")
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write new data frame to new sheet
+            data_frame["dataframe"].to_excel(
+                writer, sheet_name=data_frame["sheetname"], index=False
+            )
+
+    def concat_dataframes(self, existing, newdata):
+        """Concatenate two data Frames"""
+        return pandas.concat([existing, newdata], ignore_index=True, axis=0)
 
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
-            self.full_file_path = f"{self.output_directory}/{filename}"
+            self.filepath = f"{self.output_directory}/{filename}"
         else:
-            self.full_file_path = filename
+            self.filepath = filename
 
         data = pandas.DataFrame({"Live IP Addresses": [content]})
 
-        if self.validator.file_exists(f"{self.full_file_path}"):
-            existing_df = self.read_csv(f"{self.full_file_path}")
+        if self.validator.file_exists(f"{self.filepath}"):
+            existing_df = self.read_csv(f"{self.filepath}")
 
-            updated_df = pandas.concat([existing_df, data], ignore_index=True)
+            updated_df = self.concat_dataframes(existing_df, data)
         else:
             updated_df = data
 
-        updated_df.to_csv(f"{self.full_file_path}", index=False)
+        updated_df.to_csv(f"{self.filepath}", index=False)
+
+    def get_file_basename(self, full_file_path):
+        return os.path.basename(full_file_path)
 
     def append_to_txt(self, filename, content):
         """Update existing file"""
         with open(f"{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def folder_exists(self, folder_name):
-        folder_exists = False
-        for folder, subfolder,files in os.walk("./output_directory"):
-            if folder_name in subfolder:
-                print(f"the folder exists at path {os.path.join(folder,folder_name)}")
-                folder_exists = True
-                break
-        return folder_exists
+    def create_folder(self, folder_name, search_path="./output_directory"):
 
-    def create_folder(self, folder_name):
+        self.output_directory = f"{search_path}/{folder_name}"
 
-        if not self.folder_exists(folder_name):
+        if not self.validator.check_subdirectory_exists(
+            folder_name, search_path=search_path
+        ):
             # os.getcwd()
             folder_path = self.output_directory
             os.makedirs(folder_path)
-            print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
+            # print(f"Folder '{folder_name}' not found. Created at: {folder_path}")
 
-    def find_files(self):
+    def find_files(self, search_path):
         """
         Searches for a file in the given directory and its subdirectories.
 
@@ -117,37 +152,74 @@ class FileHandler:
         :return: Full path of the files if found, None otherwise.
         """
 
-        for root, files in os.walk(f"{self.output_directory}"):
+        for root, _, files in os.walk(search_path):
+
             for file in files:
                 file_object = {"filename": "", "full_path": ""}
                 file_object["filename"] = file
                 file_object["full_path"] = os.path.join(root, file)
                 self.files.append(file_object)
+
         # return self.files
 
-    def display_saved_files(self) -> str:
+    def display_saved_files(self, dir_to_search, **kwargs) -> str:
         """Display to the user a list of files available
         and returns the last ip present in that file"""
-        self.find_files()
+        self.find_files(dir_to_search)
+
+        csv_files = [
+            file
+            for file in self.files
+            if self.validator.check_filetype(file["filename"], "csv")
+        ]
+        app_files = [
+            file
+            for file in self.files
+            if self.validator.check_filetype(file["filename"], "apk")
+            or self.validator.check_filetype(file["filename"], "ipa")
+        ]
+        # filter out CSV files only
+        if "display_csv" in kwargs:
+            self.files = csv_files
+
+        # allow user to view only apks and ios
+        elif "display_applications" in kwargs:
+            self.files = app_files
+
         if len(self.files) != 0:
+            display_strs = []  # list to collect all display strings
+
             for index in range(len(self.files)):
-                print(
-                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index}{self.colors.ENDC}] to select  {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
-                )
-                # prompt user for filename from the displayed list and use that to get the full path
-            return self.get_last_ip()
+                # Prepare the display string for each file
+                display_str = f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index}{self.colors.ENDC}] to select  {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
+                display_strs.append(display_str)
+
+            # print all collected strings
+            for display_str in display_strs:
+                print(display_str)
+
+            ## Resume scan
+            if "display_csv" in kwargs:
+                ## Display files to perform VA analysis
+                return self.select_analyze_file()
+
+            elif "display_applications" in kwargs:
+                return self.analyze_applications()
+
+            else:
+                # Handle users choice
+                return self.get_last_ip()
+
         else:
             return None
 
-    def get_last_ip(self):
-        """Returns the IP address from a file input"""
+    def common_loop(self, input_str):
         while True:
             # Error handling
             try:
-                selected_file = int(
-                    input("\nPlease enter the file number displayed above: ")
-                )
+                selected_file = int(input(f"\n{input_str}"))
                 if 0 <= selected_file < len(self.files):
+
                     break
                 else:
                     print(
@@ -157,9 +229,32 @@ class FileHandler:
                 print(
                     f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}"
                 )
+        return selected_file
 
-        self.full_file_path = self.files[selected_file]["full_path"]
-        starting_ip = self.read_last_line(self.full_file_path)
+    def select_analyze_file(self):
+        """
+        During VA analysis, display all CSV files to analyze and select the one to start from
+        retun Tuple containing the list of CSV files and the index to start scan
+        """
+        selected = self.common_loop(
+            "Please enter the file number you would like scan first : "
+        )
+        # self.filepath = self.files[selected]["full_path"]
+
+        return (self.files, selected)
+
+    def analyze_applications(self):
+        selected_apk = self.common_loop("Select the application to scan ")
+        return self.files[selected_apk]
+
+    def get_last_ip(self):
+        """Returns the IP address from a file input"""
+        selected_file = self.common_loop(
+            "Please enter the file number displayed above: "
+        )
+
+        self.filepath = self.files[selected_file]["full_path"]
+        starting_ip = self.read_last_line(self.filepath)
         return starting_ip
 
     def read_last_line(self, filename) -> str:
@@ -185,3 +280,4 @@ class FileHandler:
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
         removed_extension = Path(file).stem
         return f"{removed_extension}_{timestamp}.{extension}"
+    

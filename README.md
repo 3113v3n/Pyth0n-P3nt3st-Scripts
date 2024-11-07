@@ -1,6 +1,7 @@
 # Pyth0n-P3nt3st-Scripts
 
-Python scripts to aid in pentest automation
+Python scripts to aid in pentest automation.
+- Start by installing all the dependencies in the requirements.txt
 
 | Domain                       | Script Target                      |
 | ---------------------------- | ---------------------------------- |
@@ -12,7 +13,7 @@ Python scripts to aid in pentest automation
 |                              |                                    |
 | Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]   |
 |                              |                                    |
-| Vulnerability Analysis       | 1. Analyze Nessus VA output (xlsx) |
+| Vulnerability Analysis       | 1. Analyze Nessus VA output (csv) |
 
 ## 1. Internal Penetration Testing
 
@@ -48,21 +49,35 @@ inorder to avoid resumming from the last recorded live IP.
 
 - This module runs an automated analysis on a **Nessus Advanced scan** and summarizes the vulnerabilities discovered
 - To run the module simply enter [ **va** ] on the provided prompt
-- It requires 2 files
+- It requires 2 parameters:
 
 ```text
-    Input file: The Nessus output file (xlsx)
+    Path to Scanned files: The Nessus output file (csv)
     Output file: The Name of your analyzed file
 ```
 ![Vulnerability Analysis](images/va.png)
-## 3. External Penetration Testing
+
+## 3. Mobile Penetration Testing
+
+
+- To run the module simply enter [ **mobile** ] on the provided prompt
+- This module performs a number of static analysis on both android and iOS (iOS coming soon)
+- It decompiles the apk file using apktool and runs regex checks on the files present on the decompiled application folder to look for
+1. Hardcoded values
+2. URLs present within the application
+3. IP addresses present
+4. Decode any available base64 strings
+
+### Start script
+![Mobile Penetration](images/mobile-start.png)
+
+### Check for hardcoded values
+![Hardcoded strings](images/mobile-hardcoded.png)
+
+## 4. External Penetration Testing
 
 [Coming Soon]
 
 - To run the module simply enter [ **external** ] on the provided prompt
 
-## 4. Mobile Penetration Testing
 
-[Coming Soon]
-
-- To run the module simply enter [ **mobile** ] on the provided prompt
