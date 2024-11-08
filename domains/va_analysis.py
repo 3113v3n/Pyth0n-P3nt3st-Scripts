@@ -1,4 +1,5 @@
 # trunk-ignore-all(isort)
+from pprint import pprint
 from utils.shared import Config
 from handlers import FileHandler
 from handlers.file_handler import read_csv, concat_dataframes
@@ -55,7 +56,7 @@ class VulnerabilityAnalysis:
                     self.data,
                     "Plugin Output",
                     "contains",
-                    contains_key="Credential checks: yes",
+                    contains_key="Credentialed checks : yes",
                 )
             )
         ]["Host"].tolist()
@@ -248,6 +249,7 @@ class VulnerabilityAnalysis:
         unfiltered_vulnerabilities = [
             {"dataframe": unfiltered, "sheetname": "Unfiltered"}
         ]
+        
         if not unfiltered.empty:
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
