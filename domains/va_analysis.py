@@ -1,6 +1,7 @@
 # trunk-ignore-all(isort)
 from utils.shared import Config
 from handlers import FileHandler
+from handlers.file_handler import read_csv, concat_dataframes
 
 
 def percentage_null_fields(dataframe):
@@ -47,22 +48,32 @@ class VulnerabilityAnalysis:
         # lists of hosts that passed credential check
         # filter hosts with credential check successful
 
-        credentialed_hosts = self.data[(csv_filter_operations(self.data, "Plugin Output", "notnull"))
-                                       & (
-                                           csv_filter_operations(self.data, "Plugin Output", "contains",
-                                                                 contains_key="Credential checks: yes")
-                                       )]["Host"].tolist()
+        credentialed_hosts = self.data[
+            (csv_filter_operations(self.data, "Plugin Output", "notnull"))
+            & (
+                csv_filter_operations(
+                    self.data,
+                    "Plugin Output",
+                    "contains",
+                    contains_key="Credential checks: yes",
+                )
+            )
+        ]["Host"].tolist()
         self.credentialed_hosts = credentialed_hosts
 
-        selected_columns = self.data[csv_filter_operations(self.data, "Host", "in", in_key=self.credentialed_hosts)][
+        selected_columns = self.data[
+            csv_filter_operations(
+                self.data, "Host", "in", in_key=self.credentialed_hosts
+            )
+        ][
             self.headers[:-1]  # ignore the last item in our headers list
         ]
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
         formated_vulnerabilities = selected_columns[
-
-            (csv_filter_operations(selected_columns, "Risk", "notnull")) & (selected_columns["Risk"] != "Low")
-            ].reset_index(drop=True)
+            (csv_filter_operations(selected_columns, "Risk", "notnull"))
+            & (selected_columns["Risk"] != "Low")
+        ].reset_index(drop=True)
         print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
         return formated_vulnerabilities
@@ -90,7 +101,7 @@ class VulnerabilityAnalysis:
         try:
             # Read the first file as baseline
             filename = file_list[starting_index]["filename"]
-            original_file = self.filemanager.read_csv(starting_file)
+            original_file = read_csv(starting_file)
 
             # Check if baseline file is empty
             if original_file.empty:
@@ -104,7 +115,7 @@ class VulnerabilityAnalysis:
             for file in file_list:
                 if file["full_path"] != starting_file:
                     # Read CSV file without headers
-                    new_data = self.filemanager.read_csv(file["full_path"], header=None)
+                    new_data = read_csv(file["full_path"], header=None)
 
                     # Check if new data is empty
                     if new_data.empty:
@@ -121,7 +132,7 @@ class VulnerabilityAnalysis:
                     # Check if other files have missing columns
                     self.get_missing_columns(new_data, file["filename"])
                     # Append new data to the original data
-                    all_vulnerabilities = self.filemanager.concat_dataframes(
+                    all_vulnerabilities = concat_dataframes(
                         all_vulnerabilities, new_data
                     )
 
@@ -138,7 +149,7 @@ class VulnerabilityAnalysis:
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
         conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word= self.regex_word
+            vulnerabilities, regex_word=self.regex_word
         )
         # Show remaining data after filtering
         unfiltered = vulnerabilities[
@@ -160,7 +171,7 @@ class VulnerabilityAnalysis:
             & ~conditions["information_condition"]
             & ~conditions["web_condition"]
             & ~conditions["rce_condition"]
-            ]
+        ]
         # 1. SSL issues
         ssl_issues = vulnerabilities[conditions["ssl_condition"]]
 
@@ -206,7 +217,7 @@ class VulnerabilityAnalysis:
             conditions["rce_condition"]
             & ~conditions["missing_patch_condition"]
             & ~conditions["unsupported_software"]
-            ]
+        ]
 
         found_vulnerabilities = [
             {"dataframe": winverify, "sheetname": "winverify"},
