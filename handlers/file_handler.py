@@ -1,12 +1,8 @@
 import os
+import pandas
 from datetime import datetime
 from pathlib import Path
-
 from utils.shared import InputValidators
-import zipfile
-
-# from pprint import pprint
-import pandas
 
 
 def read_csv(dataframe, **kwargs):
@@ -162,10 +158,11 @@ class FileHandler:
             self.filepath = filename
 
         file_header = ""
-        if filename != "unresponsive_hosts.txt":
+        if filename != "unresponsive_hosts":
             file_header += "Live Host IP Addresses"
         else:
             file_header += "Unresponsive IP Addresses"
+            #print(f"Resuming unresponsive scan from :{self.filepath}\nFilename: {filename}")
             self.filepath = f"{self.output_directory}/unresponsive_hosts.txt"
 
         data = pandas.DataFrame({file_header: [content]})

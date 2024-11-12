@@ -1,5 +1,4 @@
-# trunk-ignore-all(isort)
-from pprint import pprint
+# trunk-ignore-all(isort)t
 from utils.shared import Config
 from handlers import FileHandler
 from handlers.file_handler import read_csv, concat_dataframes
@@ -249,14 +248,15 @@ class VulnerabilityAnalysis:
         unfiltered_vulnerabilities = [
             {"dataframe": unfiltered, "sheetname": "Unfiltered"}
         ]
-        
+
         if not unfiltered.empty:
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
                 "Unfiltered Vulnerabilities",
             )
-
-        self.filemanager.write_to_multiple_sheets(
-            found_vulnerabilities,
-            output_file,
-        )
+        # write to file if data is present
+        if not found_vulnerabilities.empty:
+            self.filemanager.write_to_multiple_sheets(
+                found_vulnerabilities,
+                output_file,
+            )

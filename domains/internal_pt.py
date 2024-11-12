@@ -1,17 +1,16 @@
 from handlers import FileHandler, NetworkHandler
-from utils import bcolors  # NetExec
 from handlers.file_handler import generate_unique_name
+from utils import bcolors  # NetExec
 
 
 class InternalAssessment:
     """class will be responsible for handling all Internal PT"""
 
     def __init__(
-            self,
-            filemanager: FileHandler,
-            network: NetworkHandler,
-            colors: bcolors,
-
+        self,
+        filemanager: FileHandler,
+        network: NetworkHandler,
+        colors: bcolors,
     ) -> None:
         self.output_file = "sample.txt"
         self.mode = "SCAN"
