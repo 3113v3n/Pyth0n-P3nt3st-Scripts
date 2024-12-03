@@ -1,5 +1,8 @@
 from pathlib import Path
 import re
+from handlers.file_handler import get_file_extension, get_filename_without_extension
+
+base_output_dir = "./output_directory/Mobile"
 
 
 class MobileCommands:
@@ -54,14 +57,12 @@ class MobileCommands:
         # 1. decompile using apk tool
         # 2. save the decompiled file to output directory
         base_dir = self.filemanager.output_directory
-        self.file_type = self.filemanager.get_file_extension(package)  # ipa / apk
-        filename_without_ext = self.filemanager.get_filename_without_extension(package)
+        self.file_type = get_file_extension(package)  # ipa / apk
+        filename_without_ext = get_filename_without_extension(package)
         self.file_name = self.validator.remove_spaces(filename_without_ext)
 
         if self.file_type == "apk":
-            self.filemanager.create_folder(
-                "Android", search_path="./output_directory/mobile"
-            )
+            self.filemanager.create_folder("Android", search_path=base_output_dir)
             self.output_dir = f"{base_dir}/Android"
             self.folder_name = f"{self.output_dir}/{filename_without_ext}"
             self.folder_name = self.validator.remove_spaces(self.folder_name)
@@ -74,9 +75,7 @@ class MobileCommands:
             return self.folder_name
 
         elif self.file_type == "ipa":
-            self.filemanager.create_folder(
-                "iOS", search_path="./output_directory/mobile"
-            )
+            self.filemanager.create_folder("iOS", search_path=base_output_dir)
 
             self.output_dir = f"{base_dir}/iOS"
             self.folder_name = f"{self.output_dir}/{self.file_name}"
@@ -343,7 +342,7 @@ class MobileCommands:
         )
 
     def install_nuclei_template(
-        self, install_path="./output_directory/mobile/mobile-nuclei-templates"
+        self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
     ):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
@@ -369,7 +368,7 @@ class MobileCommands:
 
     def scan_with_nuclei(self, application_folder, output_dir, platform):
 
-        nuclei_dir = "./output_directory/mobile/mobile-nuclei-templates"
+        nuclei_dir = f"{base_output_dir}/mobile-nuclei-templates"
         out_file = f"{output_dir}/{self.file_name}_nuclei_keys_results.txt"
         android_output = f"{output_dir}/{self.file_name}_nuclei_android_results.txt"
 

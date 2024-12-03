@@ -255,7 +255,7 @@ class VulnerabilityAnalysis:
                 "Unfiltered Vulnerabilities",
             )
         # write to file if data is present
-        if not found_vulnerabilities.empty:
+        if  len(found_vulnerabilities)!=0:
             self.filemanager.write_to_multiple_sheets(
                 found_vulnerabilities,
                 output_file,

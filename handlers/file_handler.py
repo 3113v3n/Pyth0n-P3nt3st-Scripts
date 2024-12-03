@@ -101,6 +101,10 @@ class FileHandler:
         self.files = []
         self.colors = colors
         self.validator = validator
+        self.mobile_dir = "Mobile"
+        self.external_dir = "External"
+        self.internal_dir = "Internal"
+        self.va_dir = "Vulnerability_Assessment"
 
     def update_output_directory(self, domain):
         """
@@ -109,26 +113,24 @@ class FileHandler:
         """
         match domain:
             case "mobile":
-                self.output_directory = f"{self.output_directory}/Mobile"
+                self.output_directory = f"{self.output_directory}/{self.mobile_dir}"
                 # create folder if not existent
-                self.create_folder("Mobile")
+                self.create_folder(self.mobile_dir)
                 return self.output_directory
             case "internal":
-                self.output_directory = f"{self.output_directory}/Internal"
+                self.output_directory = f"{self.output_directory}/{self.internal_dir}"
                 # create folder if not existent
-                self.create_folder("Internal")
+                self.create_folder(self.internal_dir)
                 return self.output_directory
             case "external":
-                self.output_directory = f"{self.output_directory}/External"
+                self.output_directory = f"{self.output_directory}/{self.external_dir}"
                 # create folder if not existent
-                self.create_folder("External")
+                self.create_folder(self.external_dir)
                 return self.output_directory
             case "va":
-                self.output_directory = (
-                    f"{self.output_directory}/Vulnerability_Assessment"
-                )
+                self.output_directory = f"{self.output_directory}/{self.va_dir}"
                 # create folder if not existent
-                self.create_folder("Vulnerability_Assessment")
+                self.create_folder(self.va_dir)
                 return self.output_directory
             case _:
                 return
@@ -162,7 +164,7 @@ class FileHandler:
             file_header += "Live Host IP Addresses"
         else:
             file_header += "Unresponsive IP Addresses"
-            #print(f"Resuming unresponsive scan from :{self.filepath}\nFilename: {filename}")
+            # print(f"Resuming unresponsive scan from :{self.filepath}\nFilename: {filename}")
             self.filepath = f"{self.output_directory}/unresponsive_hosts.txt"
 
         data = pandas.DataFrame({file_header: [content]})
