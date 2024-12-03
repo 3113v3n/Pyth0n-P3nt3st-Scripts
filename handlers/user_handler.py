@@ -7,11 +7,11 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-        self,
-        filemanager,
-        validator: InputValidators,
-        bcolors,
-        config: Config,
+            self,
+            filemanager,
+            validator: InputValidators,
+            bcolors,
+            config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -30,7 +30,6 @@ class UserHandler:
         # Create a list to store formatted options
         OPTIONS = []
         for option in self.config.test_domains:
-
             # number to display on screen
             number = self.config.test_domains.index(option) + 1
             # Format each option with colors and spacing
@@ -46,17 +45,28 @@ class UserHandler:
         # Join the list into a single multi-line string
         return "".join(OPTIONS)
 
-    ## User Interactions
+    ## ceUser Interactions
 
     def mobile_ui_interaction(self):
+        while True:
+            try:
+                print("Running Mobile scripts\n")
+                package_path = input(
+                    "Please provide the Path to your mobile application(s)\nPath to File:  "
+                ).strip()
+                # Show list of apks available
+                if not self.validator.check_folder_exists(package_path):
+                    raise ValueError("No Such Folder exists")
+                applications = self.filemanager.display_saved_files(
+                    package_path, display_applications=True
+                )
 
-        print("Running Mobile scripts")
-        package_name = input(
-            "Please provide the package name (com.example.packagename)\n"
-        )
-        # TODO: validate input is valid string
-
-        return {"package_name": package_name}
+                if applications:
+                    return applications
+                else:
+                    raise FileExistsError("No Files Present in the provided Directory")
+            except (ValueError, FileExistsError) as error:
+                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
 
     def va_ui_interaction(self):
         print("Running Vulnerability Analysis Module\n")

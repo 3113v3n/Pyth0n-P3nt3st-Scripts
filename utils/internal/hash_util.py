@@ -19,6 +19,6 @@ class HashUtil(FileHandler):
         """
         self.dumped_hashes = dump
         self.hash2compare = hash2compare
-        for hashes in self.read_all_lines(self.dumped_hashes):
+        for hashes in read_all_lines(self.dumped_hashes):
             if self.hash2compare == hashes.split(":")[2]:
-                pprint(self.read_all_lines(self.dumped_hashes))
+                pprint(read_all_lines(self.dumped_hashes))

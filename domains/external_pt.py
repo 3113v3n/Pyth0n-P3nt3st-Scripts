@@ -1,7 +1,7 @@
 from utils.shared import bcolors, Commands
 
 
-class ExternalPT:
+class ExternalAssessment:
     """Class will be responsible for handling external PT operations"""
 
     def __init__(self) -> None:

@@ -1,20 +1,23 @@
-from utils.shared import bcolors, Commands
+from utils.mobile import MobileCommands
 
-class MobilePT:
+
+class MobileAssessment:
     # class will be responsible for all mobile operations
-    def __init__(self) -> None:
+    def __init__(self, commands: MobileCommands) -> None:
         self.package_name = ""
-        self.command = Commands()
-        self.colors = bcolors
+        self.package_path = ""
+        self.mobile_cmds = commands  # mobile specific commands
 
     def initialize_variables(self, data):
         # Sets user provided values
-        self.package_name = data["package_name"]
+        self.package_name = data["filename"]  # application filename
+        self.package_path = data["full_path"]  # fullpath to the application
 
-    def find_package_in_device(self):
-        self.command.run_os_commands(
-            f"adb shell cmd package list packages | grep ${self.package_name}"
-        )
+    def inspect_application_files(self):
+        self.mobile_cmds.inspect_application_files(application=self.package_path)
+
+    # Install web proxies cert
+    # 1. Take filepath to .der
 
     """ Bypass permission denied
     adb shell su -c 'cat ~/somefile.txt' > somefile.txt

@@ -8,10 +8,10 @@ class Commands:
 
     def __init__(self) -> None:
         pass
-       
 
     def run_os_commands(self, command):
         """Executes shell commands such as [apt and sudo]"""
+
         result = subprocess.run(
             command,
             stdout=subprocess.PIPE,
@@ -20,6 +20,18 @@ class Commands:
             text=True,
         )
         return result
+
+    def run_git_cmd(self, git_command):
+        try:
+            print(f"runing command:\n{git_command}\n\n")
+            subprocess.run(git_command, check=True)
+            print("Nuclei template Installed successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to install Nuclei templates: {e}")
+            return False
+
+    def get_process_output(self, command):
+        return subprocess.getoutput(command)
 
     def auto_enter_commands(self, command):
         """Automatically press enter when prompted by script"""
@@ -54,6 +66,7 @@ class Commands:
             return False
 
         except Exception as e:
+            print(e)
             return False
 
     def clear_screen(self):
