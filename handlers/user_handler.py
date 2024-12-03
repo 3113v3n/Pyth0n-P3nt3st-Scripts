@@ -7,11 +7,11 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-            self,
-            filemanager,
-            validator: InputValidators,
-            bcolors,
-            config: Config,
+        self,
+        filemanager,
+        validator: InputValidators,
+        bcolors,
+        config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -36,16 +36,16 @@ class UserHandler:
             formatted_option = (
                 # <30 align with width of 30 characters
                 f"{self.color.OKGREEN}{number}. {option['domain']:<30} "
-                f"[ Enter {option['alias']:<8}] {option['icon']}{self.color.ENDC}\n"
+                f"[ ENTER {number:<2}] {option['icon']}{self.color.ENDC}\n"
             )
             OPTIONS.append(formatted_option)
             # set up default test domains
-            self.default_test_domains.append(option["alias"])
 
+            self.default_test_domains.append(option["alias"])
         # Join the list into a single multi-line string
         return "".join(OPTIONS)
 
-    ## ceUser Interactions
+    ## User Interactions
 
     def mobile_ui_interaction(self):
         while True:
@@ -157,14 +157,22 @@ class UserHandler:
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
+        # Reduce displayed index by 1 to avoid index error
+        selected_index = int(input(self.formatted_question).strip()) - 1
 
-        user_input = input(self.formatted_question).strip()
-        while user_input not in self.default_test_domains:
-            user_input = input(
-                f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
-            ).strip()
-        self.domain = user_input.lower()
+        while selected_index not in range(len(self.default_test_domains)):
+            selected_index = (
+                int(
+                    input(
+                        f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
+                    ).strip()
+                )
+                - 1
+            )
+
+        self.domain = self.default_test_domains[selected_index]
         # self.set_domain_variables(self.domain)
+        print(self.domain)
         return self.domain
 
     def get_user_subnet(self):
