@@ -23,7 +23,7 @@ class UserHandler:
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
         self.formatted_question = (
-            f"\nWhat task do you want to perform?\n" f"{self.OPTIONS}\n"
+            f"\nWhat task do you want to perform?\n" f"{self.OPTIONS}\n=> "
         )
 
     def set_test_options(self):
@@ -172,7 +172,6 @@ class UserHandler:
 
         self.domain = self.default_test_domains[selected_index]
         # self.set_domain_variables(self.domain)
-        print(self.domain)
         return self.domain
 
     def get_user_subnet(self):
