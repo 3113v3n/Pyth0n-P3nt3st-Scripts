@@ -18,10 +18,11 @@ Python scripts to aid in pentest automation.
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
-- To run the module simply enter [ **internal** ] on the provided prompt
-- Requires one to pass in an ip address in the following format (ip_address/subnet_range)
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
+- Requires one to pass in an ip address in the following format (ip_address/subnet)
+ 
+  ```text
   Example:
-  ```
       10.0.0.3/16
   ```
   ![Internal Module](images/internal.png)
@@ -48,7 +49,7 @@ inorder to avoid resumming from the last recorded live IP.
 ## 2. Vulnerability Analysis
 
 - This module runs an automated analysis on a **Nessus Advanced scan** and summarizes the vulnerabilities discovered
-- To run the module simply enter [ **va** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 - It requires 2 parameters:
 
 ```text
@@ -60,7 +61,7 @@ inorder to avoid resumming from the last recorded live IP.
 ## 3. Mobile Penetration Testing
 
 
-- To run the module simply enter [ **mobile** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 - This module performs a number of static analysis on both android and iOS (iOS coming soon)
 - It decompiles the apk file using apktool and runs regex checks on the files present on the decompiled application folder to look for
 1. Hardcoded values
@@ -78,6 +79,6 @@ inorder to avoid resumming from the last recorded live IP.
 
 [Coming Soon]
 
-- To run the module simply enter [ **external** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 
 

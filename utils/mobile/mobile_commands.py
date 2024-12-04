@@ -1,8 +1,22 @@
 from pathlib import Path
+import os
 import re
 from handlers.file_handler import get_file_extension, get_filename_without_extension
+from pprint import pprint
 
 base_output_dir = "./output_directory/Mobile"
+
+
+def rename_folders_with_spaces(path):
+
+    for root, dirs, _ in os.walk(path):
+        for dir_name in dirs:
+            if " " in dir_name:  # Check if folder name contains a space
+                new_name = dir_name.replace(" ", "_")  # Replace spaces with underscores
+                old_path = os.path.join(root, dir_name)
+                new_path = os.path.join(root, new_name)
+                os.rename(old_path, new_path)  # Rename the folder
+                print(f"Renamed: {old_path} -> {new_path}")
 
 
 class MobileCommands:
@@ -244,19 +258,23 @@ class MobileCommands:
                         f"{self.color.FAIL}[!] Error extracting Links {e}{self.color.ENDC}"
                     )
         # Remove all duplicates and save to file
-        self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
         self.sort_urls_and_ips(ip_name, self.all_ips)
+        self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
 
     def sort_urls_and_ips(self, filename, data, **kwargs):
-        with open(filename, "w") as f:
-            unique_lines = sorted(set(data))
-            for line in unique_lines:
-                if "urls" in kwargs:
-                    self.url_count += 1
-                    print(
-                        f"{self.color.OKCYAN}[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: {self.color.ENDC}"
-                    )
-                f.write(f"{line}\n")
+        # Write to file only if its not empty
+        if len(data) != 0:
+            with open(filename, "w") as f:
+                unique_lines = sorted(set(data))
+
+                for line in unique_lines:
+
+                    if "urls" in kwargs:
+                        self.url_count += 1
+                        print(
+                            f"{self.color.OKCYAN}[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: {self.color.ENDC}"
+                        )
+                    f.write(f"{line}\n")
 
     def format_content(self, content):
 
@@ -320,6 +338,9 @@ class MobileCommands:
 
         folder_name = self.decompile_application(application)
         output_name = f"{self.output_dir}/{self.file_name}"
+
+        # Rename folder/subfolders that contain spaces to avoid errors
+        rename_folders_with_spaces(folder_name)
 
         if self.file_type.lower() == "apk":
             platform = "android"

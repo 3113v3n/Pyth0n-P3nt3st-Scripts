@@ -6,7 +6,7 @@ class Config:
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
         {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
         #{"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
+        {"domain": "Nessus Vulnerability Analysis", "alias": "va", "icon": "🔎"},
     ]
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
