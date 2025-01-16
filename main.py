@@ -1,31 +1,28 @@
-from pprint import pprint
-
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, Config, InputValidators, bcolors, MobileCommands, ProgressBar
+from utils import Commands, Config, bcolors, MobileCommands, ProgressBar
+from utils.shared import validators
 
 # [Utils]
-
-
 # Initializers
-validator = InputValidators()
+
 # Handle packages
 package = PackageHandler(Commands, bcolors, Config)
 
 # Handles file management
-filemanager = FileHandler(bcolors, validator=validator)
+filemanager = FileHandler(bcolors, validator=validators)
 
 # gathers user input
-user = UserHandler(filemanager, validator, bcolors, Config)
+user = UserHandler(filemanager, validators, bcolors, Config)
 
 # Handles network related operations
 network = NetworkHandler(filemanager, Commands)
 
 # Mobile Commands
-mobile_commands = MobileCommands(Commands, filemanager, validator, bcolors, Config)
+mobile_commands = MobileCommands(Commands, filemanager, validators, bcolors, Config)
 
 # [penetration Testing domains]
 internal = InternalAssessment(filemanager=filemanager, network=network, colors=bcolors)
@@ -94,7 +91,7 @@ def user_interactions():
 def main():
     """
     Run different modules depending on the various domains
-    i.e Internal Mobile and External
+    i.e. Internal Mobile and External
     """
 
     # if packages_present():  #TODO: change this back to True

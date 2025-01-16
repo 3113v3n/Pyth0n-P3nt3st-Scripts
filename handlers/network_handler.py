@@ -91,7 +91,7 @@ class NetworkHandler:
                 else:
                     x_plus_1 = x_value + 1
 
-            print(f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}")
+            print(f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}/{self.network_mask}")
             self.scan_network(
                 stdscr=stdscr,
                 octets=octets,
@@ -153,7 +153,7 @@ class NetworkHandler:
             is_alive=is_alive,
             mode=mode,
         )
-        #time.sleep(0.01)
+        time.sleep(0.01)
 
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled

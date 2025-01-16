@@ -1,5 +1,5 @@
 # trunk-ignore-all(black)
-from utils.shared import InputValidators, Config
+from utils.shared import Config, validators
 
 
 class UserHandler:
@@ -7,11 +7,11 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-        self,
-        filemanager,
-        validator: InputValidators,
-        bcolors,
-        config: Config,
+            self,
+            filemanager,
+            validator: validators,
+            bcolors,
+            config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -28,24 +28,24 @@ class UserHandler:
 
     def set_test_options(self):
         # Create a list to store formatted options
-        OPTIONS = []
+        test_options = []
         for option in self.config.test_domains:
             # number to display on screen
             number = self.config.test_domains.index(option) + 1
             # Format each option with colors and spacing
             formatted_option = (
                 # <30 align with width of 30 characters
-                f"{self.color.OKGREEN}{number}. {option['domain']:<30} "
+                f"\n{self.color.OKGREEN}{number}. {option['domain']:<30} "
                 f"[ ENTER {number:<2}] {option['icon']}{self.color.ENDC}\n"
             )
-            OPTIONS.append(formatted_option)
+            test_options.append(formatted_option)
             # set up default test domains
 
             self.default_test_domains.append(option["alias"])
         # Join the list into a single multi-line string
-        return "".join(OPTIONS)
+        return "".join(test_options)
 
-    ## User Interactions
+    # User Interactions
 
     def mobile_ui_interaction(self):
         while True:
@@ -113,20 +113,24 @@ class UserHandler:
 
     def internal_ui_interaction(self):
         print(" Running Internal PT modules ")
-        subnet = self.get_user_subnet()
+        subnet = ""
         mode = input(self.config.internal_mode_choice).strip().lower()
+        output_file = ""
 
         # Ensure correct mode is selected by user
         while mode not in ["scan", "resume"]:
             mode = input(self.config.internal_choice_error)
 
         if mode == "resume":
+            """
+            Incase of resume module, get user subnet and append to the last ip obtained from the file
+            """
             try:
                 # returns an ip address if a file exists
                 # returns None if no file exists
 
                 resume_ip = self.filemanager.display_saved_files(
-                    self.filemanager.output_directory
+                    self.filemanager.output_directory, resume_scan=True
                 )
 
                 if resume_ip is None:
@@ -134,7 +138,8 @@ class UserHandler:
 
                 # output file
                 output_file = self.filemanager.filepath
-                subnet = f"{resume_ip}/{subnet.split('/')[1]}"
+                cidr = self.get_cidr()
+                subnet = f"{resume_ip}/{cidr}"
 
             except ValueError as error:
                 print(
@@ -147,6 +152,7 @@ class UserHandler:
 
         elif mode == "scan":
             # TODO: file validations
+            subnet = self.get_user_subnet()
             output_file = input("[+] Provide a name for your output file: ").strip()
 
         return {
@@ -162,12 +168,12 @@ class UserHandler:
 
         while selected_index not in range(len(self.default_test_domains)):
             selected_index = (
-                int(
-                    input(
-                        f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
-                    ).strip()
-                )
-                - 1
+                    int(
+                        input(
+                            f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
+                        ).strip()
+                    )
+                    - 1
             )
 
         self.domain = self.default_test_domains[selected_index]
@@ -182,13 +188,28 @@ class UserHandler:
                 subnet = input(
                     "\n[+] Please provide a valid subnet [10.0.0.0/24]\n"
                 ).strip()
-                if self.validator.validate_cidr(subnet):
+                if self.validator.validate_ip_and_cidr(subnet):
                     break
                 else:
                     raise ValueError(" Invalid IP address format provided")
             except ValueError as error:
                 print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
         return subnet
+
+    def get_cidr(self):
+        # Validate CIDR
+        while True:
+            try:
+                cidr = input(
+                    "[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
+                ).strip()
+                if self.validator.validate_cidr(cidr):
+                    break
+                else:
+                    raise ValueError(" Invalid CIDR provided")
+            except ValueError as error:
+                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+        return cidr
 
     def set_domain_variables(self, test_domain):
         """Update the variables object with reference to the test domain provisioned"""

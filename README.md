@@ -3,16 +3,16 @@
 Python scripts to aid in pentest automation.
 - Start by installing all the dependencies in the requirements.txt
 
-| Domain                       | Script Target                      |
-| ---------------------------- | ---------------------------------- |
-| External Penetration Testing | 1. Enumerate subdomains            |
-|                              |                                    |
-| Internal Penetration Testing | 1. Enumerate IPs give CIDR         |
-|                              | 2. Run netexec                     |
-|                              | 3. Compare Hashes obtained         |
-|                              |                                    |
-| Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]   |
-|                              |                                    |
+| Domain                       | Script Target                     |
+|------------------------------|-----------------------------------|
+| External Penetration Testing | 1. Enumerate subdomains           |
+|                              |                                   |
+| Internal Penetration Testing | 1. Enumerate IPs give CIDR        |
+|                              | 2. Run netexec                    |
+|                              | 3. Compare Hashes obtained        |
+|                              |                                   |
+| Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]  |
+|                              |                                   |
 | Vulnerability Analysis       | 1. Analyze Nessus VA output (csv) |
 
 ## 1. Internal Penetration Testing
