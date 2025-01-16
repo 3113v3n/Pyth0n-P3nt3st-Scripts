@@ -258,6 +258,7 @@ class VulnerabilityAnalysis:
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
                 f"{get_filename_without_extension(output_file)}_Unfiltered",
+                unfiltered=True
             )
         # write to file if data is present
         if len(found_vulnerabilities) != 0:

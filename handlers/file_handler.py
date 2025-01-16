@@ -140,7 +140,7 @@ class FileHandler:
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def write_to_multiple_sheets(self, dataframe_objects: list, filename: str):
+    def write_to_multiple_sheets(self, dataframe_objects: list, filename: str,**kwargs):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{generate_unique_name(filename, extension='xlsx')}"
         with pandas.ExcelWriter(self.filepath) as writer:
@@ -149,9 +149,13 @@ class FileHandler:
                     dataframe["dataframe"].to_excel(
                         writer, sheet_name=dataframe["sheetname"], index=False
                     )
-        print(
-            f"Data has been written to :\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
-        )
+        if "unfiltered" in kwargs:
+            text = (f"\n\nUnfiltered vulnerabilities have been written to :"
+                    f"\n{self.colors.OKCYAN}{self.filepath}{self.colors.ENDC}\n")
+        else:
+            text = (f"Filtered vulnerabilities have been written to :"
+                    f"\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n")
+        print(text)
 
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
