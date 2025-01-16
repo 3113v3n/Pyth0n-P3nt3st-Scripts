@@ -94,10 +94,9 @@ def main():
     i.e. Internal Mobile and External
     """
 
-    # if packages_present():  #TODO: change this back to True
-    #     # start our pentest
-    #     user_interactions()
-    user_interactions()
+    if packages_present():  # TODO: change this back to True
+        # start our pentest
+        user_interactions()
 
 
 if __name__ == "__main__":
