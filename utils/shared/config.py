@@ -10,16 +10,13 @@ class Config:
     ]
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
-    internal_mode_choice = (
-        f"\n[+] What mode would you like to run the scan with [{bcolors.OKCYAN} SCAN | RESUME {bcolors.ENDC}]"
-        f"\n{bcolors.OKCYAN}SCAN{bcolors.ENDC} : scan new subnet\n"
-        f"{bcolors.OKCYAN}RESUME{bcolors.ENDC} : resume previous scan\n "
-        f"\n(In case you want to {bcolors.BOLD}RESUME{bcolors.ENDC} a scan,"
-        f"please remember to {bcolors.BOLD}{bcolors.WARNING}manually update "
-        f"the file{bcolors.ENDC}{bcolors.ENDC} \nwith the last scanned ip to "
-        "allow resume scan from last scanned ip rather than last found ip address)\n"
-        "\n Enter mode: ==> "
-    )
+
+    internal_mode_choice = (f"\n[+] Select scan mode: [{bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC}]"
+                            f"\n\n{bcolors.OKCYAN}SCAN{bcolors.ENDC}: Scan a new subnet."
+                            f"\n{bcolors.OKCYAN}RESUME{bcolors.ENDC}: Continue a previous scan. "
+                            f"\n\n(To resume, {bcolors.BOLD}{bcolors.WARNING}manually update the file "
+                            f"with the last scanned IP{bcolors.ENDC} to start from it instead of the last found IP.)"
+                            "\n\n Enter mode: ==> ")
     internal_choice_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC} ]"
     external_packages = [
         # External
@@ -27,7 +24,8 @@ class Config:
         {
             "name": ["go"],
             "command": "multiple",
-            "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+            "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
+                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
         },
         {
             "name": ["gowitness"],
@@ -87,7 +85,7 @@ class Config:
     ]
     mobile_packages = [
         # Mobile
-        ## Install on Device
+        # Install on Device
         # 1. WiFi ADB
         # 2. Magisk Frida / SQlite
         # 3. Drozer
@@ -103,7 +101,8 @@ class Config:
         {
             "name": ["go"],
             "command": "multiple",
-            "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+            "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
+                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
         },
         {
             "name": ["adb", "dex2jar", "nuclei", "radare2", "libusbmuxd-tools", "sqlite3", "sqlitebrowser",
@@ -135,7 +134,8 @@ class Config:
         "See Also",
         "Plugin Output",
     ]
-    column_mismatch_error = f"{bcolors.FAIL}{bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the same number of columns {bcolors.ENDC}"
+    column_mismatch_error = (f"{bcolors.FAIL}{bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the "
+                             f"same number of columns {bcolors.ENDC}")
 
     def filter_conditions(vulnerabilities, regex_word):
         return {
@@ -143,7 +143,7 @@ class Config:
                              & (vulnerabilities["Name"].str.contains(regex_word("SSL"), regex=True))
                              | (vulnerabilities["Name"].str.contains(regex_word("TLS"), regex=True))
                              | (vulnerabilities["Name"].str.contains(regex_word("POODLE"), regex=True)),
-            "missing_patch_condition": ((vulnerabilities["Solution"].notna()))
+            "missing_patch_condition": (vulnerabilities["Solution"].notna())
                                        & (
                                            vulnerabilities["Solution"].str.contains(
                                                regex_word("Update"), regex=True
@@ -271,7 +271,9 @@ class Config:
     # Define regex patterns as raw strings for better readability and handling
     IOS_FILE_SEARCH = r"hasOnlySecureContent|javaScriptEnabled|UIWebView|WKWebView"
     BEARER_REGEX = r"[^\w\d]+(basic|bearer)\s.+"
-    HARDCODED_REGEX = r'(\?access|account|admin|basic|bearer|card|conf|cred|customer|email|history|id|info|jwt|key|kyc|log|otp|pass|pin|priv|refresh|salt|secret|seed|setting|sign|token|transaction|transfer|user)\w*(?:"\s*:\s*|\s*=).+'
+    HARDCODED_REGEX = (r'(\?access|account|admin|basic|bearer|card|conf|cred|customer|email|history|id|info|jwt|key'
+                       r'|kyc|log|otp|pass|pin|priv|refresh|salt|secret|seed|setting|sign|token|transaction|transfer'
+                       r'|user)\w*(?:"\s*:\s*|\s*=).+')
     HARDCODED_REGEX_2 = r"([^\w\d]+(to(_|\s)do|todo|note)\s|//|/\*|\*/).+"
     BASE64_REGEX = r"(?:[a-zA-Z0-9\+\/]{4})*(?:[a-zA-Z0-9\+\/]{4}|[a-zA-Z0-9\+\/]{3}=|[a-zA-Z0-9\+\/]{2}==)"
     IP_REGEX = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
