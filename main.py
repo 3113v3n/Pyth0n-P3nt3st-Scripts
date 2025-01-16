@@ -44,7 +44,8 @@ def packages_present() -> bool:
     else:
         num_of_packages += len(missing_packages)
         print(
-            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s)..{bcolors.ENDC}"
+            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
+            f"{bcolors.ENDC}"
         )
         # update to run check again
 
@@ -94,9 +95,10 @@ def main():
     i.e. Internal Mobile and External
     """
 
-    if packages_present():  # TODO: change this back to True
-        # start our pentest
-        user_interactions()
+    # if packages_present():  # TODO: change this back to True
+    #     # start our pentest
+    #     user_interactions()
+    user_interactions()
 
 
 if __name__ == "__main__":
