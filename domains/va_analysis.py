@@ -1,7 +1,7 @@
 # trunk-ignore-all(isort)t
 from utils.shared import Config
 from handlers import FileHandler
-from handlers.file_handler import read_csv, concat_dataframes
+from handlers.file_handler import read_csv, concat_dataframes, get_filename_without_extension
 
 
 def percentage_null_fields(dataframe):
@@ -26,6 +26,12 @@ def csv_filter_operations(dataframe, filter_option, operation, **kwargs):
                 return dataframe[filter_option].isin(kwargs["in_key"])
         case _:
             raise ValueError(f"Invalid filter option: {filter_option}")
+
+
+def regex_word(search_term, **kwargs):
+    if "is_extra" in kwargs:
+        return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
+    return rf"\b{search_term}\b"
 
 
 class VulnerabilityAnalysis:
@@ -58,7 +64,7 @@ class VulnerabilityAnalysis:
                     contains_key="Credentialed checks : yes",
                 )
             )
-        ]["Host"].tolist()
+            ]["Host"].tolist()
         self.credentialed_hosts = credentialed_hosts
 
         selected_columns = self.data[
@@ -73,7 +79,7 @@ class VulnerabilityAnalysis:
         formated_vulnerabilities = selected_columns[
             (csv_filter_operations(selected_columns, "Risk", "notnull"))
             & (selected_columns["Risk"] != "Low")
-        ].reset_index(drop=True)
+            ].reset_index(drop=True)
         print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
         return formated_vulnerabilities
@@ -142,14 +148,9 @@ class VulnerabilityAnalysis:
 
         return self.format_input_file()
 
-    def regex_word(self, search_term, **kwargs):
-        if "is_extra" in kwargs:
-            return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
-        return rf"\b{search_term}\b"
-
     def sort_vulnerabilities(self, vulnerabilities, output_file):
         conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word=self.regex_word
+            vulnerabilities, regex_word=regex_word
         )
         # Show remaining data after filtering
         unfiltered = vulnerabilities[
@@ -171,7 +172,7 @@ class VulnerabilityAnalysis:
             & ~conditions["information_condition"]
             & ~conditions["web_condition"]
             & ~conditions["rce_condition"]
-        ]
+            ]
         # 1. SSL issues
         ssl_issues = vulnerabilities[conditions["ssl_condition"]]
 
@@ -199,7 +200,7 @@ class VulnerabilityAnalysis:
         # 11. Microsoft
         defender = vulnerabilities[conditions["defender_condition"]]
 
-        # 12. RDP misconfigs
+        # 12. RDP Misconfig
         rdp_misconfig = vulnerabilities[conditions["rdp_condition"]]
 
         # 13. Compliance Checks
@@ -217,7 +218,7 @@ class VulnerabilityAnalysis:
             conditions["rce_condition"]
             & ~conditions["missing_patch_condition"]
             & ~conditions["unsupported_software"]
-        ]
+            ]
 
         found_vulnerabilities = [
             {"dataframe": winverify, "sheetname": "winverify"},
@@ -250,12 +251,16 @@ class VulnerabilityAnalysis:
         ]
 
         if not unfiltered.empty:
+            """
+            For the unfiltered vulnerabilities, append 'Unfiltered'
+            to the user provided filename for easy identification
+            """
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
-                "Unfiltered Vulnerabilities",
+                f"{get_filename_without_extension(output_file)}_Unfiltered",
             )
         # write to file if data is present
-        if  len(found_vulnerabilities)!=0:
+        if len(found_vulnerabilities) != 0:
             self.filemanager.write_to_multiple_sheets(
                 found_vulnerabilities,
                 output_file,

@@ -94,7 +94,11 @@ def main():
     i.e. Internal Mobile and External
     """
 
+<<<<<<< HEAD
     if packages_present():
+=======
+    if packages_present():  # TODO: change this back to True
+>>>>>>> dev
         # start our pentest
         user_interactions()
 
