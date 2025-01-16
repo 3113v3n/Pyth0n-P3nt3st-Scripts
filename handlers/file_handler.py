@@ -216,7 +216,7 @@ class FileHandler:
             file
             for file in self.files
             if self.validator.check_filetype(file["filename"], "apk")
-            or self.validator.check_filetype(file["filename"], "ipa")
+               or self.validator.check_filetype(file["filename"], "ipa")
         ]
         # filter out CSV files only
         if any(key in kwargs for key in ("display_csv", "resume_scan")):
@@ -261,7 +261,7 @@ class FileHandler:
             # Error handling
             try:
                 selected_file = int(input(f"\n{input_str}"))
-                if 0 <= selected_file < len(self.files) + 1:  # display numbers are value of index + 1
+                if 0 < selected_file < len(self.files) + 1:  # display numbers are value of index + 1
 
                     break
                 else:
