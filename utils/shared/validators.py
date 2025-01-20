@@ -19,6 +19,14 @@ def check_subdirectory_exists(folder_name, search_path) -> bool:
     return folder_exists
 
 
+def get_filename_without_extension(filepath):
+    # Get the filename with extension
+    filename_with_ext = os.path.basename(filepath)
+    # Split the filename and extension
+    filename_without_ext, _ = os.path.splitext(filename_with_ext)
+    return filename_without_ext
+
+
 def validate_ip_and_cidr(ip_address) -> bool:
     # 10.0.0.1/8
     pattern = (r"^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(3["
@@ -39,7 +47,8 @@ def validate_cidr(cidr) -> bool:
 
 
 def file_exists(filename) -> bool:
-    return os.path.isfile(filename)
+    exists = os.path.isfile(filename)
+    return exists
 
 
 def check_filetype(filename: str, filetype: str) -> bool:

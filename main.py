@@ -64,6 +64,7 @@ def user_interactions():
             )
             # TODO: [WORK IN PROGRESS]
             # Start scan to save live Ips
+
             internal.enumerate_hosts()
 
         case "va":

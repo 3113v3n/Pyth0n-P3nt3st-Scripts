@@ -24,6 +24,7 @@ class InternalAssessment:
         if mode == "scan":
             self.output_file = generate_unique_name(output_file, "csv")
         else:
+
             self.output_file = output_file
 
     def enumerate_hosts(self):
@@ -31,9 +32,13 @@ class InternalAssessment:
         In order to increase your attack surface
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
-        location = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.filepath}"
+        paths = self.filemanager.get_file_paths()
+        live = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{paths['live_hosts']}"
+        unresponsive = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.WARNING}{paths['unresponsive_hosts']}"
+
         print(
-            f"[+] {self.bcolors.BOLD}Your File is located at: {location}{self.bcolors.ENDC}"
+            f"\n{self.bcolors.OKCYAN}[+] Your Live Hosts are located here: {live}{self.bcolors.ENDC}\n"
+            f"\n{self.bcolors.FAIL}[!] Your Unresponsive Hosts are located here: {unresponsive}{self.bcolors.ENDC}\n\n"
         )
 
     def netexec_module(self):
