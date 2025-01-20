@@ -263,14 +263,11 @@ class FileHandler:
             for file in self.files
             if self.validator.check_filetype(file["filename"], "apk")
             or self.validator.check_filetype(file["filename"], "ipa")
-<<<<<<< HEAD
-=======
         ]
 
         # Only display files containing unresponsive hosts
         unresponsive_host_files = [
             file for file in csv_files if "unresponsive_host" in file["filename"]
->>>>>>> feature-x
         ]
         # filter out CSV files only
         if (

@@ -18,14 +18,14 @@ Python scripts to aid in pentest automation.
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
-- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
+- To run the module simply enter [ **_Number displayed on Right_** ] on the provided prompt
 - Requires one to pass in an ip address in the following format (ip_address/subnet)
  
   ```text
   Example:
       10.0.0.3/16
   ```
-  ![Internal Module](images/internal.png)
+  ![Internal Module](images/internal-2.png)
 
 - The script then enumerates the provided subnet and uses ICMP protocol to determine hosts that are alive on the network
 - The scan runs on two modes **SCAN** and **RESUME**
@@ -33,17 +33,15 @@ Python scripts to aid in pentest automation.
 - RESUME mode: the script resumes scan from the last saved IP address from your provided csv file
 
 ```text
-Resume mode will however require you to remember the last IP before the scan ended 
-inorder to avoid resumming from the last recorded live IP.
+Resume mode will however require you to select the filename that contains the unresponsive IP addresses
+It then sorts the IPs and selects the last IP in the file and resumes scan from there.
 
-    Example:
-        Last saved IP: 10.0.0.20
-        Last scanned IP: 10.0.0.245
+The user is however required to provide the subnet that was being scanned initially i.e /8 /16 /24 e.t.c
 
-    To ensure the scan resumes correctly, you can update the csv file with the new ip (10.0.0.245)
-    or alternatively leave it as it is, and scan will resume from (10.0.0.20)
+
 
 ```
+![Resume_scan](images/internal_resume.png)
 ![Scan Progress](images/scan_progress.png)
 
 ## 2. Vulnerability Analysis
