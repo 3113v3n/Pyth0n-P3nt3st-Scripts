@@ -48,7 +48,6 @@ def validate_cidr(cidr) -> bool:
 
 def file_exists(filename) -> bool:
     exists = os.path.isfile(filename)
-    print(f'DeBUG: Checking if file {filename} exists --> {exists}')
     return exists
 
 

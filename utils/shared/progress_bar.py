@@ -28,7 +28,6 @@ class ProgressBar:
             filemanager.save_to_csv(filename, ip, mode)
 
         self.total_scanned += 1
-
         self.display(stdscr)
 
     def display(self, stdscr):

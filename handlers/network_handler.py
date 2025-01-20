@@ -4,7 +4,6 @@ import itertools
 import threading
 from tqdm import tqdm
 from handlers import FileHandler
-from pprint import pprint
 
 
 class NetworkHandler:
@@ -58,28 +57,45 @@ class NetworkHandler:
                 executor.submit(self.scan_hosts, ip, output_file, mode, stdscr): ip
                 for ip in ip_ranges
             }
-            for _ in tqdm(concurrent.futures.as_completed(futures), total=len(ip_ranges),
-                          desc="Scanning Network", leave=False):
-                pass # UI updates are handled inside scan_host()
+            for _ in tqdm(
+                concurrent.futures.as_completed(futures),
+                total=len(ip_ranges),
+                desc="Scanning Network",
+                leave=False,
+            ):
+                pass  # UI updates are handled inside scan_host()
 
     def generate_ip_ranges(self, base_ip) -> list:
         """Generate IP addresses based on CIDR subnet provided"""
         base_ip = list(map(int, base_ip))  # ==> [192,168,0,1]
 
         if self.host_bits <= 8:
-            return [f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}" for x in range(1, 256)]
+            return [
+                f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}" for x in range(1, 256)
+            ]
         elif 16 >= self.host_bits > 8:
-            return [f"{base_ip[0]}.{base_ip[1]}.{y}.{x}" for y in range(256) for x in range(256)]
+            return [
+                f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
+                for y in range(256)
+                for x in range(256)
+            ]
         elif 24 >= self.host_bits > 16:
-            return [f"{base_ip[0]}.{z}.{y}.{x}" for z, y, x in itertools.product(range(256), repeat=3)]
+            return [
+                f"{base_ip[0]}.{z}.{y}.{x}"
+                for z, y, x in itertools.product(range(256), repeat=3)
+            ]
 
     def scan_hosts(self, ip, output_file, mode, stdscr):
         """Check if host is alive using concurrent pings and update UI"""
         is_alive = self.os_commands.ping_hosts(ip)
-        with self.lock:     # Prevents concurrent writes
+        with self.lock:  # Prevents concurrent writes
             self.progress_bar.update_ips(
-                self.filemanager, output_file=output_file, stdscr=stdscr, ip=ip, is_alive=is_alive,
-                mode=mode
+                self.filemanager,
+                output_file=output_file,
+                stdscr=stdscr,
+                ip=ip,
+                is_alive=is_alive,
+                mode=mode,
             )
 
 
@@ -95,7 +111,7 @@ def get_network_info(subnet) -> dict:
     bits = 32 - int(network_mask)
     ip_info = {
         "ip_address": subnet.split("/")[0],
-        "hosts": (2 ** bits),  # - 2
+        "hosts": (2**bits),  # - 2
         "network_mask": int(network_mask),
         "host_bits": bits,
     }
