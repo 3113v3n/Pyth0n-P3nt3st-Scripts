@@ -7,10 +7,10 @@ class InternalAssessment:
     """class will be responsible for handling all Internal PT"""
 
     def __init__(
-        self,
-        filemanager: FileHandler,
-        network: NetworkHandler,
-        colors: bcolors,
+            self,
+            filemanager: FileHandler,
+            network: NetworkHandler,
+            colors: bcolors,
     ) -> None:
         self.output_file = "sample.txt"
         self.mode = "SCAN"
@@ -31,9 +31,11 @@ class InternalAssessment:
         In order to increase your attack surface
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
-        location = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.filepath}"
+        location = (f"{self.bcolors.ENDC}{self.bcolors.BOLD}"
+                    f"{self.bcolors.OKGREEN}{self.filemanager.filepath}")
+
         print(
-            f"[+] {self.bcolors.BOLD}Your File is located at: {location}{self.bcolors.ENDC}"
+            f"\n{self.bcolors.OKCYAN}[+] Your Files are located here: {location}{self.bcolors.ENDC}\n\n"
         )
 
     def netexec_module(self):

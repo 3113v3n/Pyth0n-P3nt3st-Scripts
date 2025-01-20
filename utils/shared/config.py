@@ -17,7 +17,9 @@ class Config:
                             f"\n\n(To resume, {bcolors.BOLD}{bcolors.WARNING}manually update the file "
                             f"with the last scanned IP{bcolors.ENDC} to start from it instead of the last found IP.)"
                             "\n\n Enter mode: ==> ")
-    internal_choice_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC} ]"
+    internal_choice_error = (f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME"
+                             f"{bcolors.ENDC} ]"
+                             "\n\n Enter mode: ==> ")
     external_packages = [
         # External
 

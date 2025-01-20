@@ -140,7 +140,7 @@ class FileHandler:
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
-    def write_to_multiple_sheets(self, dataframe_objects: list, filename: str,**kwargs):
+    def write_to_multiple_sheets(self, dataframe_objects: list, filename: str, **kwargs):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{generate_unique_name(filename, extension='xlsx')}"
         with pandas.ExcelWriter(self.filepath) as writer:
@@ -160,27 +160,24 @@ class FileHandler:
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
             self.filepath = f"{self.output_directory}/{filename}"
-        else:
+        elif mode == "resume":
             self.filepath = filename
 
-        file_header = ""
-        if filename != "unresponsive_hosts":
-            file_header += "Live Host IP Addresses"
-        else:
-            file_header += "Unresponsive IP Addresses"
-            # print(f"Resuming unresponsive scan from :{self.filepath}\nFilename: {filename}")
-            self.filepath = f"{self.output_directory}/unresponsive_hosts.txt"
+        file_header = "Live Host IP Addresses" if "unresponsive_hosts" not in filename.lower else ("Unresponsive IP "
+                                                                                                   "Addresses")
+        if "unresponsive_hosts" in filename:
+            self.filepath = f'{self.output_directory}/{filename}'
 
         data = pandas.DataFrame({file_header: [content]})
 
         if self.validator.file_exists(f"{self.filepath}"):
             existing_df = read_csv(f"{self.filepath}")
-
             updated_df = concat_dataframes(existing_df, data)
         else:
             updated_df = data
 
         updated_df.to_csv(f"{self.filepath}", index=False)
+
 
     def create_folder(self, folder_name, search_path="./output_directory"):
 

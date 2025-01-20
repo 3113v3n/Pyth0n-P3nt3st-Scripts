@@ -1,4 +1,5 @@
 import curses
+from .validators import get_filename_without_extension
 
 
 class ProgressBar:
@@ -13,17 +14,21 @@ class ProgressBar:
         self.unresponsive_hosts = []
 
     def update_ips(
-        self, filemanager, output_file, stdscr, ip, is_alive, mode
+            self, filemanager, output_file, stdscr, ip, is_alive, mode
     ):
+        """Update the scan progress and save both live and unresponsive hosts"""
+        basename = get_filename_without_extension(output_file)
         if is_alive:
-
             self.live_hosts.append(ip)
             filemanager.save_to_csv(output_file, ip, mode)
 
         else:
             self.unresponsive_hosts.append(ip)
-            filemanager.save_to_csv("unresponsive_hosts", ip, mode)
+            filename = f"{basename}_unresponsive_hosts.csv"
+            filemanager.save_to_csv(filename, ip, mode)
+
         self.total_scanned += 1
+
         self.display(stdscr)
 
     def display(self, stdscr):
