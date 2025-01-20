@@ -1,5 +1,5 @@
 from .internal import HashUtil, NetExec
-from .shared import bcolors, Commands, InputValidators, Config
+from .shared import bcolors, Commands, Config, ProgressBar
 from .mobile import MobileCommands
 
 __all__ = [
@@ -7,7 +7,7 @@ __all__ = [
     NetExec,
     bcolors,
     Commands,
-    InputValidators,
     Config,
     MobileCommands,
+    ProgressBar
 ]

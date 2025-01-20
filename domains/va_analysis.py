@@ -1,45 +1,85 @@
-# trunk-ignore-all(isort)
-from handlers import FileHandler
+# trunk-ignore-all(isort)t
 from utils.shared import Config
+from handlers import FileHandler
+from handlers.file_handler import read_csv, concat_dataframes, get_filename_without_extension
 
-#from pprint import pprint
+
+def percentage_null_fields(dataframe):
+    # determine percentage accuracy of the data by showing null fields
+    for i in dataframe.columns:
+        null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
+        if null_rate > 0:
+            print(f"{i} null rate: {null_rate:.2f}%")
+
+
+def csv_filter_operations(dataframe, filter_option, operation, **kwargs):
+    # Function to combine all the major CSV filters into one for code clarity
+    match operation:
+        case "notnull":
+            return dataframe[filter_option].notna()
+        case "contains":
+            if "contains_key" in kwargs:
+                # check for any key value pair passed as an  extra argument and uses it as a filter
+                return dataframe[filter_option].str.contains(kwargs["contains_key"])
+        case "in":
+            if "in_key" in kwargs:
+                return dataframe[filter_option].isin(kwargs["in_key"])
+        case _:
+            raise ValueError(f"Invalid filter option: {filter_option}")
+
+
+def regex_word(search_term, **kwargs):
+    if "is_extra" in kwargs:
+        return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
+    return rf"\b{search_term}\b"
 
 
 class VulnerabilityAnalysis:
+    """Class that handles Vulnerability analysis tasks"""
+
     def __init__(self, filemanager: FileHandler, config: Config) -> None:
+        # File manager class that is responsible for file operations
         self.filemanager = filemanager
         self.data = []
+        # list of hosts that passed credential check
         self.credentialed_hosts = []
+        # CSV headers used for analysis
         self.headers = config.va_headers
-        self.selected_columns = []  # columns to showcase on our final excel
-        self.config = config  # contains constants to be used accross the program
+        # columns to showcase on our final excel
+        self.selected_columns = []
+        # contains constants to be used across the program
+        self.config = config
 
-    def percentage_null_fields(self, dataframe):
-        # determine percentage accuracy of the data by showing null fields
-        for i in dataframe.columns:
-            null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
-            if null_rate > 0:
-                print(f"{i} null rate: {null_rate:.2f}%")
-
-    def format_input_file(self)->list:
+    def format_input_file(self) -> list:
         # lists of hosts that passed credential check
         # filter hosts with credential check successful
-        credentialed_hosts = self.data[ (self.data["Plugin Output"].notna())
+
+        credentialed_hosts = self.data[
+            (csv_filter_operations(self.data, "Plugin Output", "notnull"))
             & (
-                self.data["Plugin Output"].str.contains(
-                    "Credentialed checks : yes"
+                csv_filter_operations(
+                    self.data,
+                    "Plugin Output",
+                    "contains",
+                    contains_key="Credentialed checks : yes",
                 )
-            )]["Host"].tolist()
+            )
+            ]["Host"].tolist()
         self.credentialed_hosts = credentialed_hosts
 
-        selected_columns = self.data[self.data["Host"].isin(self.credentialed_hosts)][
+        selected_columns = self.data[
+            csv_filter_operations(
+                self.data, "Host", "in", in_key=self.credentialed_hosts
+            )
+        ][
             self.headers[:-1]  # ignore the last item in our headers list
         ]
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
         formated_vulnerabilities = selected_columns[
-            (selected_columns["Risk"].notna()) & (selected_columns["Risk"] != "Low")
-        ].reset_index(drop=True)
+            (csv_filter_operations(selected_columns, "Risk", "notnull"))
+            & (selected_columns["Risk"] != "Low")
+            ].reset_index(drop=True)
         print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
         return formated_vulnerabilities
@@ -67,13 +107,13 @@ class VulnerabilityAnalysis:
         try:
             # Read the first file as baseline
             filename = file_list[starting_index]["filename"]
-            original_file = self.filemanager.read_csv(starting_file)
+            original_file = read_csv(starting_file)
 
             # Check if baseline file is empty
             if original_file.empty:
                 raise ValueError(f"Baseline file {filename} is empty")
 
-            # Check missing columns in basefile
+            # Check missing columns in base file
             self.get_missing_columns(original_file, filename)
             all_vulnerabilities = original_file
 
@@ -81,7 +121,7 @@ class VulnerabilityAnalysis:
             for file in file_list:
                 if file["full_path"] != starting_file:
                     # Read CSV file without headers
-                    new_data = self.filemanager.read_csv(file["full_path"], header=None)
+                    new_data = read_csv(file["full_path"], header=None)
 
                     # Check if new data is empty
                     if new_data.empty:
@@ -98,7 +138,7 @@ class VulnerabilityAnalysis:
                     # Check if other files have missing columns
                     self.get_missing_columns(new_data, file["filename"])
                     # Append new data to the original data
-                    all_vulnerabilities = self.filemanager.concat_dataframes(
+                    all_vulnerabilities = concat_dataframes(
                         all_vulnerabilities, new_data
                     )
 
@@ -108,14 +148,9 @@ class VulnerabilityAnalysis:
 
         return self.format_input_file()
 
-    def regex_word(self, search_term, **kwargs):
-        if "is_extra" in kwargs:
-            return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
-        return rf"\b{search_term}\b"
-
     def sort_vulnerabilities(self, vulnerabilities, output_file):
         conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word=self.regex_word
+            vulnerabilities, regex_word=regex_word
         )
         # Show remaining data after filtering
         unfiltered = vulnerabilities[
@@ -137,7 +172,7 @@ class VulnerabilityAnalysis:
             & ~conditions["information_condition"]
             & ~conditions["web_condition"]
             & ~conditions["rce_condition"]
-        ]
+            ]
         # 1. SSL issues
         ssl_issues = vulnerabilities[conditions["ssl_condition"]]
 
@@ -165,7 +200,7 @@ class VulnerabilityAnalysis:
         # 11. Microsoft
         defender = vulnerabilities[conditions["defender_condition"]]
 
-        # 12. RDP misconfigs
+        # 12. RDP Misconfig
         rdp_misconfig = vulnerabilities[conditions["rdp_condition"]]
 
         # 13. Compliance Checks
@@ -183,7 +218,7 @@ class VulnerabilityAnalysis:
             conditions["rce_condition"]
             & ~conditions["missing_patch_condition"]
             & ~conditions["unsupported_software"]
-        ]
+            ]
 
         found_vulnerabilities = [
             {"dataframe": winverify, "sheetname": "winverify"},
@@ -214,13 +249,20 @@ class VulnerabilityAnalysis:
         unfiltered_vulnerabilities = [
             {"dataframe": unfiltered, "sheetname": "Unfiltered"}
         ]
+
         if not unfiltered.empty:
+            """
+            For the unfiltered vulnerabilities, append 'Unfiltered'
+            to the user provided filename for easy identification
+            """
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
-                "Unfiltered Vulnerabilities",
+                f"{get_filename_without_extension(output_file)}_Unfiltered",
+                unfiltered=True
             )
-
-        self.filemanager.write_to_multiple_sheets(
-            found_vulnerabilities,
-            output_file,
-        )
+        # write to file if data is present
+        if len(found_vulnerabilities) != 0:
+            self.filemanager.write_to_multiple_sheets(
+                found_vulnerabilities,
+                output_file,
+            )

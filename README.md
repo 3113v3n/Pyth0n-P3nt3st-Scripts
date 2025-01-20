@@ -3,28 +3,29 @@
 Python scripts to aid in pentest automation.
 - Start by installing all the dependencies in the requirements.txt
 
-| Domain                       | Script Target                      |
-| ---------------------------- | ---------------------------------- |
-| External Penetration Testing | 1. Enumerate subdomains            |
-|                              |                                    |
-| Internal Penetration Testing | 1. Enumerate IPs give CIDR         |
-|                              | 2. Run netexec                     |
-|                              | 3. Compare Hashes obtained         |
-|                              |                                    |
-| Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]   |
-|                              |                                    |
+| Domain                       | Script Target                     |
+|------------------------------|-----------------------------------|
+| External Penetration Testing | 1. Enumerate subdomains           |
+|                              |                                   |
+| Internal Penetration Testing | 1. Enumerate IPs give CIDR        |
+|                              | 2. Run netexec                    |
+|                              | 3. Compare Hashes obtained        |
+|                              |                                   |
+| Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]  |
+|                              |                                   |
 | Vulnerability Analysis       | 1. Analyze Nessus VA output (csv) |
 
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
-- To run the module simply enter [ **internal** ] on the provided prompt
-- Requires one to pass in an ip address in the following format (ip_address/subnet_range)
+- To run the module simply enter [ **_Number displayed on Right_** ] on the provided prompt
+- Requires one to pass in an ip address in the following format (ip_address/subnet)
+ 
+  ```text
   Example:
-  ```
       10.0.0.3/16
   ```
-  ![Internal Module](images/internal.png)
+  ![Internal Module](images/internal-2.png)
 
 - The script then enumerates the provided subnet and uses ICMP protocol to determine hosts that are alive on the network
 - The scan runs on two modes **SCAN** and **RESUME**
@@ -32,23 +33,21 @@ Python scripts to aid in pentest automation.
 - RESUME mode: the script resumes scan from the last saved IP address from your provided csv file
 
 ```text
-Resume mode will however require you to remember the last IP before the scan ended 
-inorder to avoid resumming from the last recorded live IP.
+Resume mode will however require you to select the filename that contains the unresponsive IP addresses
+It then sorts the IPs and selects the last IP in the file and resumes scan from there.
 
-    Example:
-        Last saved IP: 10.0.0.20
-        Last scanned IP: 10.0.0.245
+The user is however required to provide the subnet that was being scanned initially i.e /8 /16 /24 e.t.c
 
-    To ensure the scan resumes correctly, you can update the csv file with the new ip (10.0.0.245)
-    or alternatively leave it as it is, and scan will resume from (10.0.0.20)
+
 
 ```
+![Resume_scan](images/internal_resume.png)
 ![Scan Progress](images/scan_progress.png)
 
 ## 2. Vulnerability Analysis
 
 - This module runs an automated analysis on a **Nessus Advanced scan** and summarizes the vulnerabilities discovered
-- To run the module simply enter [ **va** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 - It requires 2 parameters:
 
 ```text
@@ -60,7 +59,7 @@ inorder to avoid resumming from the last recorded live IP.
 ## 3. Mobile Penetration Testing
 
 
-- To run the module simply enter [ **mobile** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 - This module performs a number of static analysis on both android and iOS (iOS coming soon)
 - It decompiles the apk file using apktool and runs regex checks on the files present on the decompiled application folder to look for
 1. Hardcoded values
@@ -78,6 +77,6 @@ inorder to avoid resumming from the last recorded live IP.
 
 [Coming Soon]
 
-- To run the module simply enter [ **external** ] on the provided prompt
+- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
 
 
