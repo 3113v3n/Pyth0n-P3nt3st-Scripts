@@ -91,7 +91,9 @@ class NetworkHandler:
                 else:
                     x_plus_1 = x_value + 1
 
-            print(f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}/{self.network_mask}")
+            print(
+                f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}/{self.network_mask}"
+            )
             self.scan_network(
                 stdscr=stdscr,
                 octets=octets,
@@ -103,7 +105,7 @@ class NetworkHandler:
             )
 
     def scan_network(
-            self, stdscr, octets, x_range, y_range, z_range, output_file, mode
+        self, stdscr, octets, x_range, y_range, z_range, output_file, mode
     ):
         # Host bits
         if self.host_bits <= 8:
@@ -174,7 +176,7 @@ def get_network_info(subnet) -> dict:
     bits = 32 - int(network_mask)
     ip_info = {
         "ip_address": subnet.split("/")[0],
-        "hosts": (2 ** bits),  # - 2
+        "hosts": (2**bits),  # - 2
         "network_mask": int(network_mask),
         "host_bits": bits,
     }

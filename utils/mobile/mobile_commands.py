@@ -26,7 +26,9 @@ def format_content(content):
 
 
 class MobileCommands:
-    def __init__(self, shell_commands, filemanager, validator: validators, color, configs):
+    def __init__(
+        self, shell_commands, filemanager, validator: validators, color, configs
+    ):
         self.commands = shell_commands()
         self.output_dir = ""
         self.file_type = ""
@@ -88,7 +90,9 @@ class MobileCommands:
             self.folder_name = self.validator.remove_spaces(self.folder_name)
 
             if not self.validator.check_folder_exists(self.folder_name):
-                print(f"\n Decompiling the {self.color.OKGREEN}{self.file_name}{self.color.ENDC} application ...")
+                print(
+                    f"\n Decompiling the {self.color.OKGREEN}{self.file_name}{self.color.ENDC} application ..."
+                )
                 command = f"apktool d '{package}' -o {self.folder_name}"
                 self.commands.run_os_commands(command)
                 print("Decompiling successful")
@@ -287,13 +291,13 @@ class MobileCommands:
                     f.write(f"{line}\n")
 
     def mobile_scripts(
-            self,
-            decompiled_folder,
-            hardcoded_filename,
-            platform,
-            basename,
-            output_dir,
-            base64_name,
+        self,
+        decompiled_folder,
+        hardcoded_filename,
+        platform,
+        basename,
+        output_dir,
+        base64_name,
     ):
         if platform == "ipa":
             self.ios_specific_scan(decompiled_folder, basename, output_dir)
@@ -317,8 +321,10 @@ class MobileCommands:
         filename = f"{basename}_iOS_URL_schemes.txt"
         plist_file = self.validator.find_specific_file("Info.plist", decompiled_folder)
 
-        command = (f"xmlstarlet sel -t -v 'plist/dict/array/dict[key = \"CFBundleURLSchemes\"]/array/string' -nl "
-                   f"{plist_file}")
+        command = (
+            f"xmlstarlet sel -t -v 'plist/dict/array/dict[key = \"CFBundleURLSchemes\"]/array/string' -nl "
+            f"{plist_file}"
+        )
         results = self.commands.run_os_commands(command)
 
         with open(filename, "w") as output_file:
@@ -368,7 +374,7 @@ class MobileCommands:
         )
 
     def install_nuclei_template(
-            self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
+        self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
     ):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
@@ -410,8 +416,10 @@ class MobileCommands:
 
             self.commands.run_os_commands(nuclei_command)
             if platform == "android":
-                android_nuclei = (f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform.title()} -o "
-                                  f"{android_output}")
+                android_nuclei = (
+                    f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform.title()} -o "
+                    f"{android_output}"
+                )
                 self.commands.run_os_commands(android_nuclei)
 
         except Exception as e:
