@@ -109,9 +109,9 @@ def main():
     while not exit_menu:
 
         update_user_domain()
-        if packages_present():  # TODO: change this back to True
-            # start our pentest
-            user_interactions()
+        # if packages_present():  # TODO: change this back to True
+        #     # start our pentest
+        user_interactions()
         ask_user = (
             input(
                 f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
