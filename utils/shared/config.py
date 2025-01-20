@@ -12,6 +12,15 @@ class Config:
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
 
+    internal_mode_choice = (
+        f"\n[+] Select scan mode: [{bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC}]"
+        f"\n\n{bcolors.OKCYAN}SCAN{bcolors.ENDC}: Scan a new subnet."
+        f"\n{bcolors.OKCYAN}RESUME{bcolors.ENDC}: Continue a previous scan. "
+        f"\n\n(To resume, {bcolors.BOLD}{bcolors.WARNING}manually update the file "
+        f"with the last scanned IP{bcolors.ENDC} to start from it instead of the last found IP.)"
+        "\n\n Enter mode: ==> "
+    )
+    internal_choice_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC} ]"
     internal_mode_choice = (f"\n[+] Select scan mode: [{bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC}]"
                             f"\n\n{bcolors.OKCYAN}SCAN{bcolors.ENDC}: Scan a new subnet."
                             f"\n{bcolors.WARNING}RESUME{bcolors.ENDC}: Continue a previous scan. "

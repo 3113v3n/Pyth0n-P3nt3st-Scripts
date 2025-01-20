@@ -42,6 +42,17 @@ class NetworkHandler:
         curses.wrapper(self.scan_network, mode, output)
         return self.progress_bar.live_hosts
 
+    def configure_progress_bar(self, stdscr, ip, output_file, mode):
+        is_alive = self.os_commands.ping_hosts(ip)
+        self.progress_bar.update_ips(
+            self.filemanager,
+            output_file=output_file,
+            stdscr=stdscr,
+            ip=ip,
+            is_alive=is_alive,
+            mode=mode,
+        )
+
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
         # Using masscan to scan top20ports of nmap in a /24 range (less than 5min)
@@ -55,9 +66,7 @@ class NetworkHandler:
         # Find the index of the start IP in the generated IP Ranges
         if mode == "resume":
             start_index = ip_ranges.index(self.user_ip_addr)
-            ip_ranges = ip_ranges[
-                start_index:
-            ]  # slice list to start from last unresponsive IP
+            ip_ranges = ip_ranges[start_index:]  # slice list to start from last unresponsive IP
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
@@ -65,10 +74,10 @@ class NetworkHandler:
                 for ip in ip_ranges
             }
             for _ in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(ip_ranges),
-                desc="Scanning Network",
-                leave=False,
+                    concurrent.futures.as_completed(futures),
+                    total=len(ip_ranges),
+                    desc="Scanning Network",
+                    leave=False,
             ):
                 pass  # UI updates are handled inside scan_host()
 
@@ -119,7 +128,7 @@ def get_network_info(subnet) -> dict:
     bits = 32 - int(network_mask)
     ip_info = {
         "ip_address": subnet.split("/")[0],
-        "hosts": (2**bits),  # - 2
+        "hosts": (2 ** bits),  # - 2
         "network_mask": int(network_mask),
         "host_bits": bits,
     }

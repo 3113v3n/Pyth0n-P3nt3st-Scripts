@@ -170,14 +170,10 @@ class UserHandler:
                 selected_index = int(input(self.formatted_question).strip()) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
-                print(
-                    f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
-                    f"{self.color.ENDC}"
-                )
+                print(f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
+                      f"{self.color.ENDC}")
             except ValueError:
-                print(
-                    f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}"
-                )
+                print(f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}")
 
         self.domain = self.default_test_domains[selected_index]
         return self.domain
