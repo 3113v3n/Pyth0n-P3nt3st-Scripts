@@ -13,18 +13,26 @@ class ProgressBar:
         self.live_hosts = []
         self.unresponsive_hosts = []
 
-    def update_ips(
-            self, filemanager, output_file, stdscr, ip, is_alive, mode
-    ):
+    def update_ips(self, filemanager, output_file, stdscr, ip, is_alive, mode):
         """Update the scan progress and save both live and unresponsive hosts"""
         basename = get_filename_without_extension(output_file)
         if is_alive:
+
+            output_file = (
+                output_file.replace("_unresponsive_hosts", "")
+                if mode == "resume"
+                else output_file
+            )
             self.live_hosts.append(ip)
             filemanager.save_to_csv(output_file, ip, mode)
 
         else:
             self.unresponsive_hosts.append(ip)
-            filename = f"{basename}_unresponsive_hosts.csv"
+            filename = (
+                f"{basename}_unresponsive_hosts.csv"
+                if "unresponsive_hosts" not in basename
+                else f"{basename}.csv"
+            )
             filemanager.save_to_csv(filename, ip, mode)
 
         self.total_scanned += 1

@@ -7,11 +7,11 @@ class UserHandler:
     The different domains"""
 
     def __init__(
-            self,
-            filemanager,
-            validator: validators,
-            bcolors,
-            config: Config,
+        self,
+        filemanager,
+        validator: validators,
+        bcolors,
+        config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -137,6 +137,7 @@ class UserHandler:
                     raise ValueError("No Previously saved file present")
 
                 # output file
+                # Output file will be the name of unresposive file without text 'unresponsive_hosts'
                 output_file = self.filemanager.filepath
                 cidr = self.get_cidr()
                 subnet = f"{resume_ip}/{cidr}"
@@ -168,12 +169,12 @@ class UserHandler:
 
         while selected_index not in range(len(self.default_test_domains)):
             selected_index = (
-                    int(
-                        input(
-                            f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
-                        ).strip()
-                    )
-                    - 1
+                int(
+                    input(
+                        f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
+                    ).strip()
+                )
+                - 1
             )
 
         self.domain = self.default_test_domains[selected_index]

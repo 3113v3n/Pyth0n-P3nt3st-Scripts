@@ -41,6 +41,7 @@ class NetworkHandler:
     def get_live_ips(self, mode, output):
         curses.wrapper(self.scan_network, mode, output)
         return self.progress_bar.live_hosts
+        
 
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
@@ -51,6 +52,11 @@ class NetworkHandler:
     def scan_network(self, stdscr, mode, output_file):
         base_ip = self.user_ip_addr.split(".")
         ip_ranges = self.generate_ip_ranges(base_ip)
+        
+        # Find the index of the start IP in the generated IP Ranges
+        if mode == "resume":
+            start_index = ip_ranges.index(self.user_ip_addr)
+            ip_ranges = ip_ranges[start_index:] # slice list to start from last unresponsive IP
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
@@ -88,6 +94,7 @@ class NetworkHandler:
     def scan_hosts(self, ip, output_file, mode, stdscr):
         """Check if host is alive using concurrent pings and update UI"""
         is_alive = self.os_commands.ping_hosts(ip)
+        
         with self.lock:  # Prevents concurrent writes
             self.progress_bar.update_ips(
                 self.filemanager,
@@ -97,6 +104,7 @@ class NetworkHandler:
                 is_alive=is_alive,
                 mode=mode,
             )
+
 
 
 def get_network_info(subnet) -> dict:

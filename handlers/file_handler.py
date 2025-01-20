@@ -3,6 +3,7 @@ import pandas
 from datetime import datetime
 from pathlib import Path
 from utils.shared import validators
+import ipaddress
 
 
 def read_csv(dataframe, **kwargs):
@@ -44,6 +45,30 @@ def append_to_sheets(data_frame: object, file: str):
         data_frame["dataframe"].to_excel(
             writer, sheet_name=data_frame["sheetname"], index=False
         )
+
+
+def get_last_unresponsive_ip(unresponsive_file) -> str:
+    """
+    Takes file as an input, sorts the ips available in the list in ascending order
+    get the last Ip on the list to use as start_ip
+    """
+    try:
+        data_frame = read_csv(unresponsive_file)
+
+        if data_frame.empty:
+            return None
+
+        # Extract Ips from the first column
+        ip_list = data_frame.iloc[:, 0].dropna().tolist()
+
+        # Convert to IPAddress objects for correct numerical sorting
+        sorted_ips = sorted(ip_list, key=lambda ip: ipaddress.ip_address(ip))
+
+        last_address = sorted_ips[-1]
+        return last_address
+
+    except FileNotFoundError:
+        print("No previous unresponsive host file found")
 
 
 def concat_dataframes(existing, newdata):
@@ -168,7 +193,7 @@ class FileHandler:
     def save_to_csv(self, filename, content, mode):
         if mode == "scan":
             file_path = f"{self.output_directory}/{filename}"
-        elif mode == "resume":
+        else:
             file_path = filename
 
         file_header = ""
@@ -177,6 +202,9 @@ class FileHandler:
             file_header += "Live Host IP Addresses"
             self.live_hosts_file = file_path
         else:
+            file_path = (
+                f"{self.output_directory}/{filename}" if mode == "resume" else filename
+            )
             file_header += "Unresponsive IP Addresses"
             self.unresponsive_hosts_file = file_path
 
@@ -187,7 +215,7 @@ class FileHandler:
             updated_df = concat_dataframes(existing_df, data)
         else:
             updated_df = data
-        self.get_file_paths()
+
         updated_df.to_csv(f"{file_path}", index=False)
 
     def get_file_paths(self) -> dict:
@@ -237,9 +265,19 @@ class FileHandler:
             if self.validator.check_filetype(file["filename"], "apk")
             or self.validator.check_filetype(file["filename"], "ipa")
         ]
+
+        # Only display files containing unresponsive hosts
+        unresponsive_host_files = [
+            file for file in csv_files if "unresponsive_host" in file["filename"]
+        ]
         # filter out CSV files only
-        if any(key in kwargs for key in ("display_csv", "resume_scan")):
+        if (
+            "display_csv" in kwargs
+        ):  # any(key in kwargs for key in ("display_csv", "resume_scan")):
             self.files = csv_files
+
+        elif "resume_scan" in kwargs:
+            self.files = unresponsive_host_files
 
         # allow user to view only apks and ios
         elif "display_applications" in kwargs:
@@ -325,5 +363,7 @@ class FileHandler:
             )
 
             self.filepath = self.files[selected_file]["full_path"]
-            starting_ip = read_last_line(self.filepath)
+            starting_ip = get_last_unresponsive_ip(
+                self.filepath
+            )  # read_last_line(self.filepath)
             return starting_ip

@@ -24,6 +24,7 @@ class InternalAssessment:
         if mode == "scan":
             self.output_file = generate_unique_name(output_file, "csv")
         else:
+
             self.output_file = output_file
 
     def enumerate_hosts(self):
@@ -31,8 +32,9 @@ class InternalAssessment:
         In order to increase your attack surface
         """
         self.network.get_live_ips(mode=self.mode, output=self.output_file)
-        live = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{self.filemanager.live_hosts_file}"
-        unresponsive = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.WARNING}{self.filemanager.unresponsive_hosts_file}"
+        paths = self.filemanager.get_file_paths()
+        live = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.OKGREEN}{paths['live_hosts']}"
+        unresponsive = f"{self.bcolors.ENDC}{self.bcolors.BOLD}{self.bcolors.WARNING}{paths['unresponsive_hosts']}"
 
         print(
             f"\n{self.bcolors.OKCYAN}[+] Your Live Hosts are located here: {live}{self.bcolors.ENDC}\n"
