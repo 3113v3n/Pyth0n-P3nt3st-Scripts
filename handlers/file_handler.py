@@ -191,21 +191,20 @@ class FileHandler:
         print(text)
 
     def save_to_csv(self, filename, content, mode):
-        if mode == "scan":
-            file_path = f"{self.output_directory}/{filename}"
+        filename = get_file_basename(filename) #os.path.normpath(filename)
+        
+        # If filename is not full path prepend output_directory
+        if not os.path.isabs(filename) and not filename.startswith(self.output_directory):
+            file_path = os.path.join(self.output_directory, filename) 
         else:
-            file_path = filename
-
-        file_header = ""
+            file_path = filename 
 
         if "unresponsive_hosts" not in filename:
-            file_header += "Live Host IP Addresses"
+            file_header = "Live Host IP Addresses"
             self.live_hosts_file = file_path
+
         else:
-            file_path = (
-                f"{self.output_directory}/{filename}" if mode == "resume" else filename
-            )
-            file_header += "Unresponsive IP Addresses"
+            file_header = "Unresponsive IP Addresses"
             self.unresponsive_hosts_file = file_path
 
         data = pandas.DataFrame({file_header: [content]})  # Live Hosts : [Ip addresses]

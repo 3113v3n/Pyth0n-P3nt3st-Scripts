@@ -163,22 +163,22 @@ class UserHandler:
         }
 
     def get_user_domain(self) -> str:
+
         """Interacts with user to gather the target test domain"""
         # Reduce displayed index by 1 to avoid index error
-        selected_index = int(input(self.formatted_question).strip()) - 1
+        while True:
+            try:
+                selected_index = int(input(self.formatted_question).strip())-1
+                if 0< selected_index < len(self.default_test_domains):
+                    break
+                print(f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
+                      f"{self.color.ENDC}")
+            except ValueError:
+                print(f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}")
 
-        while selected_index not in range(len(self.default_test_domains)):
-            selected_index = (
-                int(
-                    input(
-                        f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
-                    ).strip()
-                )
-                - 1
-            )
+            
 
         self.domain = self.default_test_domains[selected_index]
-        # self.set_domain_variables(self.domain)
         return self.domain
 
     def get_user_subnet(self):
