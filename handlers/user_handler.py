@@ -176,20 +176,6 @@ class UserHandler:
             except ValueError:
                 print(f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}")
 
-<<<<<<< HEAD
-        while selected_index not in range(len(self.default_test_domains)):
-            selected_index = (
-                int(
-                    input(
-                        f"{self.config.domain_select_error}" f"{self.OPTIONS}\n"
-                    ).strip()
-                )
-                - 1
-            )
-=======
-            
->>>>>>> feature-x
-
         self.domain = self.default_test_domains[selected_index]
         return self.domain
 
