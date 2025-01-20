@@ -41,128 +41,6 @@ class NetworkHandler:
     def get_live_ips(self, mode, output):
         curses.wrapper(self.scan_network, mode, output)
         return self.progress_bar.live_hosts
-<<<<<<< HEAD
-
-    def show_progress(self, stdscr, mode, output):
-
-        octets = self.user_ip_addr.split(".")
-        if mode == "scan":
-            self.scan_network(
-                stdscr=stdscr,
-                octets=octets,
-                x_range=0,
-                y_range=0,
-                z_range=0,
-                output_file=output,
-                mode=mode,
-            )
-        else:
-            # increment the scan start ip by 1 depending on the selected network range
-            x_value = int(octets[3])
-            y_value = int(octets[2])
-            z_value = int(octets[1])
-            x_plus_1 = x_value
-            y_plus_1 = y_value
-            z_plus_1 = z_value
-            """
-            192.[Z].[Y].[X]
-            in /16: 
-                If the last octet [ X ] is < 255 we retain the second last octet [ Y ] as is and increase
-                the X value by 1
-                otherwise, set the X value to zero and increase the Y value by 1
-                            
-            """
-            if self.host_bits <= 8:
-                if x_value <= 254:
-                    x_plus_1 = x_value + 1
-
-            elif 16 >= self.host_bits > 8:
-                if x_value >= 255:
-                    x_plus_1 = 0
-                    y_plus_1 = y_value + 1
-                else:
-                    x_plus_1 = x_value + 1
-
-            elif 24 >= self.host_bits > 16:
-
-                if x_value >= 255:
-                    x_plus_1 = 0
-                    y_plus_1 = y_value + 1
-                    if y_value >= 255:
-                        y_plus_1 = 0
-                        z_plus_1 = z_value + 1
-
-                else:
-                    x_plus_1 = x_value + 1
-
-            print(
-                f"Resuming Scanning from {octets[0]}.{z_value}.{y_value}.{x_value}/{self.network_mask}"
-            )
-            self.scan_network(
-                stdscr=stdscr,
-                octets=octets,
-                x_range=x_plus_1,
-                y_range=y_plus_1,
-                z_range=z_plus_1,
-                output_file=output,
-                mode=mode,
-            )
-
-    def scan_network(
-        self, stdscr, octets, x_range, y_range, z_range, output_file, mode
-    ):
-        # Host bits
-        if self.host_bits <= 8:
-            # Example: 192.168.10.X
-            base_ip = f"{octets[0]}.{octets[1]}.{octets[2]}"
-            for x in tqdm(range(x_range, 256), desc="Scanning Network", leave=False):
-                self.configure_progress_bar(
-                    stdscr=stdscr,
-                    output_file=output_file,
-                    ip=f"{base_ip}.{x}",
-                    mode=mode,
-                )
-        # Host bits > 8 and <= 16
-        elif 16 >= self.host_bits > 8:
-            # Example: 192.168.X.X
-            base_ip = f"{octets[0]}.{octets[1]}"
-            for y in tqdm(range(y_range, 256), desc="Scanning Network", leave=False):
-                for x in range(x_range, 256):
-                    self.configure_progress_bar(
-                        stdscr=stdscr,
-                        output_file=output_file,
-                        ip=f"{base_ip}.{y}.{x}",
-                        mode=mode,
-                    )
-
-        # Host bits > 16 and <= 24
-        elif 24 >= self.host_bits > 16:
-            # Example: 192.X.X.X
-            base_ip = f"{octets[0]}"
-            for z in tqdm(range(z_range, 256), desc="Scanning Network", leave=False):
-                for y in range(y_range, 256):
-                    for x in range(x_range, 256):
-                        self.configure_progress_bar(
-                            stdscr=stdscr,
-                            output_file=output_file,
-                            ip=f"{base_ip}.{z}.{y}.{x}",
-                            mode=mode,
-                        )
-
-    def configure_progress_bar(self, stdscr, ip, output_file, mode):
-        is_alive = self.os_commands.ping_hosts(ip)
-        self.progress_bar.update_ips(
-            self.filemanager,
-            output_file=output_file,
-            stdscr=stdscr,
-            ip=ip,
-            is_alive=is_alive,
-            mode=mode,
-        )
-        time.sleep(0.01)
-=======
-        
->>>>>>> feature-x
 
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
@@ -173,11 +51,13 @@ class NetworkHandler:
     def scan_network(self, stdscr, mode, output_file):
         base_ip = self.user_ip_addr.split(".")
         ip_ranges = self.generate_ip_ranges(base_ip)
-        
+
         # Find the index of the start IP in the generated IP Ranges
         if mode == "resume":
             start_index = ip_ranges.index(self.user_ip_addr)
-            ip_ranges = ip_ranges[start_index:] # slice list to start from last unresponsive IP
+            ip_ranges = ip_ranges[
+                start_index:
+            ]  # slice list to start from last unresponsive IP
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
@@ -215,7 +95,7 @@ class NetworkHandler:
     def scan_hosts(self, ip, output_file, mode, stdscr):
         """Check if host is alive using concurrent pings and update UI"""
         is_alive = self.os_commands.ping_hosts(ip)
-        
+
         with self.lock:  # Prevents concurrent writes
             self.progress_bar.update_ips(
                 self.filemanager,
@@ -225,7 +105,6 @@ class NetworkHandler:
                 is_alive=is_alive,
                 mode=mode,
             )
-
 
 
 def get_network_info(subnet) -> dict:

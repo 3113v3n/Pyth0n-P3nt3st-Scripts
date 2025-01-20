@@ -38,7 +38,7 @@ class InternalAssessment:
 
         print(
             f"\n{self.bcolors.OKCYAN}[+] Your Live Hosts are located here: {live}{self.bcolors.ENDC}\n"
-            f"\n{self.bcolors.FAIL}[!] Your Unresponsive Hosts are located here: {unresponsive}{self.bcolors.ENDC}\n\n"
+            f"\n{self.bcolors.HEADER}[!] Your Unresponsive Hosts are located here: {unresponsive}{self.bcolors.ENDC}\n\n"
         )
 
     def netexec_module(self):

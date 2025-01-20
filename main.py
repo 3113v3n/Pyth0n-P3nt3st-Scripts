@@ -29,7 +29,8 @@ internal = InternalAssessment(filemanager=filemanager, network=network, colors=b
 vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
 mobile = MobileAssessment(mobile_commands)
 
-user_test_domain = user.get_user_domain()
+
+user_test_domain = ""  # user.get_user_domain()
 
 
 def packages_present() -> bool:
@@ -53,6 +54,7 @@ def packages_present() -> bool:
 
 
 def user_interactions():
+    global exit_menu
     user.set_domain_variables(user_test_domain)
     match user_test_domain:  # one of Internal | Mobile | External
         case "internal":
@@ -80,14 +82,21 @@ def user_interactions():
             mobile_object = user.domain_variables
             mobile.initialize_variables(mobile_object)
             mobile.inspect_application_files()
+
         case "external":
             # initialize variables that will be used to test different External PT modules
             # out_put = filemanager.output_directory
             # external.initialize_variables(variables=domain_vars)
             # print(external.bbot_enum(out_put))
             pass
+
         case _:
             return
+
+
+def update_user_domain():
+    global user_test_domain
+    user_test_domain = user.get_user_domain()
 
 
 def main():
@@ -95,11 +104,23 @@ def main():
     Run different modules depending on the various domains
     i.e. Internal Mobile and External
     """
+    exit_menu = False
 
-    # if packages_present():  # TODO: change this back to True
-    #     # start our pentest
-    #     user_interactions()
-    user_interactions()
+    while not exit_menu:
+
+        update_user_domain()
+        if packages_present():  # TODO: change this back to True
+            # start our pentest
+            user_interactions()
+        ask_user = (
+            input(
+                f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
+            )
+            .strip()
+            .lower()
+        )
+        if ask_user in ["yes", "y"]:
+            exit_menu = True
 
 
 if __name__ == "__main__":
