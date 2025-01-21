@@ -110,17 +110,17 @@ def main():
 
         update_user_domain()
         if packages_present():  # TODO: change this back to True
-            # start our pentest
+            #     # start our pentest
             user_interactions()
-        ask_user = (
-            input(
-                f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
+            ask_user = (
+                input(
+                    f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
+                )
+                .strip()
+                .lower()
             )
-            .strip()
-            .lower()
-        )
-        if ask_user in ["yes", "y"]:
-            exit_menu = True
+            if ask_user in ["yes", "y"]:
+                exit_menu = True
 
 
 if __name__ == "__main__":
