@@ -30,34 +30,47 @@ vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
 mobile = MobileAssessment(mobile_commands)
 
 
-user_test_domain = ""  # user.get_user_domain()
-
-
-def packages_present() -> bool:
+def packages_present(user_test_domain) -> bool:
     # check if package list contains any missing packages
     missing_packages = package.get_missing_packages(user_test_domain)
 
     num_of_packages = 0
 
-    if len(missing_packages) == 0:
+    if not missing_packages:
         print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
         return True
-    else:
-        num_of_packages += len(missing_packages)
-        print(
-            f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
-            f"{bcolors.ENDC}"
-        )
-        # update to run check again
 
-    return package.install_packages(missing_packages)
+    num_of_packages += len(missing_packages)
+    print(
+        f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
+        f"{bcolors.ENDC}"
+    )
+    # update to run check again
+    try:
+        package.install_packages(missing_packages)
+    except:
+        print(f"{bcolors.FAIL}[!] Failed to install some packages ! {bcolors.ENDC}")
+        return False
+
+    return packages_present(user_test_domain)
 
 
 def user_interactions():
-    global exit_menu
+    """Handles user interaction based on selected testing domain"""
+    user_test_domain = user.get_user_domain()
     user.set_domain_variables(user_test_domain)
-    match user_test_domain:  # one of Internal | Mobile | External
+
+    # Ensure all required packages are installed before proceeding
+    if not packages_present(user_test_domain):
+        print(
+            f"{bcolors.FAIL}[!] Unable to install required packages. Exiting .. {bcolors.ENDC}"
+        )
+        return
+
+    # Match user_test_domain (Internal | Mobile | External | VA)
+    match user_test_domain:
         case "internal":
+
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(user.domain_variables, ProgressBar)
             internal.initialize_variables(
@@ -78,12 +91,14 @@ def user_interactions():
             )
 
         case "mobile":
+
             # initialize variables that will be used to test different Mobile modules
             mobile_object = user.domain_variables
             mobile.initialize_variables(mobile_object)
             mobile.inspect_application_files()
 
         case "external":
+
             # initialize variables that will be used to test different External PT modules
             # out_put = filemanager.output_directory
             # external.initialize_variables(variables=domain_vars)
@@ -94,11 +109,6 @@ def user_interactions():
             return
 
 
-def update_user_domain():
-    global user_test_domain
-    user_test_domain = user.get_user_domain()
-
-
 def main():
     """
     Run different modules depending on the various domains
@@ -107,20 +117,16 @@ def main():
     exit_menu = False
 
     while not exit_menu:
-
-        update_user_domain()
-        if packages_present():  # TODO: change this back to True
-            #     # start our pentest
-            user_interactions()
-            ask_user = (
-                input(
-                    f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
-                )
-                .strip()
-                .lower()
+        user_interactions()
+        ask_user = (
+            input(
+                f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
             )
-            if ask_user in ["yes", "y"]:
-                exit_menu = True
+            .strip()
+            .lower()
+        )
+        if ask_user in ["yes", "y"]:
+            exit_menu = True
 
 
 if __name__ == "__main__":

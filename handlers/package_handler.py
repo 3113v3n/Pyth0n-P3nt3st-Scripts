@@ -48,7 +48,7 @@ class PackageHandler:
                 f"[+] Installing the following package:\n{self.colors.OKCYAN}{package['name']}{self.colors.ENDC}\n"
             )
             # Install Missing packages
-            #self.command.run_os_commands(command=package["command"])
+            self.command.run_os_commands(command=package["command"])
             recheck_install = self.command.run_os_commands(f"which {package['name']}")
             if recheck_install.returncode != 0:
                 all_installed = False

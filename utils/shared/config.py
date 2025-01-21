@@ -5,7 +5,7 @@ class Config:
     test_domains = [
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
         {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
-        #{"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
+        # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
         {"domain": "Nessus Vulnerability Analysis", "alias": "va", "icon": "🔎"},
         {"domain": "Exit Program", "alias": "exit", "icon": ""},
     ]
@@ -63,7 +63,7 @@ class Config:
         {
             "name": ["chad"],
             "command": "multiple",
-            "cmd": "pip3 install google-chad && pip3 install --upgrade google-chad && playwright install chromium",
+            "cmd": "pipx install google-chad && pipx install --upgrade google-chad && playwright install chromium",
         },
         {"name": ["bbot"], "command": "pipx install"},
         {
@@ -72,7 +72,7 @@ class Config:
         },
         {
             "name": ["snallygaster"],
-            "command": "pip3 install snallygaster ",
+            "command": "pipx install snallygaster ",
         },
         {"name": ["parsero"], "command": "sudo apt install "},
         {
@@ -129,20 +129,26 @@ class Config:
         {
             "name": [
                 "adb",
-                "dex2jar",
+                "d2j-dex2jar",
                 "nuclei",
                 "radare2",
-                "libusbmuxd-tools",
+                # "libusbmuxd-tools",
                 "sqlite3",
                 "sqlitebrowser",
                 "xmlstarlet",
                 "apksigner",
                 "zipalign",
+                "pkg-config",
+                "checkinstall",
+                "git",
+                "autoconf",
+                "automake",
+                "usbmuxd",
             ],
-            "command": "apt-get -y install ",
+            "command": "sudo apt-get -y install ",
         },
         {
-            "name": ["frida-tools", "objection", "file-scraper"],
+            "name": ["objection", "file-scraper"],  # "frida-tools",
             "command": "pipx install",
         },
         {"name": ["java"], "command": "sudo apt install default-jdk -y"},
