@@ -5,9 +5,9 @@ class Config:
     test_domains = [
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
         {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
-        # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
+        #{"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
         {"domain": "Nessus Vulnerability Analysis", "alias": "va", "icon": "🔎"},
-        #{"domain": "Exit Program", "alias": "exit", "icon": ""},
+        {"domain": "Exit Program", "alias": "exit", "icon": ""},
     ]
     scan_modes = ["SCAN", "RESUME"]
     domain_select_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please choose one of: \n"
@@ -21,13 +21,17 @@ class Config:
         "\n\n Enter mode: ==> "
     )
     internal_choice_error = f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC} ]"
-    internal_mode_choice = (f"\n[+] Select scan mode: [{bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC}]"
-                            f"\n\n{bcolors.OKCYAN}SCAN{bcolors.ENDC}: Scan a new subnet."
-                            f"\n{bcolors.WARNING}RESUME{bcolors.ENDC}: Continue a previous scan. "
-                            "\n\n Enter mode: ==> ")
-    internal_choice_error = (f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME"
-                             f"{bcolors.ENDC} ]"
-                             "\n\n Enter mode: ==> ")
+    internal_mode_choice = (
+        f"\n[+] Select scan mode: [{bcolors.OKCYAN}SCAN | RESUME{bcolors.ENDC}]"
+        f"\n\n{bcolors.OKCYAN}SCAN{bcolors.ENDC}: Scan a new subnet."
+        f"\n{bcolors.WARNING}RESUME{bcolors.ENDC}: Continue a previous scan. "
+        "\n\n Enter mode: ==> "
+    )
+    internal_choice_error = (
+        f"\n{bcolors.FAIL}[!]{bcolors.ENDC} Please select one of: [ {bcolors.OKCYAN}SCAN | RESUME"
+        f"{bcolors.ENDC} ]"
+        "\n\n Enter mode: ==> "
+    )
     external_packages = [
         # External
         {
