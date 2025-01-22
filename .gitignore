@@ -2,6 +2,7 @@
 **/.env
 **/__pycache__
 **/.trunk
+**/.idea
 output_directory
 test-data
 **/.idea
