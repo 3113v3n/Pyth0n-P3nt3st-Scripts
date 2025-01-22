@@ -1,6 +1,6 @@
 # trunk-ignore-all(black)
 from utils.shared import Config, validators
-
+import sys
 
 class UserHandler:
     """Class will be responsible for handling user interactions with
@@ -170,10 +170,14 @@ class UserHandler:
                 selected_index = int(input(self.formatted_question).strip()) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
-                print(f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
-                      f"{self.color.ENDC}")
+                print(
+                    f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
+                    f"{self.color.ENDC}"
+                )
             except ValueError:
-                print(f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}")
+                print(
+                    f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}"
+                )
 
         self.domain = self.default_test_domains[selected_index]
         return self.domain
@@ -226,6 +230,8 @@ class UserHandler:
                 self.domain_variables = self.external_ui_interaction()
             case "va":
                 self.domain_variables = self.va_ui_interaction()
+            case "exit":
+                sys.exit(1)
             case _:
                 print(
                     f"{self.color.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.color.ENDC}"
