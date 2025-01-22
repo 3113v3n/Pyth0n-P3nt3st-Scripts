@@ -69,6 +69,7 @@ class Commands:
             print(e)
             return False
 
-    def clear_screen(self):
+    @staticmethod
+    def clear_screen():
         """Clear screen"""
-        return os.system("clear")
+        return os.system('cls' if os.name == 'nt' else 'clear')

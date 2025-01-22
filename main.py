@@ -30,7 +30,8 @@ vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
 mobile = MobileAssessment(mobile_commands)
 
 
-user_test_domain = ""  # user.get_user_domain()
+def initialize_classes() -> None:
+    pass
 
 
 def packages_present() -> bool:
@@ -121,6 +122,9 @@ def main():
         )
         if ask_user in ["yes", "y"]:
             exit_menu = True
+        else:
+            #Clear screen and reinitialize classes
+            Commands.clear_screen()
 
 
 if __name__ == "__main__":

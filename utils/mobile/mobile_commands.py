@@ -369,7 +369,7 @@ class MobileCommands:
         )
 
         print(
-            f"[+] Application scanning complete, your all files are located here:\n"
+            f"[+] Application scanning complete, all your files are located here :==>\n"
             f"{self.color.OKGREEN}{self.output_dir}{self.color.ENDC}"
         )
 
