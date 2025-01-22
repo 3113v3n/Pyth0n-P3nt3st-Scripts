@@ -69,11 +69,11 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
     user.set_domain_variables(user_test_domain)
 
     # Ensure all required packages are installed before proceeding
-    # if not packages_present(user_test_domain, package):
-    #     print(
-    #         f"{bcolors.FAIL}[!] Unable to install required packages. Exiting .. {bcolors.ENDC}"
-    #     )
-    #     return
+    if not packages_present(user_test_domain, package):
+        print(
+            f"{bcolors.FAIL}[!] Unable to install required packages. Exiting .. {bcolors.ENDC}"
+        )
+        return
 
     # Match user_test_domain (Internal | Mobile | External | VA)
     match user_test_domain:
