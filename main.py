@@ -5,6 +5,7 @@ from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
 from utils import Commands, Config, bcolors, MobileCommands, ProgressBar
 from utils.shared import validators
+from pprint import pprint
 
 
 # [Utils]
@@ -56,6 +57,7 @@ def packages_present(user_test_domain, package) -> bool:
     # update to run check again
     try:
         package.install_packages(missing_packages)
+
     except:
         print(f"{bcolors.FAIL}[!] Failed to install some packages ! {bcolors.ENDC}")
         return False
@@ -93,9 +95,12 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
         case "va":
             # Set scanner
             vulnerability_analysis.set_scanner(user.domain_variables["scanner"])
-            formatted_issues = vulnerability_analysis.analyze_csv(
-                user.domain_variables["input_file"]
+            input_file = user.domain_variables["input_file"]
+            formatted_issues = vulnerability_analysis.analyze_scan_files(
+                input_file
             )
+
+            # pprint(formatted_issues)
             vulnerability_analysis.sort_vulnerabilities(
                 formatted_issues, f"{user.domain_variables['output']}"
             )

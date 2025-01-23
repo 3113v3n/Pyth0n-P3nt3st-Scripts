@@ -9,7 +9,7 @@ import ipaddress
 def read_csv(dataframe, **kwargs):
     if "header" in kwargs:
         return pandas.read_csv(dataframe, header="infer")
-    return pandas.read_csv(dataframe)
+    return pandas.read_csv(dataframe, encoding="ISO-8859-1")  # utf-16 cp1252
 
 
 def read_excel_file(file):

@@ -44,15 +44,18 @@ class VulnerabilityAnalysis:
         # list of hosts that passed credential check
         self.credentialed_hosts = []
         # CSV headers used for analysis
-        self.headers = config.va_headers
+        self.headers = None  #config.nessus_headers
         # columns to showcase on our final excel
         self.selected_columns = []
         # contains constants to be used across the program
         self.config = config
         #Scanner_type
         self.scanner = "nessus"
-        # file_type
+        # file_attributes
         self.file_type = ""
+        self.file_list = []
+        self.starting_index = 0
+        self.starting_file = ""
 
     def set_scanner(self, scanner: str):
         self.scanner = scanner
@@ -65,7 +68,6 @@ class VulnerabilityAnalysis:
         # filter hosts with credential check successful
         if self.scanner == "nessus":
 
-            # TODO: filter depending on scanner Type
             credentialed_hosts = self.data[
                 (csv_filter_operations(self.data, "Plugin Output", "notnull"))
                 & (
@@ -95,34 +97,46 @@ class VulnerabilityAnalysis:
             print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
             return formated_vulnerabilities
+
         elif self.scanner == "rapid":
             print("Rapid Vulnerability Analysis")
-            return []
+            return self.data
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
-        missing_columns = list(set(self.config.va_headers) - set(dataframe.columns))
+
+        if self.scanner == "nessus":
+            self.headers = self.config.nessus_headers
+        elif self.scanner == "rapid":
+            self.headers = self.config.rapid7_headers
+
+        missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
             raise KeyError(
                 f"The following columns are missing from the {filename} \n{missing_columns}"
             )
 
-    def analyze_csv(self, csv_data):
+    def set_scan_attributes(self, attributes: tuple) -> None:
         """
-        Checks if the provided argument is a string containing a csv file or a tuple containing
-        a list of csv files and the index of the user selected file we then return a list
-
-        ( [list_of_csv_files], index_of_selected_file )
+        :param :( [list_of_csv_files], index_of_selected_file )
+        sets file_list ==> list of csv_files
+             start_index == 0 ==> index of selected csv
+             starting_file ==> starting file name
         """
+        self.file_list = attributes[0]
+        self.starting_index = attributes[1]
+        self.starting_file = self.file_list[self.starting_index]["full_path"]
 
-        # if isinstance(csv_data, tuple):
-        file_list = csv_data[0]
-        starting_index = csv_data[1]
-        starting_file = file_list[starting_index]["full_path"]
+    def analyze_scan_files(self, csv_data) -> list:
+        """Takes in list of csv files and returns list of vulnerabilities
+            for both Nessus and Rapid7 Scanners
+        """
+        self.set_scan_attributes(csv_data)
+
         try:
             # Read the first file as baseline
-            filename = file_list[starting_index]["filename"]
-            original_file = read_csv(starting_file)
+            filename = self.file_list[self.starting_index]["filename"]
+            original_file = read_csv(self.starting_file)
 
             # Check if baseline file is empty
             if original_file.empty:
@@ -133,8 +147,8 @@ class VulnerabilityAnalysis:
             all_vulnerabilities = original_file
 
             # Iterate through the list of files and append data from each file
-            for file in file_list:
-                if file["full_path"] != starting_file:
+            for file in self.file_list:
+                if file["full_path"] != self.starting_file:
                     # Read CSV file without headers
                     new_data = read_csv(file["full_path"], header=None)
 
@@ -164,6 +178,12 @@ class VulnerabilityAnalysis:
         return self.format_input_file()
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
+        if self.scanner == "nessus":
+            self.sort_nessus_vulnerabilities(vulnerabilities, output_file)
+        elif self.scanner == "rapid7":
+            self.sort_rapid7_vulnerabilities(vulnerabilities, output_file)
+
+    def sort_nessus_vulnerabilities(self, vulnerabilities, output_file):
         conditions = self.config.filter_conditions(
             vulnerabilities, regex_word=regex_word
         )
@@ -261,11 +281,16 @@ class VulnerabilityAnalysis:
             },
             {"dataframe": web_issues, "sheetname": "Web Issues"},
         ]
-        unfiltered_vulnerabilities = [
-            {"dataframe": unfiltered, "sheetname": "Unfiltered"}
-        ]
+        self.save_vulns_to_files(unfiltered_data=unfiltered,
+                                 found_vulnerabilities=found_vulnerabilities,
+                                 output_file=output_file)
 
-        if not unfiltered.empty:
+    def save_vulns_to_files(self, unfiltered_data, found_vulnerabilities, output_file):
+        """ Handles Saving data to File """
+        unfiltered_vulnerabilities = [
+            {"dataframe": unfiltered_data, "sheetname": "Unfiltered"}
+        ]
+        if not unfiltered_data.empty:
             """
             For the unfiltered vulnerabilities, append 'Unfiltered'
             to the user provided filename for easy identification
@@ -281,3 +306,10 @@ class VulnerabilityAnalysis:
                 found_vulnerabilities,
                 output_file,
             )
+
+    def sort_rapid7_vulnerabilities(self, vulnerabilities, output_file):
+        conditions = self.config.filter_conditions(
+            vulnerabilities, regex_word=regex_word
+        )
+        unfiltered_vulns = []
+        found_vulnerabilities = []
