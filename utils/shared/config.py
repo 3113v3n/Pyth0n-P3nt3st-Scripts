@@ -6,7 +6,7 @@ class Config:
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
         {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
         # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        {"domain": "Nessus Vulnerability Analysis", "alias": "va", "icon": "🔎"},
+        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
         {"domain": "Exit Program", "alias": "exit", "icon": ""},
     ]
     scan_modes = ["SCAN", "RESUME"]
@@ -32,13 +32,17 @@ class Config:
         f"{bcolors.ENDC} ]"
         "\n\n Enter mode: ==> "
     )
+    vulnerability_scanners = [
+        {"name": "Nessus Scanner", "alias": "nessus"},
+        #{"name": "Rapid 7", "alias": "rapid"}
+    ]
     external_packages = [
         # External
         {
             "name": ["go"],
             "command": "multiple",
             "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
-            "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
         },
         {
             "name": ["gowitness"],
@@ -124,7 +128,7 @@ class Config:
             "name": ["go"],
             "command": "multiple",
             "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
-            "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
         },
         {
             "name": [
@@ -179,131 +183,131 @@ class Config:
     def filter_conditions(vulnerabilities, regex_word):
         return {
             "ssl_condition": (vulnerabilities["Name"].notna())
-            & (vulnerabilities["Name"].str.contains(regex_word("SSL"), regex=True))
-            | (vulnerabilities["Name"].str.contains(regex_word("TLS"), regex=True))
-            | (vulnerabilities["Name"].str.contains(regex_word("POODLE"), regex=True)),
+                             & (vulnerabilities["Name"].str.contains(regex_word("SSL"), regex=True))
+                             | (vulnerabilities["Name"].str.contains(regex_word("TLS"), regex=True))
+                             | (vulnerabilities["Name"].str.contains(regex_word("POODLE"), regex=True)),
             "missing_patch_condition": (vulnerabilities["Solution"].notna())
-            & (
-                vulnerabilities["Solution"].str.contains(
-                    regex_word("Update"), regex=True
-                )
-            )
-            | (vulnerabilities["Solution"].str.contains(regex_word("patches")))
-            | (vulnerabilities["Solution"].str.contains(regex_word("updates")))
-            | (vulnerabilities["Solution"].str.contains(regex_word("security update")))
-            | (
-                vulnerabilities["Solution"].str.contains(
-                    regex_word("Microsoft has released")
-                )
-            ),
+                                       & (
+                                           vulnerabilities["Solution"].str.contains(
+                                               regex_word("Update"), regex=True
+                                           )
+                                       )
+                                       | (vulnerabilities["Solution"].str.contains(regex_word("patches")))
+                                       | (vulnerabilities["Solution"].str.contains(regex_word("updates")))
+                                       | (vulnerabilities["Solution"].str.contains(regex_word("security update")))
+                                       | (
+                                           vulnerabilities["Solution"].str.contains(
+                                               regex_word("Microsoft has released")
+                                           )
+                                       ),
             "unsupported_software": (vulnerabilities["Solution"].notna())
-            & (
-                vulnerabilities["Solution"].str.contains(
-                    regex_word("Upgrade", is_extra=True, second_term="Update"),
-                    regex=True,
-                )
-            )
-            | (
-                vulnerabilities["Name"].str.contains(
-                    regex_word("no longer supported"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Description"].str.contains(
-                    regex_word("no longer supported"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Name"].str.contains(
-                    regex_word("unsupported"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Solution"].str.contains(
-                    regex_word("unsupported"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Solution"].str.contains(
-                    regex_word("Unsupported Version"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Name"].str.contains(
-                    regex_word("Unsupported Version"), regex=True
-                )
-            ),
+                                    & (
+                                        vulnerabilities["Solution"].str.contains(
+                                            regex_word("Upgrade", is_extra=True, second_term="Update"),
+                                            regex=True,
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Name"].str.contains(
+                                            regex_word("no longer supported"), regex=True
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Description"].str.contains(
+                                            regex_word("no longer supported"), regex=True
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Name"].str.contains(
+                                            regex_word("unsupported"), regex=True
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Solution"].str.contains(
+                                            regex_word("unsupported"), regex=True
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Solution"].str.contains(
+                                            regex_word("Unsupported Version"), regex=True
+                                        )
+                                    )
+                                    | (
+                                        vulnerabilities["Name"].str.contains(
+                                            regex_word("Unsupported Version"), regex=True
+                                        )
+                                    ),
             "kaspersky_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(regex_word("Kaspersky"), regex=True),
+                                   & vulnerabilities["Name"].str.contains(regex_word("Kaspersky"), regex=True),
             "insecure_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                  & vulnerabilities["Name"].str.contains(
                 regex_word("Insecure Windows Service"), regex=True
             ),
             "winverify_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                   & vulnerabilities["Name"].str.contains(
                 regex_word("WinVerifyTrust"), regex=True
             ),
             "unquoted_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                  & vulnerabilities["Name"].str.contains(
                 regex_word("Unquoted Service Path"), regex=True
             ),
             "smb_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(regex_word("SMB"), regex=True),
+                             & vulnerabilities["Name"].str.contains(regex_word("SMB"), regex=True),
             "speculative_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                     & vulnerabilities["Name"].str.contains(
                 regex_word("Windows Speculative"), regex=True
             ),
             "AD_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                            & vulnerabilities["Name"].str.contains(
                 regex_word("AD Starter"), regex=True
             ),
             "defender_condition": (vulnerabilities["Synopsis"].notna())
-            & vulnerabilities["Synopsis"].str.contains(
+                                  & vulnerabilities["Synopsis"].str.contains(
                 regex_word("antimalware"), regex=True
             ),
             "rdp_condition": (vulnerabilities["Name"].notna())
-            & (
-                vulnerabilities["Name"].str.contains(
-                    regex_word("Terminal Services"), regex=True
-                )
-            )
-            | (
-                vulnerabilities["Name"].str.contains(
-                    regex_word("Remote Desktop Protocol"), regex=True
-                )
-            ),
+                             & (
+                                 vulnerabilities["Name"].str.contains(
+                                     regex_word("Terminal Services"), regex=True
+                                 )
+                             )
+                             | (
+                                 vulnerabilities["Name"].str.contains(
+                                     regex_word("Remote Desktop Protocol"), regex=True
+                                 )
+                             ),
             "compliance_condition": (vulnerabilities["Risk"].notna())
-            & (vulnerabilities["Risk"].str.contains(regex_word("FAILED"), regex=True))
-            & (
-                vulnerabilities["Synopsis"].str.contains(
-                    regex_word("Compliance checks"), regex=True
-                )
-            ),
+                                    & (vulnerabilities["Risk"].str.contains(regex_word("FAILED"), regex=True))
+                                    & (
+                                        vulnerabilities["Synopsis"].str.contains(
+                                            regex_word("Compliance checks"), regex=True
+                                        )
+                                    ),
             "ssh_condition": (vulnerabilities["Synopsis"].notna())
-            & vulnerabilities["Synopsis"].str.contains(
+                             & vulnerabilities["Synopsis"].str.contains(
                 regex_word("SSH server"), regex=True
             ),
             "telnet_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                & vulnerabilities["Name"].str.contains(
                 regex_word("Telnet Server"), regex=True
             ),
             "information_condition": (vulnerabilities["Name"].notna())
-            & vulnerabilities["Name"].str.contains(
+                                     & vulnerabilities["Name"].str.contains(
                 regex_word("Information Disclosure"), regex=True
             ),
             "web_condition": (vulnerabilities["Name"].notna())
-            & (vulnerabilities["Name"].str.contains(regex_word("Web"), regex=True))
-            | (
-                vulnerabilities["Description"].str.contains(
-                    regex_word("web server"), regex=True
-                )
-            ),
+                             & (vulnerabilities["Name"].str.contains(regex_word("Web"), regex=True))
+                             | (
+                                 vulnerabilities["Description"].str.contains(
+                                     regex_word("web server"), regex=True
+                                 )
+                             ),
             "rce_condition": (vulnerabilities["Description"].notna())
-            & (
-                vulnerabilities["Description"].str.contains(
-                    regex_word("remote code execution"), regex=True
-                )
-            ),
+                             & (
+                                 vulnerabilities["Description"].str.contains(
+                                     regex_word("remote code execution"), regex=True
+                                 )
+                             ),
         }
 
     # MOBILE ANALYSIS CONSTANTS

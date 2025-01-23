@@ -91,6 +91,8 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
             internal.enumerate_hosts()
 
         case "va":
+            # Set scanner
+            vulnerability_analysis.set_scanner(user.domain_variables["scanner"])
             formatted_issues = vulnerability_analysis.analyze_csv(
                 user.domain_variables["input_file"]
             )

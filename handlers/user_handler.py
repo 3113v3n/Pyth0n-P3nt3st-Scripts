@@ -2,16 +2,17 @@
 from utils.shared import Config, validators
 import sys
 
+
 class UserHandler:
     """Class will be responsible for handling user interactions with
     The different domains"""
 
     def __init__(
-        self,
-        filemanager,
-        validator: validators,
-        bcolors,
-        config: Config,
+            self,
+            filemanager,
+            validator: validators,
+            bcolors,
+            config: Config,
     ) -> None:
         self.config = config
         self.default_test_domains = []
@@ -74,6 +75,17 @@ class UserHandler:
         while True:
 
             try:
+                print(f"Select Vulnerability Scanner used: \n\n")
+                for scanner in self.config.vulnerability_scanners:
+                    print(
+                        f" {self.color.HEADER}[{self.config.vulnerability_scanners.index(scanner) + 1}]"
+                        f" {scanner["name"]}{self.color.ENDC}"
+                    )
+                scanner_index = self.filemanager.index_out_of_range_display("\nScanner: ",
+                                                                            self.config.vulnerability_scanners)
+
+                selected_scanner = self.config.vulnerability_scanners[scanner_index]["alias"]
+
                 search_dir = input(
                     "\nEnter Location Where your files are located \n"
                 ).strip()
@@ -92,8 +104,9 @@ class UserHandler:
                     ).strip()
 
                     return {
-                        "input_file": files_tuple,  # input_filename,
+                        "input_file": files_tuple,
                         "output": output_filename,
+                        "scanner": selected_scanner,
                     }
                 else:
                     raise FileExistsError("No Files Present in the provided Directory")
@@ -136,8 +149,7 @@ class UserHandler:
                 if resume_ip is None:
                     raise ValueError("No Previously saved file present")
 
-                # output file
-                # Output file will be the name of unresposive file without text 'unresponsive_hosts'
+                # Output file will be the name of unresponsive file without text 'unresponsive_hosts'
                 output_file = self.filemanager.filepath
                 cidr = self.get_cidr()
                 subnet = f"{resume_ip}/{cidr}"
@@ -152,7 +164,6 @@ class UserHandler:
                 output_file = input("[+] Provide a name for your output file: ").strip()
 
         elif mode == "scan":
-            # TODO: file validations
             subnet = self.get_user_subnet()
             output_file = input("[+] Provide a name for your output file: ").strip()
 

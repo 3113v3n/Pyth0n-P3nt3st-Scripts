@@ -49,40 +49,55 @@ class VulnerabilityAnalysis:
         self.selected_columns = []
         # contains constants to be used across the program
         self.config = config
+        #Scanner_type
+        self.scanner = "nessus"
+        # file_type
+        self.file_type = ""
+
+    def set_scanner(self, scanner: str):
+        self.scanner = scanner
+
+    def set_file_type(self, file_type: str):
+        self.file_type = file_type
 
     def format_input_file(self) -> list:
         # lists of hosts that passed credential check
         # filter hosts with credential check successful
+        if self.scanner == "nessus":
 
-        credentialed_hosts = self.data[
-            (csv_filter_operations(self.data, "Plugin Output", "notnull"))
-            & (
-                csv_filter_operations(
-                    self.data,
-                    "Plugin Output",
-                    "contains",
-                    contains_key="Credentialed checks : yes",
+            # TODO: filter depending on scanner Type
+            credentialed_hosts = self.data[
+                (csv_filter_operations(self.data, "Plugin Output", "notnull"))
+                & (
+                    csv_filter_operations(
+                        self.data,
+                        "Plugin Output",
+                        "contains",
+                        contains_key="Credentialed checks : yes",
+                    )
                 )
-            )
-            ]["Host"].tolist()
-        self.credentialed_hosts = credentialed_hosts
+                ]["Host"].tolist()
+            self.credentialed_hosts = credentialed_hosts
 
-        selected_columns = self.data[
-            csv_filter_operations(
-                self.data, "Host", "in", in_key=self.credentialed_hosts
-            )
-        ][
-            self.headers[:-1]  # ignore the last item in our headers list
-        ]
+            selected_columns = self.data[
+                csv_filter_operations(
+                    self.data, "Host", "in", in_key=self.credentialed_hosts
+                )
+            ][
+                self.headers[:-1]  # ignore the last item in our headers list
+            ]
 
-        # Return only [ Critical | High | Medium ] Risks and notnull values
-        formated_vulnerabilities = selected_columns[
-            (csv_filter_operations(selected_columns, "Risk", "notnull"))
-            & (selected_columns["Risk"] != "Low")
-            ].reset_index(drop=True)
-        print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
+            # Return only [ Critical | High | Medium ] Risks and notnull values
+            formated_vulnerabilities = selected_columns[
+                (csv_filter_operations(selected_columns, "Risk", "notnull"))
+                & (selected_columns["Risk"] != "Low")
+                ].reset_index(drop=True)
+            print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
-        return formated_vulnerabilities
+            return formated_vulnerabilities
+        elif self.scanner == "rapid":
+            print("Rapid Vulnerability Analysis")
+            return []
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe

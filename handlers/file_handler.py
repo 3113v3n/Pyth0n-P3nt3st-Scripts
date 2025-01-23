@@ -35,7 +35,7 @@ def get_file_extension(filename):
 def append_to_sheets(data_frame: object, file: str):
     """Appends data to existing Workbook"""
     with pandas.ExcelWriter(
-        file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+            file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
     ) as writer:
         # Copy existing sheets to writer
         for sheet_name in writer.book.sheetnames:
@@ -168,7 +168,7 @@ class FileHandler:
             file.write(f"{content}\n")
 
     def write_to_multiple_sheets(
-        self, dataframe_objects: list, filename: str, **kwargs
+            self, dataframe_objects: list, filename: str, **kwargs
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{generate_unique_name(filename, extension='xlsx')}"
@@ -191,13 +191,13 @@ class FileHandler:
         print(text)
 
     def save_to_csv(self, filename, content, mode):
-        filename = get_file_basename(filename) #os.path.normpath(filename)
-        
+        filename = get_file_basename(filename)  #os.path.normpath(filename)
+
         # If filename is not full path prepend output_directory
         if not os.path.isabs(filename) and not filename.startswith(self.output_directory):
-            file_path = os.path.join(self.output_directory, filename) 
+            file_path = os.path.join(self.output_directory, filename)
         else:
-            file_path = filename 
+            file_path = filename
 
         if "unresponsive_hosts" not in filename:
             file_header = "Live Host IP Addresses"
@@ -229,7 +229,7 @@ class FileHandler:
         self.output_directory = f"{search_path}/{folder_name}"
 
         if not self.validator.check_subdirectory_exists(
-            folder_name, search_path=search_path
+                folder_name, search_path=search_path
         ):
             folder_path = self.output_directory
             os.makedirs(folder_path)
@@ -262,7 +262,7 @@ class FileHandler:
             file
             for file in self.files
             if self.validator.check_filetype(file["filename"], "apk")
-            or self.validator.check_filetype(file["filename"], "ipa")
+               or self.validator.check_filetype(file["filename"], "ipa")
         ]
 
         # Only display files containing unresponsive hosts
@@ -271,7 +271,7 @@ class FileHandler:
         ]
         # filter out CSV files only
         if (
-            "display_csv" in kwargs
+                "display_csv" in kwargs
         ):  # any(key in kwargs for key in ("display_csv", "resume_scan")):
             self.files = csv_files
 
@@ -314,19 +314,24 @@ class FileHandler:
         else:
             return None
 
-    def index_out_of_range_display(self, input_str):
+    def index_out_of_range_display(self, input_str, data_list) -> int:
+        """Takes in an input string and a data list and returns the index of the
+        selected item in the data list.
+        :param input_str: Input string to be displayed to the user
+        :param data_list: list from which data will be displayed
+        """
         while True:
             # Error handling
             try:
-                selected_file = int(input(f"\n{input_str}"))
+                selected_value = int(input(f"\n{input_str}").strip())
                 if (
-                    0 < selected_file < len(self.files) + 1
+                        0 < selected_value < len(data_list) + 1
                 ):  # display numbers are value of index + 1
 
                     break
                 else:
                     print(
-                        f"{self.colors.FAIL}[!]The file number is out of range. Please enter a valid number."
+                        f"{self.colors.FAIL}[!]The selected number is out of range. Please enter a valid number."
                         f"{self.colors.ENDC}"
                     )
             except ValueError:
@@ -334,7 +339,7 @@ class FileHandler:
                     f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}"
                 )
                 # return the index of selected item
-        return selected_file - 1
+        return selected_value - 1
 
     def do_analysis(self, to_analyze="") -> tuple | str:
         print(f"\n{self.colors.OKBLUE}Analyzing {to_analyze}...{self.colors.ENDC}")
@@ -344,7 +349,7 @@ class FileHandler:
             return Tuple containing the list of CSV files and the index to start scan
             """
             selected_file = self.index_out_of_range_display(
-                "Please enter the file number you would like scan first :"
+                "Please enter the file number you would like scan first :", self.files
             )
             return self.files, selected_file
         elif to_analyze == "applications":
@@ -352,13 +357,13 @@ class FileHandler:
             Display all applications to analyze and select the one to start from
             """
             selected_app = self.index_out_of_range_display(
-                "Select the application to scan "
+                "Select the application to scan ", self.files
             )
             return self.files[selected_app]
         else:
             """Returns the IP address from a file input"""
             selected_file = self.index_out_of_range_display(
-                "Please enter the file number displayed above: "
+                "Please enter the file number displayed above: ", self.files
             )
 
             self.filepath = self.files[selected_file]["full_path"]
