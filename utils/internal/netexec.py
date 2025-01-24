@@ -3,7 +3,7 @@ from utils.shared import Commands
 
 class NetExec(Commands):
     def __init__(self) -> None:
-        pass
+        super().__init__()
 
     def gen_relay_list(self, input_file, output_file) -> list:
         print(f"\n{input_file}\n{output_file}")

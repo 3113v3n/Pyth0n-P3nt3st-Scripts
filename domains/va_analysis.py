@@ -1,49 +1,14 @@
 # trunk-ignore-all(isort)t
 from handlers import FileHandler
-from handlers.file_handler import (
-    concat_dataframes,
-    get_filename_without_extension,
-    read_csv,
-)
-from utils.shared import Config
+from utils import Config
 
 
-def percentage_null_fields(dataframe):
-    # determine percentage accuracy of the data by showing null fields
-    for i in dataframe.columns:
-        null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
-        if null_rate > 0:
-            print(f"{i} null rate: {null_rate:.2f}%")
-
-
-def csv_filter_operations(dataframe, filter_option, operation, **kwargs):
-    # Function to combine all the major CSV filters into one for code clarity
-    match operation:
-        case "notnull":
-            return dataframe[filter_option].notna()
-        case "contains":
-            if "contains_key" in kwargs:
-                # check for any key value pair passed as an  extra argument and uses it as a filter
-                return dataframe[filter_option].str.contains(kwargs["contains_key"])
-        case "in":
-            if "in_key" in kwargs:
-                return dataframe[filter_option].isin(kwargs["in_key"])
-        case _:
-            raise ValueError(f"Invalid filter option: {filter_option}")
-
-
-def regex_word(search_term, **kwargs):
-    if "is_extra" in kwargs:
-        return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
-    return rf"\b{search_term}\b"
-
-
-class VulnerabilityAnalysis:
+class VulnerabilityAnalysis(FileHandler, Config):
     """Class that handles Vulnerability analysis tasks"""
 
-    def __init__(self, filemanager: FileHandler, config: Config) -> None:
+    def __init__(self) -> None:
         # File manager class that is responsible for file operations
-        self.filemanager = filemanager
+        super().__init__()
         self.data = []
         # list of hosts that passed credential check
         self.credentialed_hosts = []
@@ -52,7 +17,6 @@ class VulnerabilityAnalysis:
         # columns to showcase on our final excel
         self.selected_columns = []
         # contains constants to be used across the program
-        self.config = config
         # Scanner_type
         self.scanner = "nessus"
         self.vulnerabilities = []
@@ -74,20 +38,20 @@ class VulnerabilityAnalysis:
         if self.scanner == "nessus":
 
             credentialed_hosts = self.data[
-                (csv_filter_operations(self.data, "Plugin Output", "notnull"))
+                (self.csv_filter_operations(self.data, "Plugin Output", "notnull"))
                 & (
-                    csv_filter_operations(
+                    self.csv_filter_operations(
                         self.data,
                         "Plugin Output",
                         "contains",
                         contains_key="Credentialed checks : yes",
                     )
                 )
-            ]["Host"].tolist()
+                ]["Host"].tolist()
             self.credentialed_hosts = credentialed_hosts
 
             selected_columns = self.data[
-                csv_filter_operations(
+                self.csv_filter_operations(
                     self.data, "Host", "in", in_key=self.credentialed_hosts
                 )
             ][
@@ -96,9 +60,9 @@ class VulnerabilityAnalysis:
 
             # Return only [ Critical | High | Medium ] Risks and notnull values
             formated_vulnerabilities = selected_columns[
-                (csv_filter_operations(selected_columns, "Risk", "notnull"))
+                (self.csv_filter_operations(selected_columns, "Risk", "notnull"))
                 & (selected_columns["Risk"] != "Low")
-            ].reset_index(drop=True)
+                ].reset_index(drop=True)
             print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
             return formated_vulnerabilities
@@ -111,9 +75,9 @@ class VulnerabilityAnalysis:
         # compare the headers from our defined headers and provided dataframe
 
         if self.scanner == "nessus":
-            self.headers = self.config.nessus_headers
+            self.headers = self.nessus_headers
         elif self.scanner == "rapid":
-            self.headers = self.config.rapid7_headers
+            self.headers = self.rapid7_headers
 
         missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
@@ -141,7 +105,7 @@ class VulnerabilityAnalysis:
         try:
             # Read the first file as baseline
             filename = self.file_list[self.starting_index]["filename"]
-            original_file = read_csv(self.starting_file)
+            original_file = self.read_csv(self.starting_file)
 
             # Check if baseline file is empty
             if original_file.empty:
@@ -155,7 +119,7 @@ class VulnerabilityAnalysis:
             for file in self.file_list:
                 if file["full_path"] != self.starting_file:
                     # Read CSV file without headers
-                    new_data = read_csv(file["full_path"], header=None)
+                    new_data = self.read_csv(file["full_path"], header=None)
 
                     # Check if new data is empty
                     if new_data.empty:
@@ -167,12 +131,12 @@ class VulnerabilityAnalysis:
                         print(
                             f"New file {file['filename']} has {len(new_data.columns)} columns "
                         )
-                        raise ValueError(self.config.column_mismatch_error)
+                        raise ValueError(self.column_mismatch_error)
 
                     # Check if other files have missing columns
                     self.get_missing_columns(new_data, file["filename"])
                     # Append new data to the original data
-                    all_vulnerabilities = concat_dataframes(
+                    all_vulnerabilities = self.concat_dataframes(
                         all_vulnerabilities, new_data
                     )
 
@@ -188,32 +152,33 @@ class VulnerabilityAnalysis:
         elif self.scanner == "rapid7":
             self.sort_rapid7_vulnerabilities(vulnerabilities, output_file)
 
-    def filter_condition(self, filter_string: str) -> list:
+    def filter_condition(self, filter_string: str):
         """Filter CSV file using the key word supplied
         :param: filter_string ==> String to use when filtering
         """
 
-        return self.config.filter_conditions(
-            self.vulnerabilities, regex_word=regex_word, filter_param=filter_string
+        return self.filter_conditions(
+            self.vulnerabilities, regex_word=self.regex_word, filter_param=filter_string
         )[filter_string]
 
-    def categorize_vulnerabilities(self) -> tuple:
-        """Function returns a tuple contain dynamically filtered tuple
-        (dataframe_name : dataframe)
+    def categorize_vulnerabilities(self) -> dict:
+        """Function returns a dictionary containing tuple
+        {(dataframe_name : dataframe)}
         """
         # Apply filtering dynamically
         categorized_vulnerabilities = {}
+        categories = None
         if self.scanner == "nessus":
-            categories = self.config.nessus_vuln_categories
+            categories = self.nessus_vuln_categories
             # Special case for RCE condition
             categorized_vulnerabilities["rce"] = self.vulnerabilities[
                 self.filter_condition("rce_condition")
                 & ~self.filter_condition("missing_patch_condition")
                 & ~self.filter_condition("unsupported_software")
-            ]
+                ]
 
         elif self.scanner == "rapid":
-            categories = self.config.rapid7_vuln_categories
+            categories = self.rapid7_vuln_categories
 
         categorized_vulnerabilities = {
             key: self.vulnerabilities[self.filter_condition(value)]
@@ -223,11 +188,12 @@ class VulnerabilityAnalysis:
 
     def sort_nessus_vulnerabilities(self, vulnerabilities, output_file):
         self.vulnerabilities = vulnerabilities
+        filter_strings = None
 
         if self.scanner == "nessus":
-            filter_strings = self.config.nessus_strings_to_filter
+            filter_strings = self.nessus_strings_to_filter
         elif self.scanner == "rapid":
-            filter_strings = self.config.rapid7_strings_to_filter
+            filter_strings = self.rapid7_strings_to_filter
 
         # Show remaining data after filtering
         # Start loop from the second value and append results
@@ -265,22 +231,52 @@ class VulnerabilityAnalysis:
             For the unfiltered vulnerabilities, append 'Unfiltered'
             to the user provided filename for easy identification
             """
-            self.filemanager.write_to_multiple_sheets(
+            self.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
-                f"{get_filename_without_extension(output_file)}_Unfiltered",
+                f"{self.get_filename_without_extension(output_file)}_Unfiltered",
                 unfiltered=True,
             )
         # write to file if data is present
         if len(found_vulnerabilities) != 0:
-            self.filemanager.write_to_multiple_sheets(
+            self.write_to_multiple_sheets(
                 found_vulnerabilities,
                 output_file,
             )
 
     def sort_rapid7_vulnerabilities(self, vulnerabilities, output_file):
-        conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word=regex_word
+        conditions = self.filter_conditions(
+            vulnerabilities, regex_word=self.regex_word, filter_param=""
         )
         unfiltered_vulns = []
         found_vulnerabilities = []
-        print(f"{conditions}\n{unfiltered_vulns}\n{found_vulnerabilities}")
+        print(f"{conditions}\n{unfiltered_vulns}\n{found_vulnerabilities}\n{output_file}")
+
+    @staticmethod
+    def percentage_null_fields(dataframe):
+        # determine percentage accuracy of the data by showing null fields
+        for i in dataframe.columns:
+            null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
+            if null_rate > 0:
+                print(f"{i} null rate: {null_rate:.2f}%")
+
+    @staticmethod
+    def csv_filter_operations(dataframe, filter_option, operation, **kwargs):
+        # Function to combine all the major CSV filters into one for code clarity
+        match operation:
+            case "notnull":
+                return dataframe[filter_option].notna()
+            case "contains":
+                if "contains_key" in kwargs:
+                    # check for any key value pair passed as an  extra argument and uses it as a filter
+                    return dataframe[filter_option].str.contains(kwargs["contains_key"])
+            case "in":
+                if "in_key" in kwargs:
+                    return dataframe[filter_option].isin(kwargs["in_key"])
+            case _:
+                raise ValueError(f"Invalid filter option: {filter_option}")
+
+    @staticmethod
+    def regex_word(search_term, **kwargs):
+        if "is_extra" in kwargs:
+            return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
+        return rf"\b{search_term}\b"

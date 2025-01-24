@@ -4,13 +4,15 @@ import threading
 from tqdm import tqdm
 import concurrent.futures
 from handlers import FileHandler
-from scapy.all import IP, ICMP, sr1
+# from scapy.all import IP, ICMP, sr1
+from utils.shared import Commands
 
 
-class NetworkHandler:
+class NetworkHandler(FileHandler, Commands):
     """Class will handle any logic necessary for network operations"""
 
-    def __init__(self, filemanager: FileHandler, commands) -> None:
+    def __init__(self) -> None:
+        super().__init__()
         # subnet range
         self.subnet = ""
         # Number of hosts within the network
@@ -24,9 +26,7 @@ class NetworkHandler:
         # remaining usable host bits
         self.host_bits = 0
         # Shell commands
-        self.os_commands = commands()
         self.progress_bar = None
-        self.filemanager = filemanager
         self.lock = threading.Lock()  # prevent race conditions
 
     def initialize_network_variables(self, variables, progress_bar):
@@ -44,9 +44,9 @@ class NetworkHandler:
         return self.progress_bar.live_hosts
 
     def configure_progress_bar(self, stdscr, ip, output_file, mode):
-        is_alive = self.os_commands.ping_hosts(ip)
+        is_alive = self.ping_hosts(ip)
         self.progress_bar.update_ips(
-            self.filemanager,
+            self.save_to_csv,
             output_file=output_file,
             stdscr=stdscr,
             ip=ip,
@@ -68,8 +68,8 @@ class NetworkHandler:
         if mode == "resume":
             start_index = ip_ranges.index(self.user_ip_addr)
             ip_ranges = ip_ranges[
-                start_index:
-            ]  # slice list to start from last unresponsive IP
+                        start_index:
+                        ]  # slice list to start from last unresponsive IP
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
@@ -77,10 +77,10 @@ class NetworkHandler:
                 for ip in ip_ranges
             }
             for _ in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=len(ip_ranges),
-                desc="Scanning Network",
-                leave=False,
+                    concurrent.futures.as_completed(futures),
+                    total=len(ip_ranges),
+                    desc="Scanning Network",
+                    leave=False,
             ):
                 pass  # UI updates are handled inside scan_host()
 
@@ -106,11 +106,11 @@ class NetworkHandler:
 
     def scan_hosts(self, ip, output_file, mode, stdscr):
         """Check if host is alive using concurrent pings and update UI"""
-        is_alive = self.os_commands.ping_hosts(ip) #self.scapy_ping(ip)  
+        is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
 
         with self.lock:  # Prevents concurrent writes
             self.progress_bar.update_ips(
-                self.filemanager,
+                self.save_to_csv,
                 output_file=output_file,
                 stdscr=stdscr,
                 ip=ip,
@@ -118,11 +118,11 @@ class NetworkHandler:
                 mode=mode,
             )
 
-    @staticmethod
-    def scapy_ping(ip) -> bool:
-        """Sends an ICMP Echo Request using scapy and returns boolean value"""
-        response = sr1(IP(dst=ip) / ICMP(), timeout=0.5, verbose=False)
-        return response is not None
+    # @staticmethod
+    # def scapy_ping(ip) -> bool:
+    #     """Sends an ICMP Echo Request using scapy and returns boolean value"""
+    #     response = sr1(IP(dst=ip) / ICMP(), timeout=0.5, verbose=False)
+    #     return response is not None
 
     @staticmethod
     def get_network_info(subnet) -> dict:
@@ -137,7 +137,7 @@ class NetworkHandler:
         bits = 32 - int(network_mask)
         ip_info = {
             "ip_address": subnet.split("/")[0],
-            "hosts": (2**bits),  # - 2
+            "hosts": (2 ** bits),  # - 2
             "network_mask": int(network_mask),
             "host_bits": bits,
         }

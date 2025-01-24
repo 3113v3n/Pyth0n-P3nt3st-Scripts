@@ -1,21 +1,22 @@
 import curses
-from .validators import get_filename_without_extension
+from .validators import Validator
 
 
-class ProgressBar:
+class ProgressBar(Validator):
     """Display Scan Progress and saves the Live hosts to a file using the
     Filehandler Module
     """
 
     def __init__(self, total) -> None:
+        super().__init__()
         self.total_scanned = 0
         self.total_hosts = total
         self.live_hosts = []
         self.unresponsive_hosts = []
 
-    def update_ips(self, filemanager, output_file, stdscr, ip, is_alive, mode):
+    def update_ips(self, save_file_to_csv, output_file, stdscr, ip, is_alive, mode):
         """Update the scan progress and save both live and unresponsive hosts"""
-        basename = get_filename_without_extension(output_file)
+        basename = self.get_filename_without_extension(output_file)
         if is_alive:
 
             output_file = (
@@ -24,7 +25,7 @@ class ProgressBar:
                 else output_file
             )
             self.live_hosts.append(ip)
-            filemanager.save_to_csv(output_file, ip, mode)
+            save_file_to_csv(output_file, ip)
 
         else:
             self.unresponsive_hosts.append(ip)
@@ -33,7 +34,7 @@ class ProgressBar:
                 if "unresponsive_hosts" not in basename
                 else f"{basename}.csv"
             )
-            filemanager.save_to_csv(filename, ip, mode)
+            save_file_to_csv(filename, ip)
 
         self.total_scanned += 1
         self.display(stdscr)

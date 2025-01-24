@@ -2,121 +2,15 @@ import os
 import pandas
 from datetime import datetime
 from pathlib import Path
-from utils.shared import validators
+from utils.shared import Validator, Bcolors
 import ipaddress
 
 
-def read_csv(dataframe, **kwargs):
-    if "header" in kwargs:
-        return pandas.read_csv(dataframe, header="infer")
-    return pandas.read_csv(dataframe, encoding="ISO-8859-1")  # utf-16 cp1252
-
-
-def read_excel_file(file):
-    xls = pandas.ExcelFile(file)
-    return pandas.read_excel(xls)
-
-
-def get_filename_without_extension(filepath):
-    # Get the filename with extension
-    filename_with_ext = os.path.basename(filepath)
-    # Split the filename and extension
-    filename_without_ext, _ = os.path.splitext(filename_with_ext)
-    return filename_without_ext
-
-
-def get_file_extension(filename):
-    # Split the filename into root and extension
-    root, ext = os.path.splitext(filename)
-    # Return the extension, excluding the dot
-    return ext.lstrip(".")
-
-
-def append_to_sheets(data_frame: object, file: str):
-    """Appends data to existing Workbook"""
-    with pandas.ExcelWriter(
-            file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
-    ) as writer:
-        # Copy existing sheets to writer
-        for sheet_name in writer.book.sheetnames:
-            df = pandas.read_excel(file, sheet_name=sheet_name, engine="openpyxl")
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-        # Write new data frame to new sheet
-        data_frame["dataframe"].to_excel(
-            writer, sheet_name=data_frame["sheetname"], index=False
-        )
-
-
-def get_last_unresponsive_ip(unresponsive_file) -> str:
-    """
-    Takes file as an input, sorts the ips available in the list in ascending order
-    get the last Ip on the list to use as start_ip
-    """
-    try:
-        data_frame = read_csv(unresponsive_file)
-
-        if data_frame.empty:
-            return None
-
-        # Extract Ips from the first column
-        ip_list = data_frame.iloc[:, 0].dropna().tolist()
-
-        # Convert to IPAddress objects for correct numerical sorting
-        sorted_ips = sorted(ip_list, key=lambda ip: ipaddress.ip_address(ip))
-
-        last_address = sorted_ips[-1]
-        return last_address
-
-    except FileNotFoundError:
-        print("No previous unresponsive host file found")
-
-
-def concat_dataframes(existing, newdata):
-    """Concatenate two data Frames"""
-    return pandas.concat([existing, newdata], ignore_index=True, axis=0)
-
-
-def get_file_basename(full_file_path):
-    return os.path.basename(full_file_path)
-
-
-def append_to_txt(filename, content):
-    """Update existing file"""
-    with open(f"{filename}", "a") as file:
-        file.write(f"{content}\n")
-
-
-def read_last_line(filename) -> str:
-    """
-    Takes a filename containing a list of ips and returns
-    the last ip address
-    """
-    with open(f"{filename}", "rb") as file:
-        try:  # catch OSError in case of one line file
-            file.seek(-2, os.SEEK_END)
-            while file.read(1) != b"\n":
-                file.seek(-2, os.SEEK_CUR)
-        except OSError:
-            file.seek(0)
-        last_line = file.readline().decode()
-    return last_line
-
-
-def read_all_lines(file):
-    with open(file, "r") as file:
-        return file.readlines()
-
-
-def generate_unique_name(file, extension) -> str:
-    timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-    removed_extension = Path(file).stem
-    return f"{removed_extension}_{timestamp}.{extension}"
-
-
-class FileHandler:
+class FileHandler(Validator, Bcolors):
     """Handle File operations"""
 
-    def __init__(self, colors, validator: validators) -> None:
+    def __init__(self) -> None:
+        super().__init__()
         self.assessment_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
@@ -124,8 +18,6 @@ class FileHandler:
         )
         self.filepath = ""  # full path to saved file
         self.files = []
-        self.colors = colors
-        self.validator = validator
         self.mobile_dir = "Mobile"
         self.external_dir = "External"
         self.internal_dir = "Internal"
@@ -171,7 +63,7 @@ class FileHandler:
             self, dataframe_objects: list, filename: str, **kwargs
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
-        self.filepath = f"{self.output_directory}/{generate_unique_name(filename, extension='xlsx')}"
+        self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename, extension='xlsx')}"
         with pandas.ExcelWriter(self.filepath) as writer:
             for dataframe in dataframe_objects:
                 if not dataframe["dataframe"].empty:
@@ -181,17 +73,17 @@ class FileHandler:
         if "unfiltered" in kwargs:
             text = (
                 f"\n\nUnfiltered vulnerabilities have been written to :"
-                f"\n{self.colors.OKCYAN}{self.filepath}{self.colors.ENDC}\n"
+                f"\n{self.OKCYAN}{self.filepath}{self.ENDC}\n"
             )
         else:
             text = (
                 f"Filtered vulnerabilities have been written to :"
-                f"\n{self.colors.OKGREEN}{self.filepath}{self.colors.ENDC}\n"
+                f"\n{self.OKGREEN}{self.filepath}{self.ENDC}\n"
             )
         print(text)
 
-    def save_to_csv(self, filename, content, mode):
-        filename = get_file_basename(filename)  #os.path.normpath(filename)
+    def save_to_csv(self, filename, content):
+        filename = self.get_file_basename(filename)
 
         # If filename is not full path prepend output_directory
         if not os.path.isabs(filename) and not filename.startswith(self.output_directory):
@@ -209,9 +101,9 @@ class FileHandler:
 
         data = pandas.DataFrame({file_header: [content]})  # Live Hosts : [Ip addresses]
 
-        if self.validator.file_exists(f"{file_path}"):
-            existing_df = read_csv(f"{file_path}")
-            updated_df = concat_dataframes(existing_df, data)
+        if self.file_exists(f"{file_path}"):
+            existing_df = self.read_csv(f"{file_path}")
+            updated_df = self.concat_dataframes(existing_df, data)
         else:
             updated_df = data
 
@@ -228,7 +120,7 @@ class FileHandler:
 
         self.output_directory = f"{search_path}/{folder_name}"
 
-        if not self.validator.check_subdirectory_exists(
+        if not self.check_subdirectory_exists(
                 folder_name, search_path=search_path
         ):
             folder_path = self.output_directory
@@ -256,13 +148,13 @@ class FileHandler:
         csv_files = [
             file
             for file in self.files
-            if self.validator.check_filetype(file["filename"], "csv")
+            if self.check_filetype(file["filename"], "csv")
         ]
         app_files = [
             file
             for file in self.files
-            if self.validator.check_filetype(file["filename"], "apk")
-               or self.validator.check_filetype(file["filename"], "ipa")
+            if self.check_filetype(file["filename"], "apk")
+            or self.check_filetype(file["filename"], "ipa")
         ]
 
         # Only display files containing unresponsive hosts
@@ -287,9 +179,9 @@ class FileHandler:
 
             for index in range(len(self.files)):
                 # Prepare the display string for each file
-                filename = f" {self.colors.BOLD}{self.colors.WARNING}{self.files[index]['filename']}{self.colors.ENDC}"
+                filename = f" {self.BOLD}{self.WARNING}{self.files[index]['filename']}{self.ENDC}"
                 display_str = (
-                    f"Enter [{self.colors.OKGREEN}{self.colors.BOLD}{index + 1}{self.colors.ENDC}] to select"
+                    f"Enter [{self.OKGREEN}{self.BOLD}{index + 1}{self.ENDC}] to select"
                     f"{filename}"
                 )
                 display_strs.append(display_str)
@@ -331,18 +223,18 @@ class FileHandler:
                     break
                 else:
                     print(
-                        f"{self.colors.FAIL}[!]The selected number is out of range. Please enter a valid number."
-                        f"{self.colors.ENDC}"
+                        f"{self.FAIL}[!]The selected number is out of range. Please enter a valid number."
+                        f"{self.ENDC}"
                     )
             except ValueError:
                 print(
-                    f"{self.colors.FAIL}[!!] Invalid input. Please enter a number.{self.colors.ENDC}"
+                    f"{self.FAIL}[!!] Invalid input. Please enter a number.{self.ENDC}"
                 )
                 # return the index of selected item
         return selected_value - 1
 
     def do_analysis(self, to_analyze="") -> tuple | str:
-        print(f"\n{self.colors.OKBLUE}Analyzing {to_analyze}...{self.colors.ENDC}")
+        print(f"\n{self.OKBLUE}Analyzing {to_analyze}...{self.ENDC}")
         if to_analyze == "files":
             """
             During VA analysis, display all CSV files to analyze and select the one to start from
@@ -367,7 +259,105 @@ class FileHandler:
             )
 
             self.filepath = self.files[selected_file]["full_path"]
-            starting_ip = get_last_unresponsive_ip(
+            starting_ip = self.get_last_unresponsive_ip(
                 self.filepath
             )  # read_last_line(self.filepath)
             return starting_ip
+
+    @staticmethod
+    def read_csv(dataframe, **kwargs):
+        if "header" in kwargs:
+            return pandas.read_csv(dataframe, header="infer")
+        return pandas.read_csv(dataframe, encoding="ISO-8859-1")  # utf-16 cp1252
+
+    @staticmethod
+    def read_excel_file(file):
+        xls = pandas.ExcelFile(file)
+        return pandas.read_excel(xls)
+
+    @staticmethod
+    def get_file_extension(filename):
+        # Split the filename into root and extension
+        root, ext = os.path.splitext(filename)
+        # Return the extension, excluding the dot
+        return ext.lstrip(".")
+
+    @staticmethod
+    def append_to_sheets(data_frame: object, file: str):
+        """Appends data to existing Workbook"""
+        with pandas.ExcelWriter(
+                file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+        ) as writer:
+            # Copy existing sheets to writer
+            for sheet_name in writer.book.sheetnames:
+                df = pandas.read_excel(file, sheet_name=sheet_name, engine="openpyxl")
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+            # Write new data frame to new sheet
+            data_frame["dataframe"].to_excel(
+                writer, sheet_name=data_frame["sheetname"], index=False
+            )
+
+    def get_last_unresponsive_ip(self, unresponsive_file):
+        """
+        Takes file as an input, sorts the ips available in the list in ascending order
+        get the last Ip on the list to use as start_ip
+        """
+        try:
+            data_frame = self.read_csv(unresponsive_file)
+
+            if data_frame.empty:
+                return None
+
+            # Extract Ips from the first column
+            ip_list = data_frame.iloc[:, 0].dropna().tolist()
+
+            # Convert to IPAddress objects for correct numerical sorting
+            sorted_ips = sorted(ip_list, key=lambda ip: ipaddress.ip_address(ip))
+
+            last_address = sorted_ips[-1]
+            return last_address
+
+        except FileNotFoundError:
+            print("No previous unresponsive host file found")
+
+    @staticmethod
+    def concat_dataframes(existing, newdata):
+        """Concatenate two data Frames"""
+        return pandas.concat([existing, newdata], ignore_index=True, axis=0)
+
+    @staticmethod
+    def get_file_basename(full_file_path):
+        return os.path.basename(full_file_path)
+
+    @staticmethod
+    def append_to_txt(filename, content):
+        """Update existing file"""
+        with open(f"{filename}", "a") as file:
+            file.write(f"{content}\n")
+
+    @staticmethod
+    def read_last_line(filename) -> str:
+        """
+        Takes a filename containing a list of ips and returns
+        the last ip address
+        """
+        with open(f"{filename}", "rb") as file:
+            try:  # catch OSError in case of one line file
+                file.seek(-2, os.SEEK_END)
+                while file.read(1) != b"\n":
+                    file.seek(-2, os.SEEK_CUR)
+            except OSError:
+                file.seek(0)
+            last_line = file.readline().decode()
+        return last_line
+
+    @staticmethod
+    def read_all_lines(file):
+        with open(file, "r") as file:
+            return file.readlines()
+
+    @staticmethod
+    def generate_unique_name(file, extension) -> str:
+        timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
+        removed_extension = Path(file).stem
+        return f"{removed_extension}_{timestamp}.{extension}"

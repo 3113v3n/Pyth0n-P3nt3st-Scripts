@@ -4,34 +4,29 @@ from pprint import pprint
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
-from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, Config, MobileCommands, ProgressBar, bcolors
-from utils.shared import validators
+from handlers import NetworkHandler, PackageHandler, UserHandler
+from utils import Commands, MobileCommands, ProgressBar
+from utils.shared import Bcolors
 
 
 # [Utils]
 # Initializers
 def initialize_classes() -> dict:
     # Handle packages
-    package = PackageHandler(Commands, bcolors, Config)
-
-    # Handles file management
-    filemanager = FileHandler(bcolors, validator=validators)
+    package = PackageHandler()
 
     # gathers user input
-    user = UserHandler(filemanager, validators, bcolors, Config)
+    user = UserHandler()
 
     # Handles network related operations
-    network = NetworkHandler(filemanager, Commands)
+    network = NetworkHandler()
 
     # Mobile Commands
-    mobile_commands = MobileCommands(Commands, filemanager, validators, bcolors, Config)
+    mobile_commands = MobileCommands()
 
     # [penetration Testing domains]
-    internal = InternalAssessment(
-        filemanager=filemanager, network=network, colors=bcolors
-    )
-    vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
+    internal = InternalAssessment()
+    vulnerability_analysis = VulnerabilityAnalysis()
     mobile = MobileAssessment(mobile_commands)
 
     return {
@@ -51,21 +46,21 @@ def packages_present(user_test_domain, package) -> bool:
     num_of_packages = 0
 
     if not missing_packages:
-        print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
+        print(f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
         return True
 
     num_of_packages += len(missing_packages)
     print(
-        f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
-        f"{bcolors.ENDC}"
+        f"\n{Bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
+        f"{Bcolors.ENDC}"
     )
     # update to run check again
     try:
         package.install_packages(missing_packages)
         raise RuntimeError("[!] Failed to install some packages !")
     except RuntimeError as error:
-        print(f"{bcolors.FAIL}{error} {bcolors.ENDC}")
-        #return False
+        print(f"{Bcolors.FAIL}{error} {Bcolors.ENDC}")
+        # return False
 
     return packages_present(user_test_domain, package)
 
@@ -153,7 +148,7 @@ def main():
         )
         ask_user = (
             input(
-                f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
+                f"{Bcolors.OKGREEN}[*] Would you like to EXIT the program {Bcolors.BOLD}('Y' | 'N') ?{Bcolors.ENDC} "
             )
             .strip()
             .lower()
