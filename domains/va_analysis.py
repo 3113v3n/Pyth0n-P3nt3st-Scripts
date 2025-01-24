@@ -1,7 +1,11 @@
 # trunk-ignore-all(isort)t
-from utils.shared import Config
 from handlers import FileHandler
-from handlers.file_handler import read_csv, concat_dataframes, get_filename_without_extension
+from handlers.file_handler import (
+    concat_dataframes,
+    get_filename_without_extension,
+    read_csv,
+)
+from utils.shared import Config
 
 
 def percentage_null_fields(dataframe):
@@ -44,13 +48,14 @@ class VulnerabilityAnalysis:
         # list of hosts that passed credential check
         self.credentialed_hosts = []
         # CSV headers used for analysis
-        self.headers = None  #config.nessus_headers
+        self.headers = None  # config.nessus_headers
         # columns to showcase on our final excel
         self.selected_columns = []
         # contains constants to be used across the program
         self.config = config
-        #Scanner_type
+        # Scanner_type
         self.scanner = "nessus"
+        self.vulnerabilities = []
         # file_attributes
         self.file_type = ""
         self.file_list = []
@@ -78,7 +83,7 @@ class VulnerabilityAnalysis:
                         contains_key="Credentialed checks : yes",
                     )
                 )
-                ]["Host"].tolist()
+            ]["Host"].tolist()
             self.credentialed_hosts = credentialed_hosts
 
             selected_columns = self.data[
@@ -93,7 +98,7 @@ class VulnerabilityAnalysis:
             formated_vulnerabilities = selected_columns[
                 (csv_filter_operations(selected_columns, "Risk", "notnull"))
                 & (selected_columns["Risk"] != "Low")
-                ].reset_index(drop=True)
+            ].reset_index(drop=True)
             print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
             return formated_vulnerabilities
@@ -129,7 +134,7 @@ class VulnerabilityAnalysis:
 
     def analyze_scan_files(self, csv_data) -> list:
         """Takes in list of csv files and returns list of vulnerabilities
-            for both Nessus and Rapid7 Scanners
+        for both Nessus and Rapid7 Scanners
         """
         self.set_scan_attributes(csv_data)
 
@@ -183,110 +188,75 @@ class VulnerabilityAnalysis:
         elif self.scanner == "rapid7":
             self.sort_rapid7_vulnerabilities(vulnerabilities, output_file)
 
+    def filter_condition(self, filter_string: str) -> list:
+        """Filter CSV file using the key word supplied
+        :param: filter_string ==> String to use when filtering
+        """
+
+        return self.config.filter_conditions(
+            self.vulnerabilities, regex_word=regex_word, filter_param=filter_string
+        )[filter_string]
+
+    def categorize_vulnerabilities(self) -> tuple:
+        """Function returns a tuple contain dynamically filtered tuple
+        (dataframe_name : dataframe)
+        """
+        # Apply filtering dynamically
+        categorized_vulnerabilities = {}
+        if self.scanner == "nessus":
+            categories = self.config.nessus_vuln_categories
+            # Special case for RCE condition
+            categorized_vulnerabilities["rce"] = self.vulnerabilities[
+                self.filter_condition("rce_condition")
+                & ~self.filter_condition("missing_patch_condition")
+                & ~self.filter_condition("unsupported_software")
+            ]
+
+        elif self.scanner == "rapid":
+            categories = self.config.rapid7_vuln_categories
+
+        categorized_vulnerabilities = {
+            key: self.vulnerabilities[self.filter_condition(value)]
+            for key, value in categories.items()
+        }
+        return categorized_vulnerabilities
+
     def sort_nessus_vulnerabilities(self, vulnerabilities, output_file):
-        conditions = self.config.filter_conditions(
-            vulnerabilities, regex_word=regex_word
-        )
+        self.vulnerabilities = vulnerabilities
+
+        if self.scanner == "nessus":
+            filter_strings = self.config.nessus_strings_to_filter
+        elif self.scanner == "rapid":
+            filter_strings = self.config.rapid7_strings_to_filter
+
         # Show remaining data after filtering
-        unfiltered = vulnerabilities[
-            ~conditions["ssl_condition"]
-            & ~conditions["missing_patch_condition"]
-            & ~conditions["unsupported_software"]
-            & ~conditions["kaspersky_condition"]
-            & ~conditions["insecure_condition"]
-            & ~conditions["winverify_condition"]
-            & ~conditions["unquoted_condition"]
-            & ~conditions["smb_condition"]
-            & ~conditions["speculative_condition"]
-            & ~conditions["AD_condition"]
-            & ~conditions["defender_condition"]
-            & ~conditions["rdp_condition"]
-            & ~conditions["compliance_condition"]
-            & ~conditions["ssh_condition"]
-            & ~conditions["telnet_condition"]
-            & ~conditions["information_condition"]
-            & ~conditions["web_condition"]
-            & ~conditions["rce_condition"]
-            ]
-        # 1. SSL issues
-        ssl_issues = vulnerabilities[conditions["ssl_condition"]]
+        # Start loop from the second value and append results
+        # to combined filter
 
-        # 2. Missing Patches and Security Updates
-        missing_patches = vulnerabilities[conditions["missing_patch_condition"]]
-        # 3. Unsupported Software
-        unsupported = vulnerabilities[conditions["unsupported_software"]]
-        # 4. Kaspersky
-        kaspersky = vulnerabilities[conditions["kaspersky_condition"]]
+        combined_filter = ~self.filter_condition(filter_strings[0])
+        for condition in filter_strings[1:]:
+            combined_filter &= ~self.filter_condition(condition)
 
-        # 5. Windows Service Permission
-        insecure_service = vulnerabilities[conditions["insecure_condition"]]
-        # 6. WinVerify
-        winverify = vulnerabilities[conditions["winverify_condition"]]
-        # 7. Unquoted Service Path
-        unquoted = vulnerabilities[conditions["unquoted_condition"]]
-        # 8. SMB misconfiguration
-        smb_issues = vulnerabilities[conditions["smb_condition"]]
-        # 9. Windows Speculative
-        speculative = vulnerabilities[conditions["speculative_condition"]]
+        unfiltered = self.vulnerabilities[combined_filter]
 
-        # 10. AD Misconfigurations
-        active_directory = vulnerabilities[conditions["AD_condition"]]
+        # returns tuple containing key, value pair of dataframe
+        # identifier and dataframe
 
-        # 11. Microsoft
-        defender = vulnerabilities[conditions["defender_condition"]]
+        issues = self.categorize_vulnerabilities()
+        found_vulnerabilities = []
+        for issue in issues.items():
+            found_vulnerabilities.append(
+                {"dataframe": issue[1], "sheetname": f"{issue[0]}"}
+            )
 
-        # 12. RDP Misconfig
-        rdp_misconfig = vulnerabilities[conditions["rdp_condition"]]
-
-        # 13. Compliance Checks
-        compliance = vulnerabilities[conditions["compliance_condition"]]
-        # 14. SSH misconfig
-        ssh_misconfig = vulnerabilities[conditions["ssh_condition"]]
-        # 15. Telnet
-        telnet = vulnerabilities[conditions["telnet_condition"]]
-        # 16. Info Disclosure
-        information_disclosure = vulnerabilities[conditions["information_condition"]]
-        # 17, Web Issues
-        web_issues = vulnerabilities[conditions["web_condition"]]
-        # 18. Remote Code execution
-        rce = vulnerabilities[
-            conditions["rce_condition"]
-            & ~conditions["missing_patch_condition"]
-            & ~conditions["unsupported_software"]
-            ]
-
-        found_vulnerabilities = [
-            {"dataframe": winverify, "sheetname": "winverify"},
-            {"dataframe": unquoted, "sheetname": "Unquoted Service"},
-            {"dataframe": smb_issues, "sheetname": "SMB Issues"},
-            {"dataframe": ssl_issues, "sheetname": "SSL issues"},
-            {"dataframe": missing_patches, "sheetname": "Missing Security Updates"},
-            {"dataframe": unsupported, "sheetname": "Unsupported Software"},
-            {"dataframe": kaspersky, "sheetname": "Kaspersky Misconfigs"},
-            {"dataframe": ssh_misconfig, "sheetname": "SSH Misconfig"},
-            {"dataframe": rdp_misconfig, "sheetname": "RDP Misconfig"},
-            {"dataframe": defender, "sheetname": "Windows Defender"},
-            {"dataframe": rce, "sheetname": "RCE"},
-            {"dataframe": active_directory, "sheetname": "AD misconfig"},
-            {
-                "dataframe": insecure_service,
-                "sheetname": "Insecure Windows Services",
-            },
-            {"dataframe": speculative, "sheetname": "Windows Speculative"},
-            {"dataframe": compliance, "sheetname": "Compliance checks"},
-            {"dataframe": telnet, "sheetname": "Unencrypted Telnet"},
-            {
-                "dataframe": information_disclosure,
-                "sheetname": "Information Disclosure",
-            },
-            {"dataframe": web_issues, "sheetname": "Web Issues"},
-        ]
-        self.save_vulns_to_files(unfiltered_data=unfiltered,
-                                 found_vulnerabilities=found_vulnerabilities,
-                                 output_file=output_file)
+        self.save_vulns_to_files(
+            unfiltered_data=unfiltered,
+            found_vulnerabilities=found_vulnerabilities,
+            output_file=output_file,
+        )
 
     def save_vulns_to_files(self, unfiltered_data, found_vulnerabilities, output_file):
-        """ Handles Saving data to File """
+        """Handles Saving data to File"""
         unfiltered_vulnerabilities = [
             {"dataframe": unfiltered_data, "sheetname": "Unfiltered"}
         ]
@@ -298,7 +268,7 @@ class VulnerabilityAnalysis:
             self.filemanager.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
                 f"{get_filename_without_extension(output_file)}_Unfiltered",
-                unfiltered=True
+                unfiltered=True,
             )
         # write to file if data is present
         if len(found_vulnerabilities) != 0:
@@ -313,3 +283,4 @@ class VulnerabilityAnalysis:
         )
         unfiltered_vulns = []
         found_vulnerabilities = []
+        print(f"{conditions}\n{unfiltered_vulns}\n{found_vulnerabilities}")

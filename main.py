@@ -1,11 +1,12 @@
 # [Test Domains]
+from pprint import pprint
+
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, Config, bcolors, MobileCommands, ProgressBar
+from utils import Commands, Config, MobileCommands, ProgressBar, bcolors
 from utils.shared import validators
-from pprint import pprint
 
 
 # [Utils]
@@ -27,16 +28,20 @@ def initialize_classes() -> dict:
     mobile_commands = MobileCommands(Commands, filemanager, validators, bcolors, Config)
 
     # [penetration Testing domains]
-    internal = InternalAssessment(filemanager=filemanager, network=network, colors=bcolors)
+    internal = InternalAssessment(
+        filemanager=filemanager, network=network, colors=bcolors
+    )
     vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
     mobile = MobileAssessment(mobile_commands)
 
-    return {"package": package,
-            "user": user,
-            "network": network,
-            "internal": internal,
-            "mobile": mobile,
-            "vulnerability": vulnerability_analysis}
+    return {
+        "package": package,
+        "user": user,
+        "network": network,
+        "internal": internal,
+        "mobile": mobile,
+        "vulnerability": vulnerability_analysis,
+    }
 
 
 def packages_present(user_test_domain, package) -> bool:
@@ -57,10 +62,10 @@ def packages_present(user_test_domain, package) -> bool:
     # update to run check again
     try:
         package.install_packages(missing_packages)
-
-    except:
-        print(f"{bcolors.FAIL}[!] Failed to install some packages ! {bcolors.ENDC}")
-        return False
+        raise RuntimeError("[!] Failed to install some packages !")
+    except RuntimeError as error:
+        print(f"{bcolors.FAIL}{error} {bcolors.ENDC}")
+        #return False
 
     return packages_present(user_test_domain, package)
 
@@ -96,9 +101,7 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
             # Set scanner
             vulnerability_analysis.set_scanner(user.domain_variables["scanner"])
             input_file = user.domain_variables["input_file"]
-            formatted_issues = vulnerability_analysis.analyze_scan_files(
-                input_file
-            )
+            formatted_issues = vulnerability_analysis.analyze_scan_files(input_file)
 
             # pprint(formatted_issues)
             vulnerability_analysis.sort_vulnerabilities(
@@ -134,19 +137,20 @@ def main():
     while not exit_menu:
         # Initialize classes
         init_classes = initialize_classes()
-        user = init_classes['user']
-        package = init_classes['package']
-        internal = init_classes['internal']
-        network = init_classes['network']
-        vulnerability_analysis = init_classes['vulnerability']
-        mobile = init_classes['mobile']
+        user = init_classes["user"]
+        package = init_classes["package"]
+        internal = init_classes["internal"]
+        network = init_classes["network"]
+        vulnerability_analysis = init_classes["vulnerability"]
+        mobile = init_classes["mobile"]
         user_interactions(
             user=user,
             package=package,
             internal=internal,
             network=network,
             mobile=mobile,
-            vulnerability_analysis=vulnerability_analysis)
+            vulnerability_analysis=vulnerability_analysis,
+        )
         ask_user = (
             input(
                 f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
