@@ -1,9 +1,10 @@
 # trunk-ignore-all(isort)t
 from handlers import FileHandler
-from utils import Config
+from utils import Config, FilterVulnerabilities
+from pprint import pprint
 
 
-class VulnerabilityAnalysis(FileHandler, Config):
+class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
     """Class that handles Vulnerability analysis tasks"""
 
     def __init__(self) -> None:
@@ -47,7 +48,7 @@ class VulnerabilityAnalysis(FileHandler, Config):
                         contains_key="Credentialed checks : yes",
                     )
                 )
-                ]["Host"].tolist()
+            ]["Host"].tolist()
             self.credentialed_hosts = credentialed_hosts
 
             selected_columns = self.data[
@@ -62,7 +63,7 @@ class VulnerabilityAnalysis(FileHandler, Config):
             formated_vulnerabilities = selected_columns[
                 (self.csv_filter_operations(selected_columns, "Risk", "notnull"))
                 & (selected_columns["Risk"] != "Low")
-                ].reset_index(drop=True)
+            ].reset_index(drop=True)
             print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
             return formated_vulnerabilities
@@ -82,7 +83,8 @@ class VulnerabilityAnalysis(FileHandler, Config):
         missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
             raise KeyError(
-                f"The following columns are missing from the {filename} \n{missing_columns}"
+                f"The following columns are missing from the "
+                f"{filename} \n{missing_columns}"
             )
 
     def set_scan_attributes(self, attributes: tuple) -> None:
@@ -113,32 +115,15 @@ class VulnerabilityAnalysis(FileHandler, Config):
 
             # Check missing columns in base file
             self.get_missing_columns(original_file, filename)
-            all_vulnerabilities = original_file
-
-            # Iterate through the list of files and append data from each file
-            for file in self.file_list:
-                if file["full_path"] != self.starting_file:
-                    # Read CSV file without headers
-                    new_data = self.read_csv(file["full_path"], header=None)
-
-                    # Check if new data is empty
-                    if new_data.empty:
-                        print(f"Skipping empty file : {file['filename']}")
-                        continue
-
-                    # Ensure columns match
-                    if original_file.shape[1] != new_data.shape[1]:
-                        print(
-                            f"New file {file['filename']} has {len(new_data.columns)} columns "
-                        )
-                        raise ValueError(self.column_mismatch_error)
-
-                    # Check if other files have missing columns
-                    self.get_missing_columns(new_data, file["filename"])
-                    # Append new data to the original data
-                    all_vulnerabilities = self.concat_dataframes(
-                        all_vulnerabilities, new_data
-                    )
+            all_vulnerabilities = self.loop_through_files(
+                file_list=self.file_list,
+                start_file=self.starting_file,
+                error_text=self.column_mismatch_error,
+                original_datafile=original_file,
+                read_csv=self.read_csv,
+                get_missing_columns=self.get_missing_columns,
+                concat_dataframes=self.concat_dataframes
+            )
 
             self.data = all_vulnerabilities
         except (ValueError, KeyError) as error:
@@ -157,7 +142,7 @@ class VulnerabilityAnalysis(FileHandler, Config):
         :param: filter_string ==> String to use when filtering
         """
 
-        return self.filter_conditions(
+        return self.filter_vulnerabilities(
             self.vulnerabilities, regex_word=self.regex_word, filter_param=filter_string
         )[filter_string]
 
@@ -175,7 +160,7 @@ class VulnerabilityAnalysis(FileHandler, Config):
                 self.filter_condition("rce_condition")
                 & ~self.filter_condition("missing_patch_condition")
                 & ~self.filter_condition("unsupported_software")
-                ]
+            ]
 
         elif self.scanner == "rapid":
             categories = self.rapid7_vuln_categories
@@ -233,7 +218,8 @@ class VulnerabilityAnalysis(FileHandler, Config):
             """
             self.write_to_multiple_sheets(
                 unfiltered_vulnerabilities,
-                f"{self.get_filename_without_extension(output_file)}_Unfiltered",
+                f"{self.get_filename_without_extension(
+                    output_file)}_Unfiltered",
                 unfiltered=True,
             )
         # write to file if data is present
@@ -249,34 +235,5 @@ class VulnerabilityAnalysis(FileHandler, Config):
         )
         unfiltered_vulns = []
         found_vulnerabilities = []
-        print(f"{conditions}\n{unfiltered_vulns}\n{found_vulnerabilities}\n{output_file}")
-
-    @staticmethod
-    def percentage_null_fields(dataframe):
-        # determine percentage accuracy of the data by showing null fields
-        for i in dataframe.columns:
-            null_rate = dataframe[i].isna().sum() / len(dataframe) * 100
-            if null_rate > 0:
-                print(f"{i} null rate: {null_rate:.2f}%")
-
-    @staticmethod
-    def csv_filter_operations(dataframe, filter_option, operation, **kwargs):
-        # Function to combine all the major CSV filters into one for code clarity
-        match operation:
-            case "notnull":
-                return dataframe[filter_option].notna()
-            case "contains":
-                if "contains_key" in kwargs:
-                    # check for any key value pair passed as an  extra argument and uses it as a filter
-                    return dataframe[filter_option].str.contains(kwargs["contains_key"])
-            case "in":
-                if "in_key" in kwargs:
-                    return dataframe[filter_option].isin(kwargs["in_key"])
-            case _:
-                raise ValueError(f"Invalid filter option: {filter_option}")
-
-    @staticmethod
-    def regex_word(search_term, **kwargs):
-        if "is_extra" in kwargs:
-            return rf'\b{search_term}\b(?!.*\b{kwargs["second_term"]}\b)'
-        return rf"\b{search_term}\b"
+        print(f"{conditions}\n{unfiltered_vulns}\n"
+              f"{found_vulnerabilities}\n{output_file}")

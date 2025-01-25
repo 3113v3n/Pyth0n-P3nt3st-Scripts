@@ -5,7 +5,7 @@ from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import NetworkHandler, PackageHandler, UserHandler
-from utils import MobileCommands, ProgressBar
+from utils import MobileCommands, ProgressBar, Commands
 from utils.shared import Bcolors
 
 
@@ -14,6 +14,9 @@ from utils.shared import Bcolors
 def initialize_classes() -> dict:
     # Handle packages
     package = PackageHandler()
+
+    #Terminal Commands
+    command = Commands()
 
     # gathers user input
     user = UserHandler()
@@ -36,6 +39,7 @@ def initialize_classes() -> dict:
         "internal": internal,
         "mobile": mobile,
         "vulnerability": vulnerability_analysis,
+        "command":command
     }
 
 
@@ -138,6 +142,7 @@ def main():
         network = init_classes["network"]
         vulnerability_analysis = init_classes["vulnerability"]
         mobile = init_classes["mobile"]
+        command = init_classes["command"]
         user_interactions(
             user=user,
             package=package,
@@ -157,7 +162,7 @@ def main():
             exit_menu = True
         else:
             # Clear screen
-            Commands.clear_screen()
+            command.clear_screen()
 
 
 if __name__ == "__main__":

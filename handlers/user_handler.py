@@ -68,7 +68,7 @@ class UserHandler(FileHandler, Config):
         while True:
 
             try:
-                print(f"Select Vulnerability Scanner used: \n\n")
+                print("Select Vulnerability Scanner used: \n\n")
                 for scanner in self.vulnerability_scanners:
                     print(
                         f" {self.HEADER}[{self.vulnerability_scanners.index(scanner) + 1}]"

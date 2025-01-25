@@ -7,7 +7,7 @@ from utils import Commands, Config
 base_output_dir = "./output_directory/Mobile"
 
 
-class MobileCommands(FileHandler, Config,Commands):
+class MobileCommands(FileHandler, Config, Commands):
     def __init__(self):
         super().__init__()
 
@@ -27,7 +27,9 @@ class MobileCommands(FileHandler, Config,Commands):
         for root, dirs, _ in os.walk(path):
             for dir_name in dirs:
                 if " " in dir_name:  # Check if folder name contains a space
-                    new_name = dir_name.replace(" ", "_")  # Replace spaces with underscores
+                    new_name = dir_name.replace(
+                        " ", "_"
+                    )  # Replace spaces with underscores
                     old_path = os.path.join(root, dir_name)
                     new_path = os.path.join(root, new_name)
                     os.rename(old_path, new_path)  # Rename the folder
@@ -74,7 +76,7 @@ class MobileCommands(FileHandler, Config,Commands):
         # 1. decompile using apk tool
         # 2. save the decompiled file to output directory
         base_dir = self.update_output_directory("mobile")
-        print(f"DEBUG: {self.OKCYAN}[+] Base directory --> {base_dir}{self.ENDC}")
+
         self.file_type = self.get_file_extension(package)  # ipa / apk
         filename_without_ext = self.get_filename_without_extension(package)
         self.file_name = self.remove_spaces(filename_without_ext)
@@ -261,9 +263,7 @@ class MobileCommands(FileHandler, Config,Commands):
                         self.all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
-                    print(
-                        f"{self.FAIL}[!] Error extracting Links {e}{self.ENDC}"
-                    )
+                    print(f"{self.FAIL}[!] Error extracting Links {e}{self.ENDC}")
         # Remove all duplicates and save to file
         self.sort_urls_and_ips(ip_name, self.all_ips)
         self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
@@ -286,13 +286,13 @@ class MobileCommands(FileHandler, Config,Commands):
                     f.write(f"{line}\n")
 
     def mobile_scripts(
-            self,
-            decompiled_folder,
-            hardcoded_filename,
-            platform,
-            basename,
-            output_dir,
-            base64_name,
+        self,
+        decompiled_folder,
+        hardcoded_filename,
+        platform,
+        basename,
+        output_dir,
+        base64_name,
     ):
         if platform == "ipa":
             self.ios_specific_scan(decompiled_folder, basename, output_dir)
@@ -368,7 +368,7 @@ class MobileCommands(FileHandler, Config,Commands):
         )
 
     def install_nuclei_template(
-            self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
+        self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
     ):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
