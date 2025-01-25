@@ -86,6 +86,7 @@ class NetworkHandler(FileHandler, Commands):
 
     def generate_ip_ranges(self, base_ip) -> list:
         """Generate IP addresses based on CIDR subnet provided"""
+
         base_ip = list(map(int, base_ip))  # ==> [192,168,0,1]
 
         if self.host_bits <= 8:

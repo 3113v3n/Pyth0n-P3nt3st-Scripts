@@ -21,11 +21,13 @@ def initialize_classes() -> dict:
     # Handles network related operations
     network = NetworkHandler()
 
+    command = Commands()
+
     # Mobile Commands
-    mobile_commands = MobileCommands()
+    mobile_commands = MobileCommands(command)
 
     # [penetration Testing domains]
-    internal = InternalAssessment()
+    internal = InternalAssessment(network)
     vulnerability_analysis = VulnerabilityAnalysis()
     mobile = MobileAssessment(mobile_commands)
 

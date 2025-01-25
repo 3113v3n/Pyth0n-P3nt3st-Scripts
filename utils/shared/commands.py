@@ -6,20 +6,23 @@ import platform
 class Commands:
     """Class handles commands that will be used by the script"""
 
-    def __init__(self) -> None:
-        pass
-
     @staticmethod
     def run_os_commands(command):
         """Executes shell commands such as [apt and sudo]"""
+        try:
 
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            text=True,
-        )
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                shell=True,
+                text=True,
+            )
+            print(f"Here is the command: {command}")
+        except subprocess.CalledProcessError as e:
+            print(f"Command failed with exit code {e.returncode}\nError: {e.stderr}")
+            raise Exception(e.stderr)
         return result
 
     @staticmethod

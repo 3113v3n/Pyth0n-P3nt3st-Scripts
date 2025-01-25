@@ -1,10 +1,10 @@
 # trunk-ignore-all(black)
-from utils.shared import Config, Validator, Bcolors
+from utils.shared import Config
 from handlers import FileHandler
 import sys
 
 
-class UserHandler(FileHandler, Config, Validator, Bcolors):
+class UserHandler(FileHandler, Config):
     """Class will be responsible for handling user interactions with
     The different domains"""
 
