@@ -5,7 +5,7 @@ from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
 from handlers import NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, MobileCommands, ProgressBar
+from utils import MobileCommands, ProgressBar
 from utils.shared import Bcolors
 
 
@@ -21,10 +21,8 @@ def initialize_classes() -> dict:
     # Handles network related operations
     network = NetworkHandler()
 
-    command = Commands()
-
     # Mobile Commands
-    mobile_commands = MobileCommands(command)
+    mobile_commands = MobileCommands()
 
     # [penetration Testing domains]
     internal = InternalAssessment(network)

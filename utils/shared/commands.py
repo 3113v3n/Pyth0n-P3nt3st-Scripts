@@ -10,16 +10,13 @@ class Commands:
     def run_os_commands(command):
         """Executes shell commands such as [apt and sudo]"""
         try:
-
             result = subprocess.run(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                check=True,
                 shell=True,
                 text=True,
             )
-            print(f"Here is the command: {command}")
         except subprocess.CalledProcessError as e:
             print(f"Command failed with exit code {e.returncode}\nError: {e.stderr}")
             raise Exception(e.stderr)
@@ -28,7 +25,7 @@ class Commands:
     @staticmethod
     def run_git_cmd(git_command):
         try:
-            print(f"runing command:\n{git_command}\n\n")
+            print(f"running command:\n{git_command}\n\n")
             subprocess.run(git_command, check=True)
             print("Nuclei template Installed successfully")
         except subprocess.CalledProcessError as e:
