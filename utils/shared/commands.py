@@ -6,34 +6,38 @@ import platform
 class Commands:
     """Class handles commands that will be used by the script"""
 
-    def __init__(self) -> None:
-        pass
-
-    def run_os_commands(self, command):
+    @staticmethod
+    def run_os_commands(command):
         """Executes shell commands such as [apt and sudo]"""
-
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Command failed with exit code {e.returncode}\nError: {e.stderr}")
+            raise Exception(e.stderr)
         return result
 
-    def run_git_cmd(self, git_command):
+    @staticmethod
+    def run_git_cmd(git_command):
         try:
-            print(f"runing command:\n{git_command}\n\n")
+            print(f"running command:\n{git_command}\n\n")
             subprocess.run(git_command, check=True)
             print("Nuclei template Installed successfully")
         except subprocess.CalledProcessError as e:
             print(f"Failed to install Nuclei templates: {e}")
             return False
 
-    def get_process_output(self, command):
+    @staticmethod
+    def get_process_output(command):
         return subprocess.getoutput(command)
 
-    def auto_enter_commands(self, command):
+    @staticmethod
+    def auto_enter_commands(command):
         """Automatically press enter when prompted by script"""
         try:
             cmd = subprocess.Popen(
@@ -43,7 +47,8 @@ class Commands:
         except TypeError:
             print(str(TypeError))
 
-    def ping_hosts(self, host):
+    @staticmethod
+    def ping_hosts(host):
         """
         Returns True if host (str) responds to a ping request.
         Remember that a host may not respond to a ping (ICMP) request even if the host name is valid.

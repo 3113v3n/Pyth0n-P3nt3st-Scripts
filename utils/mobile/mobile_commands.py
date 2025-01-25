@@ -1,43 +1,20 @@
 from pathlib import Path
 import os
 import re
-from handlers.file_handler import get_file_extension, get_filename_without_extension
-from utils.shared import validators
+from handlers import FileHandler
+from utils import Commands, Config
 
 base_output_dir = "./output_directory/Mobile"
 
 
-def rename_folders_with_spaces(path):
-    for root, dirs, _ in os.walk(path):
-        for dir_name in dirs:
-            if " " in dir_name:  # Check if folder name contains a space
-                new_name = dir_name.replace(" ", "_")  # Replace spaces with underscores
-                old_path = os.path.join(root, dir_name)
-                new_path = os.path.join(root, new_name)
-                os.rename(old_path, new_path)  # Rename the folder
-                print(f"Renamed: {old_path} -> {new_path}")
+class MobileCommands(FileHandler, Config, Commands):
+    def __init__(self):
+        super().__init__()
 
-
-def format_content(content):
-    # Replace escaped newline and tab characters
-    content = re.sub(r"\\n", "\n", content)
-    content = re.sub(r"\\t", "\t", content)
-    return content
-
-
-class MobileCommands:
-    def __init__(
-        self, shell_commands, filemanager, validator: validators, color, configs
-    ):
-        self.commands = shell_commands()
-        self.output_dir = ""
+        self.mobile_output_dir = ""
         self.file_type = ""
-        self.filemanager = filemanager
-        self.configs = configs
         self.folder_name = ""
         self.file_name = ""
-        self.validator = validator
-        self.color = color
         self.all_urls = []
         self.all_ips = []
         self.url_count = 0
@@ -45,24 +22,44 @@ class MobileCommands:
         self.temp_data = ""
         self.temp_base64_data = ""
 
+    @staticmethod
+    def rename_folders_with_spaces(path):
+        for root, dirs, _ in os.walk(path):
+            for dir_name in dirs:
+                if " " in dir_name:  # Check if folder name contains a space
+                    new_name = dir_name.replace(
+                        " ", "_"
+                    )  # Replace spaces with underscores
+                    old_path = os.path.join(root, dir_name)
+                    new_path = os.path.join(root, new_name)
+                    os.rename(old_path, new_path)  # Rename the folder
+                    print(f"Renamed: {old_path} -> {new_path}")
+
+    @staticmethod
+    def format_content(content):
+        # Replace escaped newline and tab characters
+        content = re.sub(r"\\n", "\n", content)
+        content = re.sub(r"\\t", "\t", content)
+        return content
+
     def push_certs(self, certificate):
-        self.commands.run_os_commands(f"adb push {certificate} /storage/emulated/0/")
+        self.run_os_commands(f"adb push {certificate} /storage/emulated/0/")
 
     def pull_package_with_keyword(self, keyword):
         pkg_cmd = (
             f"adb shell pm list packages | grep '{keyword}'|head -n 1|cut -d ':' -f2"
         )
-        pkg = self.commands.get_process_output(pkg_cmd).strip()
+        pkg = self.get_process_output(pkg_cmd).strip()
 
         if pkg:
             # Get the APK path
             path_cmd = f"adb shell pm path {pkg} | cut -d ':' -f2 | grep 'base.apk'"
-            apk_path = self.commands.get_process_output(path_cmd).strip()
+            apk_path = self.get_process_output(path_cmd).strip()
 
             if apk_path:
                 # pull the APK
                 pull_cmd = f"adb pull {apk_path} ./"
-                self.commands.run_os_commands(pull_cmd)
+                self.run_os_commands(pull_cmd)
                 print(f"APK pulled successfully: {apk_path}")
             else:
                 print("APK path not found.")
@@ -78,38 +75,39 @@ class MobileCommands:
         """
         # 1. decompile using apk tool
         # 2. save the decompiled file to output directory
-        base_dir = self.filemanager.output_directory
-        self.file_type = get_file_extension(package)  # ipa / apk
-        filename_without_ext = get_filename_without_extension(package)
-        self.file_name = self.validator.remove_spaces(filename_without_ext)
+        base_dir = self.update_output_directory("mobile")
+
+        self.file_type = self.get_file_extension(package)  # ipa / apk
+        filename_without_ext = self.get_filename_without_extension(package)
+        self.file_name = self.remove_spaces(filename_without_ext)
 
         if self.file_type == "apk":
-            self.filemanager.create_folder("Android", search_path=base_output_dir)
-            self.output_dir = f"{base_dir}/Android"
-            self.folder_name = f"{self.output_dir}/{filename_without_ext}"
-            self.folder_name = self.validator.remove_spaces(self.folder_name)
+            self.create_folder("Android", search_path=base_output_dir)
+            self.mobile_output_dir = f"{base_dir}/Android"
+            self.folder_name = f"{self.mobile_output_dir}/{filename_without_ext}"
+            self.folder_name = self.remove_spaces(self.folder_name)
 
-            if not self.validator.check_folder_exists(self.folder_name):
+            if not self.check_folder_exists(self.folder_name):
                 print(
-                    f"\n Decompiling the {self.color.OKGREEN}{self.file_name}{self.color.ENDC} application ..."
+                    f"\n Decompiling the {self.OKGREEN}{self.file_name}{self.ENDC} application ..."
                 )
                 command = f"apktool d '{package}' -o {self.folder_name}"
-                self.commands.run_os_commands(command)
+                self.run_os_commands(command)
                 print("Decompiling successful")
             return self.folder_name
 
         elif self.file_type == "ipa":
-            self.filemanager.create_folder("iOS", search_path=base_output_dir)
+            self.create_folder("iOS", search_path=base_output_dir)
 
-            self.output_dir = f"{base_dir}/iOS"
-            self.folder_name = f"{self.output_dir}/{self.file_name}"
+            self.mobile_output_dir = f"{base_dir}/iOS"
+            self.folder_name = f"{self.mobile_output_dir}/{self.file_name}"
 
-            if not self.validator.check_folder_exists(self.folder_name):
+            if not self.check_folder_exists(self.folder_name):
                 print(f"Decompiling {self.file_name} ...")
+
                 command = f"unzip '{package}' -d {self.folder_name}"
                 try:
-                    print(f"Running command: {command}")
-                    result = self.commands.run_os_commands(command)
+                    result = self.run_os_commands(command)
                     if result.returncode == 0:
                         print("Decompiling successful")
                     else:
@@ -118,39 +116,38 @@ class MobileCommands:
                 except (Exception, FileNotFoundError) as error:
                     print(f"Error during unzip: {error}")
 
-            return self.folder_name
+        return self.folder_name
 
         # 3. Clean up after all scans are complete
 
         # Inspect Files
 
-    def find_files(self, app_folder, output):
+    def find_app_files(self, app_folder, output):
         with open(output, "a") as output_file:
             for file in Path(app_folder).rglob("*"):
                 if file.is_file():
-                    command = f'rabin2 -zzzqq "{file}" 2>/dev/null | grep -Pi {self.configs.IOS_FILE_SEARCH} | sort -uf'
-                    result = self.commands.run_os_commands(command)
+                    command = f'rabin2 -zzzqq "{file}" 2>/dev/null | grep -Pi {self.IOS_FILE_SEARCH} | sort -uf'
+                    result = self.run_os_commands(command)
                     if result.stdour.strip():
                         output_file.write(f"{result.stdout}")
 
     def find_hardcoded_data(self, app_folder, output):
-
         with open(output, "a") as outfile:
             for file in Path(app_folder).rglob("*"):
                 if file.is_file():
                     print(
-                        f"{self.color.OKCYAN}[+] Searching For hardcoded strings in File:{self.color.ENDC} \n{file}"
+                        f"{self.OKCYAN}[+] Searching For hardcoded strings in File:{self.ENDC} \n{file}"
                     )
                     command = f"rabin2 -zzzqq  {file}"
                     regex_patterns = [
-                        self.configs.BEARER_REGEX,
-                        self.configs.HARDCODED_REGEX_2,
-                        self.configs.HARDCODED_REGEX,
+                        self.BEARER_REGEX,
+                        self.HARDCODED_REGEX_2,
+                        self.HARDCODED_REGEX,
                     ]
                     for pattern in regex_patterns:
                         escaped_pattern = re.escape(pattern)
                         grep_command = f"{command} | grep -Pi {escaped_pattern}"
-                        result = self.commands.run_os_commands(grep_command)
+                        result = self.run_os_commands(grep_command)
 
                         # Check if there's data to write
 
@@ -158,10 +155,10 @@ class MobileCommands:
                             # Sort and remove duplicates, then write to temp_file
                             unique_lines = sorted(set(result.stdout.splitlines()))
                             joined_string = "\n".join(unique_lines) + "\n"
-                            formated_string = format_content(joined_string)
+                            formated_string = self.format_content(joined_string)
                             print(
-                                f"{self.color.OKGREEN}Writing Potential Hardcoded string to temporary file "
-                                f"{self.color.ENDC}\n",
+                                f"{self.OKGREEN}Writing Potential Hardcoded string to temporary file "
+                                f"{self.ENDC}\n",
                                 flush=True,
                             )
                             outfile.write(formated_string)
@@ -179,7 +176,7 @@ class MobileCommands:
 
         if not self.temp_base64_data:
             print("Processing base64 strings ...\n")
-            base64_strings = re.findall(self.configs.BASE64_REGEX, self.temp_data)
+            base64_strings = re.findall(self.BASE64_REGEX, self.temp_data)
             self.temp_base64_data = sorted(set(base64_strings))
             print("Base64 strings processed and stored in memory.")
 
@@ -194,19 +191,19 @@ class MobileCommands:
             if file.is_file():
                 command = f"rabin2 -zzzqq  {file}"
                 try:
-                    result = self.commands.run_os_commands(command)
+                    result = self.run_os_commands(command)
                     # Sort and remove duplicates, then write to temp_file
                     unique_lines = sorted(set(result.stdout.splitlines()))
 
                     if result.stdout.strip():
                         joined_string = "\n".join(unique_lines) + "\n"
                         print(
-                            f"{self.color.OKCYAN}[+] Getting strings from:{self.color.ENDC} \n{file}\n"
+                            f"{self.OKCYAN}[+] Getting strings from:{self.ENDC} \n{file}\n"
                         )
                         temp_data_list.append(joined_string)
                 except Exception as error:
                     print(
-                        f"{self.color.FAIL}[!] Error processing file {self.color.ENDC}{file} : {error}"
+                        f"{self.FAIL}[!] Error processing file {self.ENDC}{file} : {error}"
                     )
         self.temp_data = "".join(temp_data_list)
 
@@ -219,11 +216,11 @@ class MobileCommands:
                 if string:  # Check if string is not empty
                     try:
                         command = f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
-                        decoded = self.commands.run_os_commands(command)
+                        decoded = self.run_os_commands(command)
 
                         if decoded.stdout:
                             print(
-                                f"{self.color.OKCYAN}Encoded String: {string}{self.color.ENDC}\nDecoded String: "
+                                f"{self.OKCYAN}Encoded String: {string}{self.ENDC}\nDecoded String: "
                                 f"{decoded.stdout}\n",
                                 flush=True,
                             )
@@ -232,7 +229,7 @@ class MobileCommands:
                             )
                     except Exception as e:
                         print(
-                            f"{self.color.FAIL}[!] Error decoding base64 string {string}: {e}{self.color.ENDC}"
+                            f"{self.FAIL}[!] Error decoding base64 string {string}: {e}{self.ENDC}"
                         )
 
     def get_deeplinks(self, application_folder, basename):
@@ -244,31 +241,29 @@ class MobileCommands:
                 self.file_count += 1  # Track how many files are scanned
                 command = f"rabin2 -zzzqq {file}"
                 try:
-                    result = self.commands.run_os_commands(command)
-                    unfiltered_urls = re.findall(self.configs.URL_REGEX, result.stdout)
+                    result = self.run_os_commands(command)
+                    unfiltered_urls = re.findall(self.URL_REGEX, result.stdout)
                     filtered_urls = [
                         url
                         for url in unfiltered_urls
-                        if not re.search(self.configs.DEEPLINKS_IGNORE_REGEX, url)
+                        if not re.search(self.DEEPLINKS_IGNORE_REGEX, url)
                     ]
                     if filtered_urls:
                         filtered_urls = sorted(set(filtered_urls))
                         self.all_urls.extend([url for url in filtered_urls])
 
-                    ips = re.findall(self.configs.IP_REGEX, result.stdout)
+                    ips = re.findall(self.IP_REGEX, result.stdout)
 
                     if len(ips) != 0:
                         print(
-                            f"{self.color.WARNING}[+] Possible IP(s) found: {self.color.ENDC}",
+                            f"{self.WARNING}[+] Possible IP(s) found: {self.ENDC}",
                             ips,
                             flush=True,
                         )
                         self.all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
-                    print(
-                        f"{self.color.FAIL}[!] Error extracting Links {e}{self.color.ENDC}"
-                    )
+                    print(f"{self.FAIL}[!] Error extracting Links {e}{self.ENDC}")
         # Remove all duplicates and save to file
         self.sort_urls_and_ips(ip_name, self.all_ips)
         self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
@@ -284,9 +279,9 @@ class MobileCommands:
                     if "urls" in kwargs:
                         self.url_count += 1
                         print(
-                            f"{self.color.OKCYAN}"
+                            f"{self.OKCYAN}"
                             f"[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: "
-                            f"{self.color.ENDC}"
+                            f"{self.ENDC}"
                         )
                     f.write(f"{line}\n")
 
@@ -315,17 +310,17 @@ class MobileCommands:
         # get url scheme
         self.ios_url_scheme(decompiled_app_folder, basename=file_basename)
         # find files
-        self.find_files(app_folder=decompiled_app_folder)
+        self.find_app_files(app_folder=decompiled_app_folder, output=output_dir)
 
     def ios_url_scheme(self, decompiled_folder, basename):
         filename = f"{basename}_iOS_URL_schemes.txt"
-        plist_file = self.validator.find_specific_file("Info.plist", decompiled_folder)
+        plist_file = self.find_specific_file("Info.plist", decompiled_folder)
 
         command = (
             f"xmlstarlet sel -t -v 'plist/dict/array/dict[key = \"CFBundleURLSchemes\"]/array/string' -nl "
             f"{plist_file}"
         )
-        results = self.commands.run_os_commands(command)
+        results = self.run_os_commands(command)
 
         with open(filename, "w") as output_file:
             url_schemes = sorted(set(results.stdout.splitlines))
@@ -340,17 +335,16 @@ class MobileCommands:
         pl_command = (
             f"property-lister -pl {decompiled_folder} -o {output_dir}/results_pl"
         )
-        self.commands.run_os_commands(db_command)
-        self.commands.run_os_commands(pl_command)
+        self.run_os_commands(db_command)
+        self.run_os_commands(pl_command)
 
     def inspect_application_files(self, application: str):
-        platform = ""
 
         folder_name = self.decompile_application(application)
-        output_name = f"{self.output_dir}/{self.file_name}"
+        output_name = f"{self.mobile_output_dir}/{self.file_name}"
 
         # Rename folder/subfolders that contain spaces to avoid errors
-        rename_folders_with_spaces(folder_name)
+        self.rename_folders_with_spaces(folder_name)
 
         if self.file_type.lower() == "apk":
             platform = "android"
@@ -364,13 +358,13 @@ class MobileCommands:
             hardcoded_filename=hardcoded,
             platform=platform,
             basename=basename,
-            output_dir=self.output_dir,
+            output_dir=self.mobile_output_dir,
             base64_name=output_name,
         )
 
         print(
             f"[+] Application scanning complete, all your files are located here :==>\n"
-            f"{self.color.OKGREEN}{self.output_dir}{self.color.ENDC}"
+            f"{self.OKGREEN}{self.mobile_output_dir}{self.ENDC}"
         )
 
     def install_nuclei_template(
@@ -380,7 +374,7 @@ class MobileCommands:
         absolute_path = str(template_dir.resolve())
 
         # os.environ["GOBIN"] = absolute_path
-        if not self.validator.check_folder_exists(absolute_path):
+        if not self.check_folder_exists(absolute_path):
             print(
                 f"Templates folder not present, Cloning templates into {absolute_path}"
             )
@@ -389,7 +383,7 @@ class MobileCommands:
 
             try:
 
-                self.commands.run_os_commands(command)
+                self.run_os_commands(command)
                 print("[+] Nuclei template Installed successfully")
 
             except Exception as e:
@@ -414,13 +408,13 @@ class MobileCommands:
 
         try:
 
-            self.commands.run_os_commands(nuclei_command)
+            self.run_os_commands(nuclei_command)
             if platform == "android":
                 android_nuclei = (
                     f"echo {application_folder} | nuclei -t {nuclei_dir}/{platform.title()} -o "
                     f"{android_output}"
                 )
-                self.commands.run_os_commands(android_nuclei)
+                self.run_os_commands(android_nuclei)
 
         except Exception as e:
             print(f"Error running command: {e}")

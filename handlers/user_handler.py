@@ -1,24 +1,18 @@
 # trunk-ignore-all(black)
-from utils.shared import Config, validators
+from utils.shared import Config
+from handlers import FileHandler
 import sys
 
-class UserHandler:
+
+class UserHandler(FileHandler, Config):
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(
-        self,
-        filemanager,
-        validator: validators,
-        bcolors,
-        config: Config,
-    ) -> None:
-        self.config = config
+    def __init__(self) -> None:
+        super().__init__()
         self.default_test_domains = []
-        self.color = bcolors
         self.not_valid_domain = False
-        self.filemanager = filemanager
-        self.validator = validator
+
         self.domain = ""
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
@@ -29,14 +23,14 @@ class UserHandler:
     def set_test_options(self):
         # Create a list to store formatted options
         test_options = []
-        for option in self.config.test_domains:
+        for option in self.test_domains:
             # number to display on screen
-            number = self.config.test_domains.index(option) + 1
+            number = self.test_domains.index(option) + 1
             # Format each option with colors and spacing
             formatted_option = (
                 # <30 align with width of 30 characters
-                f"\n{self.color.OKGREEN}{number}. {option['domain']:<30} "
-                f"[ ENTER {number:<2}] {option['icon']}{self.color.ENDC}\n"
+                f"\n{self.OKGREEN}{number}. {option['domain']:<30} "
+                f"[ ENTER {number:<2}] {option['icon']}{self.ENDC}\n"
             )
             test_options.append(formatted_option)
             # set up default test domains
@@ -55,9 +49,9 @@ class UserHandler:
                     "Please provide the Path to your mobile application(s)\nPath to File:  "
                 ).strip()
                 # Show list of apks available
-                if not self.validator.check_folder_exists(package_path):
+                if not self.check_folder_exists(package_path):
                     raise ValueError("No Such Folder exists")
-                applications = self.filemanager.display_saved_files(
+                applications = self.display_saved_files(
                     package_path, display_applications=True
                 )
 
@@ -66,7 +60,7 @@ class UserHandler:
                 else:
                     raise FileExistsError("No Files Present in the provided Directory")
             except (ValueError, FileExistsError) as error:
-                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
     def va_ui_interaction(self):
         print("Running Vulnerability Analysis Module\n")
@@ -74,13 +68,24 @@ class UserHandler:
         while True:
 
             try:
+                print("Select Vulnerability Scanner used: \n\n")
+                for scanner in self.vulnerability_scanners:
+                    print(
+                        f" {self.HEADER}[{self.vulnerability_scanners.index(scanner) + 1}]"
+                        f" {scanner["name"]}{self.ENDC}"
+                    )
+                scanner_index = self.index_out_of_range_display("\nScanner: ",
+                                                                self.vulnerability_scanners)
+
+                selected_scanner = self.vulnerability_scanners[scanner_index]["alias"]
+
                 search_dir = input(
                     "\nEnter Location Where your files are located \n"
                 ).strip()
-                if not self.validator.check_folder_exists(search_dir):
+                if not self.check_folder_exists(search_dir):
                     raise ValueError("No Such Folder exists")
 
-                files_tuple = self.filemanager.display_saved_files(
+                files_tuple = self.display_saved_files(
                     search_dir, display_csv=True
                 )
 
@@ -92,14 +97,15 @@ class UserHandler:
                     ).strip()
 
                     return {
-                        "input_file": files_tuple,  # input_filename,
+                        "input_file": files_tuple,
                         "output": output_filename,
+                        "scanner": selected_scanner,
                     }
                 else:
                     raise FileExistsError("No Files Present in the provided Directory")
 
             except (FileExistsError, ValueError) as error:
-                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
     def external_ui_interaction(self):
         print("\nRunning External PT modules")
@@ -114,12 +120,12 @@ class UserHandler:
     def internal_ui_interaction(self):
         print(" Running Internal PT modules ")
         subnet = ""
-        mode = input(self.config.internal_mode_choice).strip().lower()
+        mode = input(self.internal_mode_choice).strip().lower()
         output_file = ""
 
         # Ensure correct mode is selected by user
         while mode not in ["scan", "resume"]:
-            mode = input(self.config.internal_choice_error)
+            mode = input(self.internal_choice_error)
 
         if mode == "resume":
             """
@@ -129,30 +135,28 @@ class UserHandler:
                 # returns an ip address if a file exists
                 # returns None if no file exists
 
-                resume_ip = self.filemanager.display_saved_files(
-                    self.filemanager.output_directory, resume_scan=True
+                resume_ip = self.display_saved_files(
+                    self.output_directory, resume_scan=True
                 )
 
                 if resume_ip is None:
                     raise ValueError("No Previously saved file present")
 
-                # output file
-                # Output file will be the name of unresposive file without text 'unresponsive_hosts'
-                output_file = self.filemanager.filepath
+                # Output file will be the name of unresponsive file without text 'unresponsive_hosts'
+                output_file = self.filepath
                 cidr = self.get_cidr()
                 subnet = f"{resume_ip}/{cidr}"
 
             except ValueError as error:
                 print(
-                    f"{self.color.FAIL}[!] Cant use this module, {error}{self.color.ENDC}"
+                    f"{self.FAIL}[!] Cant use this module, {error}{self.ENDC}"
                 )
-                print(f"\nDefaulting to {self.color.OKCYAN}SCAN{self.color.ENDC} mode")
+                print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
                 mode = "scan"
                 subnet = self.get_user_subnet()
                 output_file = input("[+] Provide a name for your output file: ").strip()
 
         elif mode == "scan":
-            # TODO: file validations
             subnet = self.get_user_subnet()
             output_file = input("[+] Provide a name for your output file: ").strip()
 
@@ -171,12 +175,12 @@ class UserHandler:
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
                 print(
-                    f"{self.color.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
-                    f"{self.color.ENDC}"
+                    f"{self.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
+                    f"{self.ENDC}"
                 )
             except ValueError:
                 print(
-                    f"{self.color.FAIL}\n❌ Invalid choice. Please enter a valid number{self.color.ENDC}"
+                    f"{self.FAIL}\n❌ Invalid choice. Please enter a valid number{self.ENDC}"
                 )
 
         self.domain = self.default_test_domains[selected_index]
@@ -190,12 +194,12 @@ class UserHandler:
                 subnet = input(
                     "\n[+] Please provide a valid subnet [10.0.0.0/24]\n"
                 ).strip()
-                if self.validator.validate_ip_and_cidr(subnet):
+                if self.validate_ip_and_cidr(subnet):
                     break
                 else:
                     raise ValueError(" Invalid IP address format provided")
             except ValueError as error:
-                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
         return subnet
 
     def get_cidr(self):
@@ -205,19 +209,19 @@ class UserHandler:
                 cidr = input(
                     "[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
                 ).strip()
-                if self.validator.validate_cidr(cidr):
+                if self.validate_cidr(cidr):
                     break
                 else:
                     raise ValueError(" Invalid CIDR provided")
             except ValueError as error:
-                print(f"{self.color.FAIL}\n[!]{error}{self.color.ENDC}")
+                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
         return cidr
 
     def set_domain_variables(self, test_domain):
         """Update the variables object with reference to the test domain provisioned"""
 
         # Update the output directory with respective test domain
-        self.filemanager.update_output_directory(test_domain)
+        self.update_output_directory(test_domain)
 
         match test_domain:
             case "mobile":
@@ -234,5 +238,5 @@ class UserHandler:
                 sys.exit(1)
             case _:
                 print(
-                    f"{self.color.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.color.ENDC}"
+                    f"{self.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.ENDC}"
                 )

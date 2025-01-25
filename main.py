@@ -1,41 +1,46 @@
 # [Test Domains]
+from pprint import pprint
+
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
-from handlers import FileHandler, NetworkHandler, PackageHandler, UserHandler
-from utils import Commands, Config, bcolors, MobileCommands, ProgressBar
-from utils.shared import validators
+from handlers import NetworkHandler, PackageHandler, UserHandler
+from utils import MobileCommands, ProgressBar, Commands
+from utils.shared import Bcolors
 
 
 # [Utils]
 # Initializers
 def initialize_classes() -> dict:
     # Handle packages
-    package = PackageHandler(Commands, bcolors, Config)
+    package = PackageHandler()
 
-    # Handles file management
-    filemanager = FileHandler(bcolors, validator=validators)
+    #Terminal Commands
+    command = Commands()
 
     # gathers user input
-    user = UserHandler(filemanager, validators, bcolors, Config)
+    user = UserHandler()
 
     # Handles network related operations
-    network = NetworkHandler(filemanager, Commands)
+    network = NetworkHandler()
 
     # Mobile Commands
-    mobile_commands = MobileCommands(Commands, filemanager, validators, bcolors, Config)
+    mobile_commands = MobileCommands()
 
     # [penetration Testing domains]
-    internal = InternalAssessment(filemanager=filemanager, network=network, colors=bcolors)
-    vulnerability_analysis = VulnerabilityAnalysis(filemanager, Config)
+    internal = InternalAssessment(network)
+    vulnerability_analysis = VulnerabilityAnalysis()
     mobile = MobileAssessment(mobile_commands)
 
-    return {"package": package,
-            "user": user,
-            "network": network,
-            "internal": internal,
-            "mobile": mobile,
-            "vulnerability": vulnerability_analysis}
+    return {
+        "package": package,
+        "user": user,
+        "network": network,
+        "internal": internal,
+        "mobile": mobile,
+        "vulnerability": vulnerability_analysis,
+        "command":command
+    }
 
 
 def packages_present(user_test_domain, package) -> bool:
@@ -45,20 +50,21 @@ def packages_present(user_test_domain, package) -> bool:
     num_of_packages = 0
 
     if not missing_packages:
-        print(f"\n{bcolors.OKBLUE}[+] All dependencies are present..{bcolors.ENDC}")
+        print(f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
         return True
 
     num_of_packages += len(missing_packages)
     print(
-        f"\n{bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
-        f"{bcolors.ENDC}"
+        f"\n{Bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
+        f"{Bcolors.ENDC}"
     )
     # update to run check again
     try:
         package.install_packages(missing_packages)
-    except:
-        print(f"{bcolors.FAIL}[!] Failed to install some packages ! {bcolors.ENDC}")
-        return False
+        raise RuntimeError("[!] Failed to install some packages !")
+    except RuntimeError as error:
+        print(f"{Bcolors.FAIL}{error} {Bcolors.ENDC}")
+        # return False
 
     return packages_present(user_test_domain, package)
 
@@ -71,7 +77,7 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
     # Ensure all required packages are installed before proceeding
     if not packages_present(user_test_domain, package):
         print(
-            f"{bcolors.FAIL}[!] Unable to install required packages. Exiting .. {bcolors.ENDC}"
+            f"{Bcolors.FAIL}[!] Unable to install required packages. Exiting .. {Bcolors.ENDC}"
         )
         return
 
@@ -91,9 +97,12 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
             internal.enumerate_hosts()
 
         case "va":
-            formatted_issues = vulnerability_analysis.analyze_csv(
-                user.domain_variables["input_file"]
-            )
+            # Set scanner
+            vulnerability_analysis.set_scanner(user.domain_variables["scanner"])
+            input_file = user.domain_variables["input_file"]
+            formatted_issues = vulnerability_analysis.analyze_scan_files(input_file)
+
+            # pprint(formatted_issues)
             vulnerability_analysis.sort_vulnerabilities(
                 formatted_issues, f"{user.domain_variables['output']}"
             )
@@ -127,22 +136,24 @@ def main():
     while not exit_menu:
         # Initialize classes
         init_classes = initialize_classes()
-        user = init_classes['user']
-        package = init_classes['package']
-        internal = init_classes['internal']
-        network = init_classes['network']
-        vulnerability_analysis = init_classes['vulnerability']
-        mobile = init_classes['mobile']
+        user = init_classes["user"]
+        package = init_classes["package"]
+        internal = init_classes["internal"]
+        network = init_classes["network"]
+        vulnerability_analysis = init_classes["vulnerability"]
+        mobile = init_classes["mobile"]
+        command = init_classes["command"]
         user_interactions(
             user=user,
             package=package,
             internal=internal,
             network=network,
             mobile=mobile,
-            vulnerability_analysis=vulnerability_analysis)
+            vulnerability_analysis=vulnerability_analysis,
+        )
         ask_user = (
             input(
-                f"{bcolors.OKGREEN}[*] Would you like to EXIT the program {bcolors.BOLD}('Y' | 'N') ?{bcolors.ENDC} "
+                f"{Bcolors.OKGREEN}[*] Would you like to EXIT the program {Bcolors.BOLD}('Y' | 'N') ?{Bcolors.ENDC} "
             )
             .strip()
             .lower()
@@ -151,7 +162,7 @@ def main():
             exit_menu = True
         else:
             # Clear screen
-            Commands.clear_screen()
+            command.clear_screen()
 
 
 if __name__ == "__main__":

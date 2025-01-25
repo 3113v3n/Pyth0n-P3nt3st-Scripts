@@ -1,13 +1,16 @@
 from .internal import HashUtil, NetExec
-from .shared import bcolors, Commands, Config, ProgressBar
+from .shared import Bcolors, Commands, Config, ProgressBar, Validator
 from .mobile import MobileCommands
+from .vulnerability import FilterVulnerabilities
 
 __all__ = [
     HashUtil,
     NetExec,
-    bcolors,
+    Bcolors,
     Commands,
     Config,
     MobileCommands,
-    ProgressBar
+    ProgressBar,
+    Validator,
+    FilterVulnerabilities
 ]

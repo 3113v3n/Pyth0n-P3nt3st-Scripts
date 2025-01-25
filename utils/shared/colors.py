@@ -1,4 +1,4 @@
-class bcolors:
+class Bcolors:
     # Text color formatting
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

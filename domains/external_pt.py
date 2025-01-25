@@ -1,4 +1,4 @@
-from utils.shared import bcolors, Commands
+from utils.shared import Bcolors, Commands
 
 
 class ExternalAssessment:
@@ -7,7 +7,7 @@ class ExternalAssessment:
     def __init__(self) -> None:
         self.target_domain = ""
         self.command = Commands()
-        self.color = bcolors
+        self.color = Bcolors
 
     def initialize_variables(self, variables):
         # set user provided variables
