@@ -17,7 +17,7 @@ class UserHandler(FileHandler, Config):
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
         self.formatted_question = (
-            f"\nWhat task do you want to perform?\n" f"{self.OPTIONS}\n=> "
+            f"\nWhat task would you like to perform?\n" f"{self.OPTIONS}\n=> "
         )
 
     def set_test_options(self):
@@ -154,11 +154,11 @@ class UserHandler(FileHandler, Config):
                 print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
                 mode = "scan"
                 subnet = self.get_user_subnet()
-                output_file = input("[+] Provide a name for your output file: ").strip()
+                output_file = input("\n[+] Provide a name for your output file: ").strip()
 
         elif mode == "scan":
             subnet = self.get_user_subnet()
-            output_file = input("[+] Provide a name for your output file: ").strip()
+            output_file = input("\n[+] Provide a name for your output file: ").strip()
 
         return {
             "subnet": subnet,
@@ -207,7 +207,7 @@ class UserHandler(FileHandler, Config):
         while True:
             try:
                 cidr = input(
-                    "[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
+                    "\n[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
                 ).strip()
                 if self.validate_cidr(cidr):
                     break

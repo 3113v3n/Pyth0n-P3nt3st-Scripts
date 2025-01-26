@@ -15,7 +15,7 @@ def initialize_classes() -> dict:
     # Handle packages
     package = PackageHandler()
 
-    #Terminal Commands
+    # Terminal Commands
     command = Commands()
 
     # gathers user input
@@ -39,7 +39,7 @@ def initialize_classes() -> dict:
         "internal": internal,
         "mobile": mobile,
         "vulnerability": vulnerability_analysis,
-        "command":command
+        "command": command
     }
 
 
@@ -50,12 +50,14 @@ def packages_present(user_test_domain, package) -> bool:
     num_of_packages = 0
 
     if not missing_packages:
-        print(f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
+        print(
+            f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
         return True
 
     num_of_packages += len(missing_packages)
     print(
-        f"\n{Bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {num_of_packages} package(s).."
+        f"\n{Bcolors.WARNING}[!] Missing Packages Kindly be patient as we install {
+            num_of_packages} package(s).."
         f"{Bcolors.ENDC}"
     )
     # update to run check again
@@ -77,7 +79,8 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
     # Ensure all required packages are installed before proceeding
     if not packages_present(user_test_domain, package):
         print(
-            f"{Bcolors.FAIL}[!] Unable to install required packages. Exiting .. {Bcolors.ENDC}"
+            f"{Bcolors.FAIL}[!] Unable to install required packages. Exiting .. {
+                Bcolors.ENDC}"
         )
         return
 
@@ -86,7 +89,8 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
         case "internal":
 
             # initialize variables that will be used to test different Internal PT modules
-            network.initialize_network_variables(user.domain_variables, ProgressBar)
+            network.initialize_network_variables(
+                user.domain_variables, ProgressBar)
             internal.initialize_variables(
                 mode=user.domain_variables["mode"],
                 output_file=user.domain_variables["output"],
@@ -98,9 +102,11 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
 
         case "va":
             # Set scanner
-            vulnerability_analysis.set_scanner(user.domain_variables["scanner"])
+            vulnerability_analysis.set_scanner(
+                user.domain_variables["scanner"])
             input_file = user.domain_variables["input_file"]
-            formatted_issues = vulnerability_analysis.analyze_scan_files(input_file)
+            formatted_issues = vulnerability_analysis.analyze_scan_files(
+                input_file)
 
             # pprint(formatted_issues)
             vulnerability_analysis.sort_vulnerabilities(
@@ -143,6 +149,17 @@ def main():
         vulnerability_analysis = init_classes["vulnerability"]
         mobile = init_classes["mobile"]
         command = init_classes["command"]
+
+        def get_user_input():
+            return (
+                input(
+                    f"{Bcolors.OKGREEN}[*] Would you like to EXIT the program {
+                        Bcolors.BOLD}('Y' | 'N') ?{Bcolors.ENDC} "
+                )
+                .strip()
+                .lower()
+            )
+
         user_interactions(
             user=user,
             package=package,
@@ -151,13 +168,12 @@ def main():
             mobile=mobile,
             vulnerability_analysis=vulnerability_analysis,
         )
-        ask_user = (
-            input(
-                f"{Bcolors.OKGREEN}[*] Would you like to EXIT the program {Bcolors.BOLD}('Y' | 'N') ?{Bcolors.ENDC} "
-            )
-            .strip()
-            .lower()
-        )
+        ask_user = get_user_input()
+        while ask_user not in ["yes", "y", "no", "n"]:
+            print(f"\n{Bcolors.WARNING}[!]{ask_user} is not a valid choice. Please Enter a valid choice: {
+                  Bcolors.ENDC}\n")
+            ask_user = get_user_input()
+
         if ask_user in ["yes", "y"]:
             exit_menu = True
         else:

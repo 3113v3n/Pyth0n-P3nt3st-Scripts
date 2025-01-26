@@ -29,6 +29,8 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
     def set_scanner(self, scanner: str):
         self.scanner = scanner
+        # Update Inherited class attribute
+        super().update_scanner(scanner)
 
     def set_file_type(self, file_type: str):
         self.file_type = file_type
@@ -131,11 +133,12 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
         return self.format_input_file()
 
-    def sort_vulnerabilities(self, vulnerabilities, output_file):
+    def sort_all_vulnerabilities(self, vulnerabilities, output_file):
         if self.scanner == "nessus":
-            self.sort_nessus_vulnerabilities(vulnerabilities, output_file)
-        elif self.scanner == "rapid7":
+            self.sort_vulnerabilities(vulnerabilities, output_file)
+        elif self.scanner == "rapid":
             self.sort_rapid7_vulnerabilities(vulnerabilities, output_file)
+        
 
     def filter_condition(self, filter_string: str):
         """Filter CSV file using the key word supplied
@@ -171,7 +174,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         }
         return categorized_vulnerabilities
 
-    def sort_nessus_vulnerabilities(self, vulnerabilities, output_file):
+    def sort_vulnerabilities(self, vulnerabilities, output_file):
         self.vulnerabilities = vulnerabilities
         filter_strings = None
 
@@ -230,10 +233,12 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             )
 
     def sort_rapid7_vulnerabilities(self, vulnerabilities, output_file):
-        conditions = self.filter_conditions(
-            vulnerabilities, regex_word=self.regex_word, filter_param=""
-        )
-        unfiltered_vulns = []
-        found_vulnerabilities = []
-        print(f"{conditions}\n{unfiltered_vulns}\n"
-              f"{found_vulnerabilities}\n{output_file}")
+       
+        
+        unfiltered_vulns = vulnerabilities[~self.filter_condition("ssl_condition")]
+        
+        ssl_issues = vulnerabilities[self.filter_condition("ssl_condition")
+                    ]
+        
+        pprint(ssl_issues)
+        pprint(f"Unfiltered: \n{unfiltered_vulns}")
