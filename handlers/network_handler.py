@@ -29,7 +29,7 @@ class NetworkHandler(FileHandler, Commands):
         self.progress_bar = None
         self.lock = threading.Lock()  # prevent race conditions
 
-    def initialize_network_variables(self, variables, progress_bar):
+    def initialize_network_variables(self, variables, test_domain, progress_bar):
         # initialize the class variables with user variables
         self.subnet = variables["subnet"]
         network_info = self.get_network_info(self.subnet)
@@ -38,6 +38,7 @@ class NetworkHandler(FileHandler, Commands):
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
         self.progress_bar = progress_bar(self.hosts)
+        self.update_output_directory(test_domain)
 
     def get_live_ips(self, mode, output):
         curses.wrapper(self.scan_network, mode, output)
@@ -68,8 +69,8 @@ class NetworkHandler(FileHandler, Commands):
         if mode == "resume":
             start_index = ip_ranges.index(self.user_ip_addr)
             ip_ranges = ip_ranges[
-                        start_index:
-                        ]  # slice list to start from last unresponsive IP
+                start_index:
+            ]  # slice list to start from last unresponsive IP
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {

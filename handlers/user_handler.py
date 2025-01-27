@@ -221,7 +221,7 @@ class UserHandler(FileHandler, Config):
         """Update the variables object with reference to the test domain provisioned"""
 
         # Update the output directory with respective test domain
-        self.update_output_directory(test_domain)
+        # self.update_output_directory(test_domain)
 
         match test_domain:
             case "mobile":

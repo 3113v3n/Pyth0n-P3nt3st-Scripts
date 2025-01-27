@@ -19,7 +19,6 @@ class VAConfigs():
     ]
     rapid7_headers = [
         "Vulnerability Title",
-        "Asset Alternate IPv4 Addresses",
         "Asset IP Address",
         "Asset MAC Addresses",
         "Asset Names",
@@ -43,6 +42,7 @@ class VAConfigs():
         "Vulnerability Risk Score",
         "Vulnerability PCI Compliance Status",
         "Vulnerable Since",
+        "Asset Alternate IPv4 Addresses",
     ]
     column_mismatch_error = (
         f"{Bcolors.FAIL}{
@@ -88,11 +88,15 @@ class VAConfigs():
         "information_disclosure": "information_condition",
         "web_issues": "web_condition",
     }
-    rapid7_strings_to_filter = ["ssl_condition"]
+    # strings and categories need to be same number
+    rapid7_strings_to_filter = ["ssl_condition", "missing_patch_condition",
+                                "unsupported_software", "web_condition",
+                                "compliance_condition", "ssh_condition",]
     rapid7_vuln_categories = {
         "ssl_issues": "ssl_condition",
         "missing_patches": "missing_patch_condition",
-        #"unsupported": "unsupported_software",
-        #"ssh_misconfig": "ssh_condition",
-        #"default_webpage": "default_webpage_condition"
+        "unsupported": "unsupported_software",
+        "ssh_misconfig": "ssh_condition",
+        "web_issues": "web_condition",
+        "compliance": "compliance_condition",
     }

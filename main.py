@@ -1,6 +1,4 @@
 # [Test Domains]
-from pprint import pprint
-
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
 # [Handlers]
@@ -43,15 +41,15 @@ def initialize_classes() -> dict:
     }
 
 
-def packages_present(user_test_domain, package) -> bool:
+def packages_present(user_test_domain: str, package) -> bool:
     # check if package list contains any missing packages
     missing_packages = package.get_missing_packages(user_test_domain)
 
     num_of_packages = 0
 
     if not missing_packages:
-        print(
-            f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
+        # print(
+        #     f"\n{Bcolors.OKBLUE}[+] All dependencies are present..{Bcolors.ENDC}")
         return True
 
     num_of_packages += len(missing_packages)
@@ -71,7 +69,13 @@ def packages_present(user_test_domain, package) -> bool:
     return packages_present(user_test_domain, package)
 
 
-def user_interactions(user, package, internal, network, mobile, vulnerability_analysis):
+def user_interactions(
+        user,
+        package,
+        internal,
+        network,
+        mobile,
+        vulnerability_analysis):
     """Handles user interaction based on selected testing domain"""
     user_test_domain = user.get_user_domain()
     user.set_domain_variables(user_test_domain)
@@ -90,8 +94,9 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
 
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(
-                user.domain_variables, ProgressBar)
+                user.domain_variables, user_test_domain, ProgressBar)
             internal.initialize_variables(
+                user_test_domain,
                 mode=user.domain_variables["mode"],
                 output_file=user.domain_variables["output"],
             )
@@ -105,8 +110,8 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
             vulnerability_analysis.set_scanner(
                 user.domain_variables["scanner"])
             input_file = user.domain_variables["input_file"]
-            formatted_issues = vulnerability_analysis.analyze_scan_files(
-                input_file)
+            formatted_issues = vulnerability_analysis.analyze_scan_files(user_test_domain,
+                                                                         input_file)
 
             # pprint(formatted_issues)
             vulnerability_analysis.sort_vulnerabilities(
@@ -118,7 +123,7 @@ def user_interactions(user, package, internal, network, mobile, vulnerability_an
             # initialize variables that will be used to test different Mobile modules
             mobile_object = user.domain_variables
             mobile.initialize_variables(mobile_object)
-            mobile.inspect_application_files()
+            mobile.inspect_application_files(user_test_domain)
 
         case "external":
 
