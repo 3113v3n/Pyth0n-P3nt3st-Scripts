@@ -89,4 +89,10 @@ class VAConfigs():
         "web_issues": "web_condition",
     }
     rapid7_strings_to_filter = ["ssl_condition"]
-    rapid7_vuln_categories = {"ssl_issues": "ssl_condition",}
+    rapid7_vuln_categories = {
+        "ssl_issues": "ssl_condition",
+        "missing_patches": "missing_patch_condition",
+        #"unsupported": "unsupported_software",
+        #"ssh_misconfig": "ssh_condition",
+        #"default_webpage": "default_webpage_condition"
+    }
