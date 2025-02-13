@@ -91,6 +91,7 @@ class FileHandler(Validator, Bcolors):
         else:
             file_path = filename
 
+        # TODO: Remove CSV headers
         if "unresponsive_hosts" not in filename:
             file_header = "Live Host IP Addresses"
             self.live_hosts_file = file_path
@@ -150,11 +151,15 @@ class FileHandler(Validator, Bcolors):
             for file in self.files
             if self.check_filetype(file["filename"], "csv")
         ]
+        xlsx_files = [file
+                      for file in self.files
+                      if self.check_filetype(file["filename"], "xlsx")]
+        both_files = csv_files + xlsx_files
         app_files = [
             file
             for file in self.files
             if self.check_filetype(file["filename"], "apk")
-            or self.check_filetype(file["filename"], "ipa")
+               or self.check_filetype(file["filename"], "ipa")
         ]
 
         # Only display files containing unresponsive hosts
@@ -163,9 +168,15 @@ class FileHandler(Validator, Bcolors):
         ]
         # filter out CSV files only
         if (
-                "display_csv" in kwargs
+                "scan_extension" in kwargs
         ):  # any(key in kwargs for key in ("display_csv", "resume_scan")):
-            self.files = csv_files
+            # Show files selected by user
+            if kwargs['scan_extension'] == "csv":
+                self.files = csv_files
+            elif kwargs['scan_extension'] == "xlsx":
+                self.files = xlsx_files
+            elif kwargs['scan_extension'] == "both":
+                self.files = both_files
 
         elif "resume_scan" in kwargs:
             self.files = unresponsive_host_files
@@ -191,7 +202,7 @@ class FileHandler(Validator, Bcolors):
                 print(display_str)
 
             # Resume scan
-            if "display_csv" in kwargs:
+            if "scan_extension" in kwargs:
                 # Display files to perform VA analysis
                 return self.do_analysis("files")
 
@@ -223,8 +234,8 @@ class FileHandler(Validator, Bcolors):
                     break
                 else:
                     print(
-                        f"{self.FAIL}[!]The selected number is out of range. Please enter a valid number."
-                        f"{self.ENDC}"
+                        f"{self.FAIL}\n[!]The selected number is out of range."
+                        f" Please enter a valid number between 1 & {len(data_list)}{self.ENDC}."
                     )
             except ValueError:
                 print(
@@ -271,9 +282,10 @@ class FileHandler(Validator, Bcolors):
         return pandas.read_csv(dataframe, encoding="ISO-8859-1")  # utf-16 cp1252
 
     @staticmethod
-    def read_excel_file(file):
-        xls = pandas.ExcelFile(file)
-        return pandas.read_excel(xls)
+    def read_excel_file(file, **kwargs):
+        if "sheetname" in kwargs:
+            return pandas.read_excel(file, **kwargs)
+        return pandas.read_excel(file)
 
     @staticmethod
     def get_file_extension(filename):
