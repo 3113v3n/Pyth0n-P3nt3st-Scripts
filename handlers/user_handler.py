@@ -29,8 +29,8 @@ class UserHandler(FileHandler, Config):
             # Format each option with colors and spacing
             formatted_option = (
                 # <30 align with width of 30 characters
-                f"\n{self.OKGREEN}{number}. {option['domain']:<30} "
-                f"[ ENTER {number:<2}] {option['icon']}{self.ENDC}\n"
+                f"\n{number}. {self.OKGREEN}{option['domain']:<30} {self.ENDC}"
+                f"[{self.OKGREEN} ENTER {number:<2}{self.ENDC}] {option['icon']}\n"
             )
             test_options.append(formatted_option)
             # set up default test domains
@@ -62,22 +62,59 @@ class UserHandler(FileHandler, Config):
             except (ValueError, FileExistsError) as error:
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
+    @staticmethod
+    def show_submenu(menu_selection: str,
+                     options: list | tuple,
+                     check_range_string: str,
+                     check_range_function: callable,
+                     start_color: str,
+                     end_color: str,
+                     **kwargs):
+        print(menu_selection)
+        for option in options:
+            # Ensure both scanner menu and file extension are sorted for
+            if "scanner" in kwargs:
+                new_option = option["name"]
+            else:
+                new_option = option.upper()
+            print(f" {start_color}[{options.index(option) + 1}]{end_color}"
+                  f" {new_option}"
+                  )
+        return check_range_function(f"\n {check_range_string}", options)
+
     def va_ui_interaction(self):
         print("Running Vulnerability Analysis Module\n")
 
         while True:
 
             try:
-                print("Select Vulnerability Scanner used: \n\n")
-                for scanner in self.vulnerability_scanners:
-                    print(
-                        f" {self.HEADER}[{self.vulnerability_scanners.index(scanner) + 1}]"
-                        f" {scanner["name"]}{self.ENDC}"
-                    )
-                scanner_index = self.index_out_of_range_display("\nScanner: ",
-                                                                self.vulnerability_scanners)
-
+                # Select Scanner [ Nessus | Rapid7 ]
+                scanner_index = self.show_submenu(
+                    menu_selection=f" {self.HEADER}Select Vulnerability Scanner used:{self.ENDC} \n\n",
+                    options=self.vulnerability_scanners,
+                    check_range_string="Scanner: ",
+                    check_range_function=self.index_out_of_range_display,
+                    start_color=self.HEADER,
+                    end_color=self.ENDC,
+                    scanner=True
+                )
                 selected_scanner = self.vulnerability_scanners[scanner_index]["alias"]
+
+                # File format of the files [CSV or XLSX ]
+                file_format_index = self.show_submenu(
+                    menu_selection=f" \n {self.WARNING} Select the file "
+                                   f"format of the Scanned File(s):{self.ENDC} \n",
+                    options=self.SCAN_FILE_FORMAT,
+                    check_range_string="File Format: ",
+                    check_range_function=self.index_out_of_range_display,
+                    start_color=self.WARNING,
+                    end_color=self.ENDC
+                )
+
+                file_extension = self.SCAN_FILE_FORMAT[file_format_index]
+                print(f"\n{self.OKCYAN}Scanning {file_extension.upper()} file extensions{self.ENDC}")
+
+                # file extension ensures we display the correct file extensions
 
                 search_dir = input(
                     "\nEnter Location Where your files are located \n"
@@ -86,7 +123,8 @@ class UserHandler(FileHandler, Config):
                     raise ValueError("No Such Folder exists")
 
                 files_tuple = self.display_saved_files(
-                    search_dir, display_csv=True
+                    # display files depending on user selected extension
+                    search_dir, scan_extension=file_extension
                 )
 
                 if files_tuple:
@@ -175,8 +213,8 @@ class UserHandler(FileHandler, Config):
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
                 print(
-                    f"{self.FAIL}❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
-                    f"{self.ENDC}"
+                    f"{self.FAIL}\n❌ Invalid choice. Please enter a number between 1 and "
+                    f"{len(self.default_test_domains)}{self.ENDC}"
                 )
             except ValueError:
                 print(
@@ -238,5 +276,5 @@ class UserHandler(FileHandler, Config):
                 sys.exit(1)
             case _:
                 print(
-                    f"{self.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.ENDC}"
+                    f"\n{self.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.ENDC}"
                 )
