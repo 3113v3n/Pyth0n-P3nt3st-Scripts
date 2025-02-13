@@ -95,8 +95,8 @@ def user_interactions(
             # initialize variables that will be used to test different Internal PT modules
             network.initialize_network_variables(
                 user.domain_variables, user_test_domain, ProgressBar)
+            
             internal.initialize_variables(
-                user_test_domain,
                 mode=user.domain_variables["mode"],
                 output_file=user.domain_variables["output"],
             )
@@ -158,8 +158,8 @@ def main():
         def get_user_input():
             return (
                 input(
-                    f"{Bcolors.OKGREEN}[*] Would you like to EXIT the program {
-                        Bcolors.BOLD}('Y' | 'N') ?{Bcolors.ENDC} "
+                    f"[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
+                        f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
                 )
                 .strip()
                 .lower()
@@ -174,9 +174,10 @@ def main():
             vulnerability_analysis=vulnerability_analysis,
         )
         ask_user = get_user_input()
-        while ask_user not in ["yes", "y", "no", "n"]:
-            print(f"\n{Bcolors.WARNING}[!]{ask_user} is not a valid choice. Please Enter a valid choice: {
-                  Bcolors.ENDC}\n")
+        valid_choices = {"yes", "y", "no", "n"}
+        while ask_user not in valid_choices:
+            print(f"\n{Bcolors.WARNING}[!] {ask_user} is not a valid choice. Please Enter a valid choice: "
+                  f"{Bcolors.ENDC}\n")
             ask_user = get_user_input()
 
         if ask_user in ["yes", "y"]:
