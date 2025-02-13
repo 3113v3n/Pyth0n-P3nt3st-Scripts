@@ -4,6 +4,7 @@ from ..colors import Bcolors
 class VAConfigs():
     def __init__(self):
         pass
+
     nessus_headers = [
         "CVE",
         "Risk",
@@ -16,6 +17,16 @@ class VAConfigs():
         "Solution",
         "See Also",
         "Plugin Output",
+    ]
+    summary_page_headers = [
+        "S.No",
+        "Observation",
+        "Description",
+        "Impact",
+        "Risk Rating",
+        "Recommendation",
+        "Affected Hosts",
+        "Management Response"
     ]
     rapid7_headers = [
         "Vulnerability Title",
@@ -46,7 +57,7 @@ class VAConfigs():
     ]
     column_mismatch_error = (
         f"{Bcolors.FAIL}{
-            Bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the "
+        Bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the "
         f"same number of columns {Bcolors.ENDC}"
     )
     nessus_strings_to_filter = [
@@ -88,5 +99,6 @@ class VAConfigs():
         "information_disclosure": "information_condition",
         "web_issues": "web_condition",
     }
+    scan_file_format = ("csv", "xlsx", "both")
     rapid7_strings_to_filter = []
     rapid7_vuln_categories = {}
