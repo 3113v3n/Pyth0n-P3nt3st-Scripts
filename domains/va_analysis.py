@@ -1,7 +1,6 @@
 # trunk-ignore-all(isort)t
 from handlers import FileHandler
 from utils import Config, FilterVulnerabilities
-from pprint import pprint
 
 
 class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
@@ -29,6 +28,8 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
     def set_scanner(self, scanner: str):
         self.scanner = scanner
+        # Update Inherited class attribute
+        super().update_scanner(scanner)
 
     def set_file_type(self, file_type: str):
         self.file_type = file_type
@@ -66,11 +67,14 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             ].reset_index(drop=True)
             print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
 
-            return formated_vulnerabilities
+            # Sort Vulnerabilities using Risk
+            return formated_vulnerabilities.sort_values(by='Risk')
 
         elif self.scanner == "rapid":
-            print("Rapid Vulnerability Analysis")
-            return self.data
+          
+            #print("TODO: Filter further i.e Credentialed Hosts")
+            
+            return self.data[self.headers[:-1]]
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
@@ -98,10 +102,12 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         self.starting_index = attributes[1]
         self.starting_file = self.file_list[self.starting_index]["full_path"]
 
-    def analyze_scan_files(self, csv_data) -> list:
+    def analyze_scan_files(self, domain, csv_data) -> list:
         """Takes in list of csv files and returns list of vulnerabilities
         for both Nessus and Rapid7 Scanners
         """
+        # update our storage path
+        self.update_output_directory(domain)
         self.set_scan_attributes(csv_data)
 
         try:
@@ -131,19 +137,13 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
         return self.format_input_file()
 
-    def sort_vulnerabilities(self, vulnerabilities, output_file):
-        if self.scanner == "nessus":
-            self.sort_nessus_vulnerabilities(vulnerabilities, output_file)
-        elif self.scanner == "rapid7":
-            self.sort_rapid7_vulnerabilities(vulnerabilities, output_file)
-
     def filter_condition(self, filter_string: str):
         """Filter CSV file using the key word supplied
         :param: filter_string ==> String to use when filtering
         """
 
         return self.filter_vulnerabilities(
-            self.vulnerabilities, regex_word=self.regex_word, filter_param=filter_string
+            self.vulnerabilities, filter_param=filter_string
         )[filter_string]
 
     def categorize_vulnerabilities(self) -> dict:
@@ -171,7 +171,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         }
         return categorized_vulnerabilities
 
-    def sort_nessus_vulnerabilities(self, vulnerabilities, output_file):
+    def sort_vulnerabilities(self, vulnerabilities, output_file):
         self.vulnerabilities = vulnerabilities
         filter_strings = None
 
@@ -228,12 +228,3 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
                 found_vulnerabilities,
                 output_file,
             )
-
-    def sort_rapid7_vulnerabilities(self, vulnerabilities, output_file):
-        conditions = self.filter_conditions(
-            vulnerabilities, regex_word=self.regex_word, filter_param=""
-        )
-        unfiltered_vulns = []
-        found_vulnerabilities = []
-        print(f"{conditions}\n{unfiltered_vulns}\n"
-              f"{found_vulnerabilities}\n{output_file}")

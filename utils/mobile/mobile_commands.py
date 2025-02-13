@@ -338,8 +338,9 @@ class MobileCommands(FileHandler, Config, Commands):
         self.run_os_commands(db_command)
         self.run_os_commands(pl_command)
 
-    def inspect_application_files(self, application: str):
+    def inspect_application_files(self, application: str, test_domain:str):
 
+        self.update_output_directory(test_domain)
         folder_name = self.decompile_application(application)
         output_name = f"{self.mobile_output_dir}/{self.file_name}"
 

@@ -1,7 +1,7 @@
 from ..colors import Bcolors
 
 
-class VAConfigs():
+class VAConfigs:
     def __init__(self):
         pass
 
@@ -30,7 +30,6 @@ class VAConfigs():
     ]
     RAPID7_HEADERS = [
         "Vulnerability Title",
-        "Asset Alternate IPv4 Addresses",
         "Asset IP Address",
         "Asset MAC Addresses",
         "Asset Names",
@@ -54,11 +53,11 @@ class VAConfigs():
         "Vulnerability Risk Score",
         "Vulnerability PCI Compliance Status",
         "Vulnerable Since",
+        "Asset Alternate IPv4 Addresses",
     ]
     column_mismatch_error = (
-        f"{Bcolors.FAIL}{
-        Bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the "
-        f"same number of columns {Bcolors.ENDC}"
+        f"{Bcolors.FAIL}{Bcolors.BOLD}[!]Column mismatch between files. "
+        f" Ensure all files have the same number of columns {Bcolors.ENDC}"
     )
     NESSUS_STRINGS_TO_FILTER = [
         "ssl_condition",
@@ -81,24 +80,34 @@ class VAConfigs():
         "rce_condition",
     ]
     NESSUS_VULN_CATEGORIES = {
-        "ssl_issues": "ssl_condition",
-        "missing_patches": "missing_patch_condition",
-        "unsupported": "unsupported_software",
+        "SSL Misconfigurations": "ssl_condition",
+        "Missing Patches": "missing_patch_condition",
+        "Unsupported Software": "unsupported_software",
         "kaspersky": "kaspersky_condition",
         "insecure_service": "insecure_condition",
-        "winverify": "winverify_condition",
+        "Winverify": "winverify_condition",
         "unquoted": "unquoted_condition",
         "smb_issues": "smb_condition",
-        "speculative": "speculative_condition",
+        "Windows Speculative": "speculative_condition",
         "active_directory": "AD_condition",
         "defender": "defender_condition",
-        "rdp_misconfig": "rdp_condition",
-        "compliance": "compliance_condition",
-        "ssh_misconfig": "ssh_condition",
+        "RDP Misconfig": "rdp_condition",
+        "Compliance": "compliance_condition",
+        "SSH Misconfig": "ssh_condition",
         "telnet": "telnet_condition",
         "information_disclosure": "information_condition",
         "web_issues": "web_condition",
     }
+    # strings and categories need to be same number
+    RAPID7_STRINGS_TO_FILTER = ["ssl_condition", "missing_patch_condition",
+                                "unsupported_software", "web_condition",
+                                "compliance_condition", "ssh_condition", ]
+    RAPID7_VULN_CATEGORIES = {
+        "SSL Misconfigurations": "ssl_condition",
+        "Missing Patches": "missing_patch_condition",
+        "Unsupported Software": "unsupported_software",
+        "SSH Misconfig": "ssh_condition",
+        "web_issues": "web_condition",
+        "Compliance": "compliance_condition",
+    }
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
-    RAPID7_STRINGS_TO_FILTER = []
-    RAPID7_VULN_CATEGORIES = {}

@@ -11,7 +11,7 @@ class InternalAssessment(Bcolors):
         self.mode = "SCAN"
         self.network_manager = network
 
-    def initialize_variables(self, mode, output_file):
+    def initialize_variables(self,mode, output_file):
         # Sets user provided values
         self.mode = mode
         if mode == "scan":
