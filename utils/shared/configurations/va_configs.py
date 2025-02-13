@@ -5,7 +5,7 @@ class VAConfigs():
     def __init__(self):
         pass
 
-    nessus_headers = [
+    NESSUS_HEADERS = [
         "CVE",
         "Risk",
         "Host",
@@ -18,7 +18,7 @@ class VAConfigs():
         "See Also",
         "Plugin Output",
     ]
-    summary_page_headers = [
+    SUMMARY_PAGE_HEADERS = [
         "S.No",
         "Observation",
         "Description",
@@ -28,7 +28,7 @@ class VAConfigs():
         "Affected Hosts",
         "Management Response"
     ]
-    rapid7_headers = [
+    RAPID7_HEADERS = [
         "Vulnerability Title",
         "Asset Alternate IPv4 Addresses",
         "Asset IP Address",
@@ -60,7 +60,7 @@ class VAConfigs():
         Bcolors.BOLD}[!]Column mismatch between files. Ensure all files have the "
         f"same number of columns {Bcolors.ENDC}"
     )
-    nessus_strings_to_filter = [
+    NESSUS_STRINGS_TO_FILTER = [
         "ssl_condition",
         "missing_patch_condition",
         "unsupported_software",
@@ -80,7 +80,7 @@ class VAConfigs():
         "web_condition",
         "rce_condition",
     ]
-    nessus_vuln_categories = {
+    NESSUS_VULN_CATEGORIES = {
         "ssl_issues": "ssl_condition",
         "missing_patches": "missing_patch_condition",
         "unsupported": "unsupported_software",
@@ -99,6 +99,6 @@ class VAConfigs():
         "information_disclosure": "information_condition",
         "web_issues": "web_condition",
     }
-    scan_file_format = ("csv", "xlsx", "both")
-    rapid7_strings_to_filter = []
-    rapid7_vuln_categories = {}
+    SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
+    RAPID7_STRINGS_TO_FILTER = []
+    RAPID7_VULN_CATEGORIES = {}
