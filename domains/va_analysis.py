@@ -76,9 +76,9 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         # compare the headers from our defined headers and provided dataframe
 
         if self.scanner == "nessus":
-            self.headers = self.nessus_headers
+            self.headers = self.NESSUS_HEADERS
         elif self.scanner == "rapid":
-            self.headers = self.rapid7_headers
+            self.headers = self.RAPID7_HEADERS
 
         missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
@@ -154,7 +154,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         categorized_vulnerabilities = {}
         categories = None
         if self.scanner == "nessus":
-            categories = self.nessus_vuln_categories
+            categories = self.NESSUS_VULN_CATEGORIES
             # Special case for RCE condition
             categorized_vulnerabilities["rce"] = self.vulnerabilities[
                 self.filter_condition("rce_condition")
@@ -163,7 +163,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             ]
 
         elif self.scanner == "rapid":
-            categories = self.rapid7_vuln_categories
+            categories = self.RAPID7_VULN_CATEGORIES
 
         categorized_vulnerabilities = {
             key: self.vulnerabilities[self.filter_condition(value)]
@@ -176,9 +176,9 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         filter_strings = None
 
         if self.scanner == "nessus":
-            filter_strings = self.nessus_strings_to_filter
+            filter_strings = self.NESSUS_STRINGS_TO_FILTER
         elif self.scanner == "rapid":
-            filter_strings = self.rapid7_strings_to_filter
+            filter_strings = self.RAPID7_STRINGS_TO_FILTER
 
         # Show remaining data after filtering
         # Start loop from the second value and append results
