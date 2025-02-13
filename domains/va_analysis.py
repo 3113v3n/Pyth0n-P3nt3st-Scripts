@@ -1,7 +1,7 @@
 # trunk-ignore-all(isort)t
 from handlers import FileHandler
 from utils import Config, FilterVulnerabilities
-
+from pprint import pprint
 
 class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
     """Class that handles Vulnerability analysis tasks"""
@@ -73,29 +73,24 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         elif self.scanner == "rapid":
           
             #print("TODO: Filter further i.e Credentialed Hosts")
-            
+            pprint(f"Headers ==> {self.headers}")
             return self.data[self.headers[:-1]]
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
-
-        if self.scanner == "nessus":
-            self.headers = self.NESSUS_HEADERS
-        elif self.scanner == "rapid":
-            self.headers = self.RAPID7_HEADERS
-
+      
         missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
             raise KeyError(
                 f"The following columns are missing from the "
-                f"{filename} \n{missing_columns}"
+                f"{filename} : {missing_columns}"
             )
 
     def set_scan_attributes(self, attributes: tuple) -> None:
         """
-        :param :( [list_of_csv_files], index_of_selected_file )
-        sets file_list ==> list of csv_files
-             start_index == 0 ==> index of selected csv
+        :param :( [list_of_files], index_of_selected_file )
+        sets file_list ==> list of scanned_files [CSV|XLSX]
+             start_index == 0 ==> index of selected file
              starting_file ==> starting file name
         """
         self.file_list = attributes[0]
@@ -103,7 +98,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         self.starting_file = self.file_list[self.starting_index]["full_path"]
 
     def analyze_scan_files(self, domain, csv_data) -> list:
-        """Takes in list of csv files and returns list of vulnerabilities
+        """Takes in list of csv or xslx files and returns list of vulnerabilities
         for both Nessus and Rapid7 Scanners
         """
         # update our storage path
@@ -111,9 +106,23 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         self.set_scan_attributes(csv_data)
 
         try:
+
             # Read the first file as baseline
             filename = self.file_list[self.starting_index]["filename"]
-            original_file = self.read_csv(self.starting_file)
+            file_extension = self.get_file_extension(self.starting_file)
+
+            if self.scanner == "nessus":
+                self.headers = self.NESSUS_HEADERS
+            elif self.scanner == "rapid":
+                self.headers = self.RAPID7_HEADERS
+                
+            #Choose  the appropriate reader based on the file extension
+            if file_extension.lower() == "csv":
+                original_file = self.read_csv(self.starting_file)
+            elif file_extension.lower() in ["xlsx", "xls"]:
+                original_file = self.read_excel_file(self.starting_file)
+            else:
+                raise ValueError(f"Unsupported file extension: {file_extension}")
 
             # Check if baseline file is empty
             if original_file.empty:
@@ -128,7 +137,9 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
                 original_datafile=original_file,
                 read_csv=self.read_csv,
                 get_missing_columns=self.get_missing_columns,
-                concat_dataframes=self.concat_dataframes
+                concat_dataframes=self.concat_dataframes,
+                read_xlsx=self.read_excel_file,
+                get_file_extension=self.get_file_extension,
             )
 
             self.data = all_vulnerabilities

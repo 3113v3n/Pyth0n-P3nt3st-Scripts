@@ -19,7 +19,7 @@ class Config(VAConfigs, MobileConfigs, ExternalConfigs, InternalConfigs):
 
     vulnerability_scanners = [
         {"name": "Nessus Scanner", "alias": "nessus"},
-        {"name": "Insight VM", "alias": "rapid"},
+        {"name": "Rapid7 Scanner", "alias": "rapid"},
     ]
 
     general_packages = [

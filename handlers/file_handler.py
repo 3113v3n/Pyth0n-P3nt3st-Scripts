@@ -283,9 +283,14 @@ class FileHandler(Validator, Bcolors):
 
     @staticmethod
     def read_excel_file(file, **kwargs):
-        if "sheetname" in kwargs:
-            return pandas.read_excel(file, **kwargs)
-        return pandas.read_excel(file)
+        try:
+            return pandas.read_excel(file, 
+                                     engine="openpyxl",
+                                     skiprows=1,
+                                     **kwargs)
+        except Exception as e:
+            print(f"Error reading excel file: {e}")
+            raise
 
     @staticmethod
     def get_file_extension(filename):
