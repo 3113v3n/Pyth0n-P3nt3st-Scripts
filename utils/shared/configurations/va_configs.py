@@ -28,33 +28,35 @@ class VAConfigs:
         "Affected Hosts",
         "Management Response"
     ]
-    RAPID7_HEADERS = [
+    
+    RAPID7_HEADERS  = [
         "Vulnerability Title",
-        "Asset IP Address",
-        "Asset MAC Addresses",
         "Asset Names",
+        "Asset IP Address",
+        "Asset OS Name",
+        "Service Name",
+        "Service Port",
+        "Vulnerability Description",
+        "Vulnerability Solution",
+        "Vulnerability CVSS Score",
+        "Asset MAC Addresses",
         "Custom Tag",
         "Asset OS Family",
-        "Asset OS Name",
         "Asset OS Version",
         "Exploit Count",
         "Exploit URLs",
         "Malware Kit Count",
         "Exploit Minimum Skill",
         "Asset Risk Score",
-        "Service Name",
-        "Service Port",
         "Vulnerability Severity Level",
         "Vulnerability CVE IDs",
-        "Vulnerability CVSS Score",
         "Vulnerability CVE URLs",
-        "Vulnerability Description",
-        "Vulnerability Solution",
         "Vulnerability Risk Score",
         "Vulnerability PCI Compliance Status",
         "Vulnerable Since",
         "Asset Alternate IPv4 Addresses",
     ]
+    
     column_mismatch_error = (
         f"{Bcolors.FAIL}{Bcolors.BOLD}[!]Column mismatch between files. "
         f" Ensure all files have the same number of columns {Bcolors.ENDC}"

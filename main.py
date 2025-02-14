@@ -176,8 +176,7 @@ def main():
         ask_user = get_user_input()
         valid_choices = {"yes", "y", "no", "n"}
         while ask_user not in valid_choices:
-            print(f"\n{Bcolors.WARNING}[!] {ask_user} is not a valid choice. Please Enter a valid choice: "
-                  f"{Bcolors.ENDC}\n")
+            print(f"\n{Bcolors.WARNING}[!] {ask_user} is not a valid choice. Please Enter a valid choice:{Bcolors.ENDC}\n ")
             ask_user = get_user_input()
 
         if ask_user in ["yes", "y"]:
