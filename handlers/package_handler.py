@@ -1,6 +1,6 @@
 import platform
 from utils.shared import Config, Bcolors, Commands
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class PackageHandler(Config, Bcolors, Commands):
@@ -10,7 +10,7 @@ class PackageHandler(Config, Bcolors, Commands):
         super().__init__()
         self.operating_system = platform.system().lower()
         self.is_supported_os = None
-        pass
+        
 
     def _check_os_support(self) -> bool:
         supported = self.operating_system == "linux"
@@ -27,9 +27,6 @@ class PackageHandler(Config, Bcolors, Commands):
         :param test_domain: Domain to check for missing packages
         :return: List of dictionaries containing package names and installation commands
         """
-        # Only check OS support when needed
-        if self.is_supported_os is None:
-            self.is_supported_os = self._check_os_support()
 
         # Early return for unsupported OS
         if not self.is_supported_os:
@@ -63,8 +60,6 @@ class PackageHandler(Config, Bcolors, Commands):
         :param package_name: Package name
         :return bool: True if the package is missing, False otherwise
         """
-        if self.is_supported_os is None:
-            self.is_supported_os = self._check_os_support()
 
         if not self.is_supported_os:
             return False
@@ -115,8 +110,6 @@ class PackageHandler(Config, Bcolors, Commands):
         :param package_name: Package name
         :return bool: True if the package is installed, False otherwise
         """
-        if self.is_supported_os is None:
-            self.is_supported_os = self._check_os_support()
 
         if not self.is_supported_os:
             return True

@@ -24,14 +24,15 @@ class PentestFramework:
             Dictionary containing initialized class instances
         """
         try:
+            network_instance = NetworkHandler()
             return {
                 "package": PackageHandler(),
                 "command": Commands(),
                 "user": UserHandler(),
-                "network": NetworkHandler(),
+                "network": network_instance,
                 "mobile": MobileAssessment(MobileCommands()),
                 "vulnerability": VulnerabilityAnalysis(),
-                "internal": InternalAssessment(NetworkHandler())
+                "internal": InternalAssessment(network_instance)
             }
         except Exception as error:
             print(f"{Bcolors.FAIL}[!] Error initializing classes: {str(error)}{Bcolors.ENDC}")
@@ -46,7 +47,12 @@ class PentestFramework:
         Returns:
             Boolean indicating if all required packages are present
         """
+        
         package = self.classes["package"]
+
+        # Initialize OS check
+        if package.is_supported_os is None:
+            package.is_supported_os = package._check_os_support()
 
         # If OS is not supported, continue without package checks
         if not package.is_supported_os:

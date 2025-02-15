@@ -1,8 +1,8 @@
-# trunk-ignore-all(isort)t
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional
 from handlers import FileHandler
 from utils import Config, FilterVulnerabilities
 from pprint import pprint
+
 
 class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
     """Class that handles Vulnerability analysis tasks"""
@@ -30,7 +30,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
     def set_scanner(self, scanner: str):
         """
         Set the scanner type and update related configurations
-        
+
         Args:
             scanner: Type of scanner ('nessus' or 'rapid')
         """
@@ -46,25 +46,24 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
     def format_input_file(self) -> list:
         """
         Formats the input data based on scanner type and filtering criteria
-        
+
         Returns:
             Formatted DataFrame with filtered vulnerabilities
         """
         if self.data is None or self.headers is None:
             raise ValueError("Data or headers not set")
-        
+
         if self.scanner == "nessus":
             return self.format_nessus_data()
         elif self.scanner == "rapid":
             return self.format_rapid7_data()
         else:
             raise ValueError(f"Unsupported scanner: {self.scanner}")
-            
-        
+
     def format_nessus_data(self):
         """
         Formats Nessus data based on credentialed hosts and selected columns
-        
+
         Returns:
             Formatted DataFrame with filtered vulnerabilities
         """
@@ -98,22 +97,21 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
         # Sort Vulnerabilities using Risk
         return formated_vulnerabilities.sort_values(by='Risk')
-    
+
     def format_rapid7_data(self):
         """
         Formats Rapid data based on selected columns
-        
+
         Returns:
             Formatted DataFrame with filtered vulnerabilities
         """
-        #print("TODO: Filter further i.e Credentialed Hosts")
+        # print("TODO: Filter further i.e Credentialed Hosts")
         pprint(f"Headers ==> {self.headers}")
         return self.data[self.headers[:-1]]
-        
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
-      
+
         missing_columns = list(set(self.headers) - set(dataframe.columns))
         if missing_columns:
             raise KeyError(
@@ -132,18 +130,17 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         self.starting_index = attributes[1]
         self.starting_file = self.file_list[self.starting_index]["full_path"]
 
-    def analyze_scan_files(self, domain:str, csv_data:tuple) -> list:
+    def analyze_scan_files(self, domain: str, csv_data: tuple) -> list:
         """
         Analyzes vulnerability scan files and returns formatted results
-        
+
         Args:
             domain: The assessment domain (e.g., 'internal', 'external')
             scan_data: Tuple containing file information
-            
+
         Returns:
             Formatted DataFrame of vulnerabilities or None if processing fails
         """
-        
 
         try:
             # update our storage path
@@ -154,9 +151,9 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             original_file = self._process_initial_file()
             if original_file is None:
                 return None
-                
+
             # Process remaining files
-            all_vulnerabilities  = self.loop_through_files(
+            all_vulnerabilities = self.loop_through_files(
                 file_list=self.file_list,
                 start_file=self.starting_file,
                 error_text=self.column_mismatch_error,
@@ -169,40 +166,41 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             )
             if all_vulnerabilities is None:
                 return None
-            
+
             self.data = all_vulnerabilities
             return self.format_input_file()
-        
+
         except Exception as error:
-            print(f"{self.FAIL}[!] Error analyzing scan files: {str(error)}{self.ENDC}")
+            print(
+                f"{self.FAIL}[!] Error analyzing scan files: {str(error)}{self.ENDC}")
             return None
 
-        
-    
     def _process_initial_file(self):
         """Process the initial file and handle errors
-        
+
         Returns:
             DataFrame from initial file or None if processing fails
         """
         try:
             filename = self.file_list[self.starting_index]["filename"]
             file_extension = self.get_file_extension(self.starting_file)
-            
+
             if file_extension.lower() == "csv":
                 original_file = self.read_csv(self.starting_file)
             elif file_extension.lower() in ["xlsx", "xls"]:
-                original_file = self.read_excel_file(self.starting_file,header=None)
+                original_file = self.read_excel_file(
+                    self.starting_file, header=None)
             else:
-                raise ValueError(f"Unsupported file extension: {file_extension}")
-            
+                raise ValueError(
+                    f"Unsupported file extension: {file_extension}")
+
             self.get_missing_columns(original_file, filename)
             return original_file
-            
+
         except Exception as error:
-            print(f"{self.FAIL}[!] Error processing initial file: {str(error)}{self.ENDC}")
+            print(
+                f"{self.FAIL}[!] Error processing initial file: {str(error)}{self.ENDC}")
             return None
-        
 
     def filter_condition(self, filter_string: str):
         """Filter CSV file using the key word supplied
@@ -240,7 +238,8 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
         self.vulnerabilities = vulnerabilities
-        filter_strings = (self.NESSUS_STRINGS_TO_FILTER if self.scanner == "nessus" else self.RAPID7_STRINGS_TO_FILTER)
+        filter_strings = (self.NESSUS_STRINGS_TO_FILTER if self.scanner ==
+                          "nessus" else self.RAPID7_STRINGS_TO_FILTER)
 
         # Show remaining data after filtering
         # Start loop from the second value and append results
