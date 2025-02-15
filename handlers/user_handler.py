@@ -1,8 +1,8 @@
 # trunk-ignore-all(black)
 from utils.shared import Config
 from handlers import FileHandler
-import sys
-
+from utils.shared import Loader
+from time import sleep
 
 class UserHandler(FileHandler, Config):
     """Class will be responsible for handling user interactions with
@@ -12,7 +12,6 @@ class UserHandler(FileHandler, Config):
         super().__init__()
         self.default_test_domains = []
         self.not_valid_domain = False
-
         self.domain = ""
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
@@ -40,11 +39,17 @@ class UserHandler(FileHandler, Config):
         return "".join(test_options)
 
     # User Interactions
+    def loader(self, message: str, end_message: str):
+        with Loader(message, end_message):
+            for i in range(10):
+                sleep(0.25)
 
     def mobile_ui_interaction(self):
         while True:
             try:
-                print("Running Mobile scripts\n")
+                self.loader("[*][*] Loading Mobile Assessment Module...",
+                            "Starting Mobile Assessment...")
+                
                 package_path = input(
                     "Please provide the Path to your mobile application(s)\nPath to File:  "
                 ).strip()
@@ -83,8 +88,8 @@ class UserHandler(FileHandler, Config):
         return check_range_function(f"\n {check_range_string}", options)
 
     def va_ui_interaction(self):
-        print("Running Vulnerability Analysis Module\n")
-
+        self.loader("[*][*] Loading Vulnerability Analysis Module...",
+                            "Starting Vulnerability Analysis...")
         while True:
 
             try:
@@ -146,7 +151,8 @@ class UserHandler(FileHandler, Config):
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
     def external_ui_interaction(self):
-        print("\nRunning External PT modules")
+        self.loader("[*][*] Loading External Assessment Module...",
+                            "Starting External Assessment...")
         website_domain = (
             input("Enter domain to enumerate (example.domain.com)").strip().lower()
         )
@@ -156,53 +162,71 @@ class UserHandler(FileHandler, Config):
         return {"target_domain": website_domain}
 
     def internal_ui_interaction(self):
-        print(" Running Internal PT modules ")
-        subnet = ""
-        mode = input(self.internal_mode_choice).strip().lower()
-        output_file = ""
+        try:
+            while True:
+                self.loader("[*][*] Loading Internal Assessment Module...",
+                            "Starting Internal Assessment...")
+                subnet = ""
+                output_file = ""
 
-        # Ensure correct mode is selected by user
-        while mode not in ["scan", "resume"]:
-            mode = input(self.internal_choice_error)
+                while True:
+                # Check for empty input
+                    mode = input(self.internal_mode_choice).strip().lower()
+                    
+                    if not mode:
+                        print(f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
+                        continue
+                    # Ensure correct mode is selected by user
+                    if mode not in ["scan", "resume"]:
+                        mode = input(self.internal_choice_error)
+                        continue
+                    break
 
-        if mode == "resume":
-            """
-            Incase of resume module, get user subnet and append to the last ip obtained from the file
-            """
-            try:
-                # returns an ip address if a file exists
-                # returns None if no file exists
+                if mode == "resume":
+                    """
+                    Incase of resume module, get user subnet and append to the last ip obtained from the file
+                    """
 
-                resume_ip = self.display_saved_files(
-                    self.output_directory, resume_scan=True
-                )
+                    # returns an ip address if a file exists
+                    # returns None if no file exists
 
-                if resume_ip is None:
-                    raise ValueError("No Previously saved file present")
+                    resume_ip = self.display_saved_files(
+                        self.output_directory, resume_scan=True
+                    )
 
-                # Output file will be the name of unresponsive file without text 'unresponsive_hosts'
-                output_file = self.filepath
-                cidr = self.get_cidr()
-                subnet = f"{resume_ip}/{cidr}"
+                    if resume_ip is None:
+                        raise ValueError("No Previously saved file present")
 
-            except ValueError as error:
-                print(
-                    f"{self.FAIL}[!] Cant use this module, {error}{self.ENDC}"
-                )
-                print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
-                mode = "scan"
-                subnet = self.get_user_subnet()
-                output_file = input("\n[+] Provide a name for your output file: ").strip()
+                    # Output file will be the name of unresponsive file without text 'unresponsive_hosts'
+                    output_file = self.filepath
+                    while True:
+                        cidr = self.get_cidr()
+                        if cidr:
+                            subnet = f"{resume_ip}/{cidr}"
+                            break
+                        else:
+                            print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
+                            continue
+                elif mode == "scan":
+                    subnet = self.get_user_subnet()
+                    output_file = input("\n[+] Provide a name for your output file: ").strip()
 
-        elif mode == "scan":
+                return {
+                    "subnet": subnet,
+                    "mode": mode,
+                    "output": output_file,
+                }
+
+        except ValueError as error:
+            print(
+                f"{self.FAIL}[!] Cant use this module, {error}{self.ENDC}"
+            )
+            print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
+            mode = "scan"
             subnet = self.get_user_subnet()
             output_file = input("\n[+] Provide a name for your output file: ").strip()
 
-        return {
-            "subnet": subnet,
-            "mode": mode,
-            "output": output_file,
-        }
+
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
@@ -260,21 +284,21 @@ class UserHandler(FileHandler, Config):
 
         # Update the output directory with respective test domain
         # self.update_output_directory(test_domain)
-
-        match test_domain:
-            case "mobile":
-                # TODO: [UNDER DEVELOPMENT]
-                self.domain_variables = self.mobile_ui_interaction()
-            case "internal":
+        try:
+            if test_domain == "internal":
                 self.domain_variables = self.internal_ui_interaction()
-            case "external":
+            elif test_domain == "external":
                 # TODO: [UNDER DEVELOPMENT !!]
                 self.domain_variables = self.external_ui_interaction()
-            case "va":
+            elif test_domain == "mobile":
+                # TODO: [UNDER DEVELOPMENT]
+                self.domain_variables = self.mobile_ui_interaction()
+            elif test_domain == "va":
                 self.domain_variables = self.va_ui_interaction()
-            case "exit":
-                sys.exit(1)
-            case _:
-                print(
-                    f"\n{self.FAIL}[!] {self.domain.title()} is not a Valid testing domain{self.ENDC}"
-                )
+            else:
+                print(f"{self.FAIL}Invalid domain provided{self.ENDC}")
+                return
+        except Exception as error:
+            print(f"{self.FAIL}\n[!] Error setting domain variables {error}{self.ENDC}")
+            raise
+

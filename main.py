@@ -134,9 +134,6 @@ class PentestFramework:
         Args:
             user_test_domain: Selected testing domain
         """
-        if not self.check_packages(user_test_domain):
-            print(f"{Bcolors.FAIL}[!] Unable to install required packages. Exiting...{Bcolors.ENDC}")
-            return
 
         # Match user_test_domain with appropriate handler
         handlers = {
@@ -180,6 +177,13 @@ class PentestFramework:
             try:
                 user = self.classes["user"]
                 test_domain = user.get_user_domain()
+                
+                #Check packages before getting user input
+                if not self.check_packages(test_domain):
+                    print(f"{Bcolors.FAIL}[*] Required packages are missing. Installing them...{Bcolors.ENDC}")
+                    continue
+                
+                # get user input and set domain variables
                 user.set_domain_variables(test_domain)
 
                 self.process_domain(test_domain)
