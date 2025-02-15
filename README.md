@@ -1,20 +1,26 @@
 # Pyth0n-P3nt3st-Scripts
 
-Python scripts to aid in pentest automation.
+Python scripts that aims to automate common activities conducted during penetration testing.
 - Start by installing all the dependencies in the requirements.txt
+```shell
+pip3 install -r requirements.txt
 
-| Domain                       | Script Target                     |
-|------------------------------|-----------------------------------|
-| External Penetration Testing | 1. Enumerate subdomains           |
-|                              |                                   |
-| Internal Penetration Testing | 1. Enumerate IPs give CIDR        |
-|                              | 2. Run netexec                    |
-|                              | 3. Compare Hashes obtained        |
-|                              |                                   |
-| Mobile Penetration Testing   | 1. Static Analysis [iOS/Android]  |
-|                              |                                   |
-| Vulnerability Analysis       | 1. Analyze Nessus VA output (csv) |
+```
+  
+Some of the Scope covered or in progress include but not limited to:
 
+| Domain                       | Script Target                                     |
+|------------------------------|---------------------------------------------------|
+| External Penetration Testing | 1. Enumerate subdomains     [coming soon]         |
+|                              |                                                   |
+| Internal Penetration Testing | 1. Enumerate IPs give CIDR [completed]            |
+|                              | 2. Run netexec         des                        |
+|                              | 3. Compare Hashes obtained                        |
+|                              |                                                   |
+| Mobile Penetration Testing   | 1. Static Analysis (iOS/Android)                  |
+|                              |                                                   |
+| Vulnerability Analysis       | 1. Analyze Nessus and Rapid7 VA scans [completed] |
+|                              | 2. Accepts both CSV and XSLX inputs   [completed] |
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
