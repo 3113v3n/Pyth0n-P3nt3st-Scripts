@@ -281,8 +281,9 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         summary_rows =[]
         
          # Map category names to more readable titles
-        category_titles = self.NESSUS_VULN_CATEGORIES
-        for category, dataframe in issues.items():
+        category_titles = (self.NESSUS_VULN_CATEGORIES if self.scanner == "nessus" else self.RAPID7_VULN_CATEGORIES)
+        category_mapping = {value: key for key, value in category_titles.items()}
+        for condition, dataframe in issues.items():
             if dataframe.empty:
                 continue
             
@@ -296,9 +297,10 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
                 
             formatted_hosts = '\n'.join(hosts)
                 
+            category_name = category_mapping.get(condition, condition)
             summary_rows.append({
             'S.No': len(summary_rows) + 1,
-            'Observation': category_titles.get(category, category),
+            'Observation': category_mapping,
             'Description': '', # Empty column for manual input
             'Impact': '', # Empty 
             'Risk Rating': '', # Empty 
