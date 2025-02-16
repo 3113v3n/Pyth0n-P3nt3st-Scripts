@@ -279,37 +279,33 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         :return: Dataframe
         """
         summary_rows =[]
-        for _, dataframe in issues.items():
+        
+         # Map category names to more readable titles
+        category_titles = self.NESSUS_VULN_CATEGORIES
+        for category, dataframe in issues.items():
             if dataframe.empty:
                 continue
             
             # Group unique vulnerabilities 
             if self.scanner == "nessus":
                 grouped = dataframe.groupby("Name")
-                title_field = 'Name'
-                desc_field = 'Description'
-                impact_field = 'Risk'
-                solution_field = 'Solution'
+                hosts = dataframe['Host'].unique()
             else:
                 grouped = dataframe.groupby("Vulnerability Title")
-                title_field = 'Vulnerability Title'
-                desc_field = 'Vulnerability Description'
-                impact_field = 'Vulnerability Severity Level'
-                solution_field = 'Vulnerability Solution'
+                hosts = dataframe['Asset IP Address'].unique()
                 
-            for name, group in grouped:
-                affected_hosts = ', '.join(group['Host'].unique() if self.scanner == "nessus" 
-                                     else group['Asset IP Address'].unique())
-                summary_rows.append({
-                'S.No': len(summary_rows) + 1,
-                'Observation': name,
-                'Description': '', # Empty column for manual input
-                'Impact': '', # Empty 
-                'Risk Rating': '', # Empty 
-                'Recommendation':'', # Empty 
-                'Affected Hosts': affected_hosts,
-                'Management Response': ''  # Empty column for manual input
-            })
+            formatted_hosts = '\n'.join(hosts)
+                
+            summary_rows.append({
+            'S.No': len(summary_rows) + 1,
+            'Observation': category_titles.get(category, category),
+            'Description': '', # Empty column for manual input
+            'Impact': '', # Empty 
+            'Risk Rating': '', # Empty 
+            'Recommendation':'', # Empty 
+            'Affected Hosts': formatted_hosts,
+            'Management Response': ''  # Empty column for manual input
+        })
             
         # Create a summary dataframe
         summary_df = self.create_pd_dataframe(summary_rows, self.SUMMARY_SHEET_HEADERS)
