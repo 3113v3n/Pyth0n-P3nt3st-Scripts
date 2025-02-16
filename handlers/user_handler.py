@@ -1,10 +1,11 @@
 # trunk-ignore-all(black)
 from utils.shared import Config
 from handlers import FileHandler
-from utils.shared import Loader
+from utils.shared import ScreenHandler
 from time import sleep
 
-class UserHandler(FileHandler, Config):
+
+class UserHandler(FileHandler, Config, ScreenHandler):
     """Class will be responsible for handling user interactions with
     The different domains"""
 
@@ -38,63 +39,33 @@ class UserHandler(FileHandler, Config):
         # Join the list into a single multi-line string
         return "".join(test_options)
 
-    # User Interactions
-    def loader(self, message: str, end_message: str):
-        with Loader(message, end_message):
-            for i in range(10):
-                sleep(0.25)
-
     def mobile_ui_interaction(self):
         while True:
             try:
                 self.loader("[*][*] Loading Mobile Assessment Module...",
                             "Starting Mobile Assessment...")
-                
-                package_path = input(
+
+                package_path = self.get_file_path(
                     "Please provide the Path to your mobile application(s)\nPath to File:  "
-                ).strip()
-                # Show list of apks available
-                if not self.check_folder_exists(package_path):
-                    raise ValueError("No Such Folder exists")
-                applications = self.display_saved_files(
-                    package_path, display_applications=True
                 )
 
+                applications = self.display_files_onscreen(package_path,
+                                                           self.display_saved_files,
+                                                           display_applications=True)
                 if applications:
                     return applications
-                else:
-                    raise FileExistsError("No Files Present in the provided Directory")
+
             except (ValueError, FileExistsError) as error:
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
-    @staticmethod
-    def show_submenu(menu_selection: str,
-                     options: list | tuple,
-                     check_range_string: str,
-                     check_range_function: callable,
-                     start_color: str,
-                     end_color: str,
-                     **kwargs):
-        print(menu_selection)
-        for option in options:
-            # Ensure both scanner menu and file extension are sorted for
-            if "scanner" in kwargs:
-                new_option = option["name"]
-            else:
-                new_option = option.upper()
-            print(f" {start_color}[{options.index(option) + 1}]{end_color}"
-                  f" {new_option}"
-                  )
-        return check_range_function(f"\n {check_range_string}", options)
-
     def va_ui_interaction(self):
         self.loader("[*][*] Loading Vulnerability Analysis Module...",
-                            "Starting Vulnerability Analysis...")
+                    "Starting Vulnerability Analysis...")
         while True:
 
             try:
                 # Select Scanner [ Nessus | Rapid7 ]
-                scanner_index = self.show_submenu(
+                scanner_index = self.create_menu_selection(
                     menu_selection=f" {self.HEADER}Select Vulnerability Scanner used:{self.ENDC} \n\n",
                     options=self.vulnerability_scanners,
                     check_range_string="Scanner: ",
@@ -106,7 +77,7 @@ class UserHandler(FileHandler, Config):
                 selected_scanner = self.vulnerability_scanners[scanner_index]["alias"]
 
                 # File format of the files [CSV or XLSX ]
-                file_format_index = self.show_submenu(
+                file_format_index = self.create_menu_selection(
                     menu_selection=f" \n {self.WARNING} Select the file "
                                    f"format of the Scanned File(s):{self.ENDC} \n",
                     options=self.SCAN_FILE_FORMAT,
@@ -121,38 +92,30 @@ class UserHandler(FileHandler, Config):
 
                 # file extension ensures we display the correct file extensions
 
-                search_dir = input(
-                    "\nEnter Location Where your files are located \n"
-                ).strip()
-                if not self.check_folder_exists(search_dir):
-                    raise ValueError("No Such Folder exists")
-
-                files_tuple = self.display_saved_files(
-                    # display files depending on user selected extension
-                    search_dir, scan_extension=file_extension
+                search_dir = self.get_file_path(
+                    "\nEnter Location Where your Scan files are located \n"
                 )
 
-                if files_tuple:
-                    # Display all available CSV files
+                files_tuple = self.display_files_onscreen(
+                    # display files depending on user selected extension
+                    search_dir, self.display_saved_files, scan_extension=file_extension
+                )
 
-                    output_filename = input(
-                        "[+] Provide a name for your output file: "
-                    ).strip()
+                output_filename = self.get_output_filename()
 
-                    return {
-                        "input_file": files_tuple,
-                        "output": output_filename,
-                        "scanner": selected_scanner,
-                    }
-                else:
-                    raise FileExistsError("No Files Present in the provided Directory")
+                return {
+                    "input_file": files_tuple,
+                    "output": output_filename,
+                    "scanner": selected_scanner,
+                }
+
 
             except (FileExistsError, ValueError) as error:
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
 
     def external_ui_interaction(self):
         self.loader("[*][*] Loading External Assessment Module...",
-                            "Starting External Assessment...")
+                    "Starting External Assessment...")
         website_domain = (
             input("Enter domain to enumerate (example.domain.com)").strip().lower()
         )
@@ -170,9 +133,9 @@ class UserHandler(FileHandler, Config):
                 output_file = ""
 
                 while True:
-                # Check for empty input
+                    # Check for empty input
                     mode = input(self.internal_mode_choice).strip().lower()
-                    
+
                     if not mode:
                         print(f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
                         continue
@@ -190,9 +153,9 @@ class UserHandler(FileHandler, Config):
                     # returns an ip address if a file exists
                     # returns None if no file exists
 
-                    resume_ip = self.display_saved_files(
-                        self.output_directory, resume_scan=True
-                    )
+                    resume_ip = self.display_files_onscreen(self.output_directory,
+                                                            self.display_saved_files,
+                                                            resume_scan=True)
 
                     if resume_ip is None:
                         raise ValueError("No Previously saved file present")
@@ -207,9 +170,9 @@ class UserHandler(FileHandler, Config):
                         else:
                             print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
                             continue
-                elif mode == "scan":
+                else:
                     subnet = self.get_user_subnet()
-                    output_file = input("\n[+] Provide a name for your output file: ").strip()
+                    output_file = self.get_output_filename()
 
                 return {
                     "subnet": subnet,
@@ -224,9 +187,13 @@ class UserHandler(FileHandler, Config):
             print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
             mode = "scan"
             subnet = self.get_user_subnet()
-            output_file = input("\n[+] Provide a name for your output file: ").strip()
+            output_file = self.get_output_filename()
 
-
+            return {
+                "subnet": subnet,
+                "mode": mode,
+                "output": output_file,
+            }
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
@@ -301,4 +268,3 @@ class UserHandler(FileHandler, Config):
         except Exception as error:
             print(f"{self.FAIL}\n[!] Error setting domain variables {error}{self.ENDC}")
             raise
-

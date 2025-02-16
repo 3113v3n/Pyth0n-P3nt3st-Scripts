@@ -143,32 +143,32 @@ class FileHandler(Validator, Bcolors):
                 file_object = {"filename": file,
                                "full_path": os.path.join(root, file)}
                 self.files.append(file_object)
+            
 
     def display_saved_files(self, dir_to_search, **kwargs):
         """Display to the user a list of files available
         and returns the last ip present in that file"""
         self.find_files(dir_to_search)
-
-        csv_files = [
-            file
-            for file in self.files
-            if self.check_filetype(file["filename"], "csv")
-        ]
-        xlsx_files = [file
-                      for file in self.files
-                      if self.check_filetype(file["filename"], "xlsx")]
+        
+        get_files_by_type = lambda ext: list(filter(
+            lambda file: self.check_filetype(file["filename"], ext),
+            self.files
+        ))
+        csv_files = get_files_by_type("csv")
+        xlsx_files = get_files_by_type("xlsx")
+        app_files = list(filter(
+            lambda file: self.check_filetype(file["filename"], "apk") or 
+            self.check_filetype(file["filename"], "ipa"),
+            self.files
+        ))
         both_files = csv_files + xlsx_files
-        app_files = [
-            file
-            for file in self.files
-            if self.check_filetype(file["filename"], "apk")
-            or self.check_filetype(file["filename"], "ipa")
-        ]
 
         # Only display files containing unresponsive hosts
-        unresponsive_host_files = [
-            file for file in csv_files if "unresponsive_host" in file["filename"]
-        ]
+        
+        unresponsive_host_files =  list(filter(
+            lambda file: "unresponsive_host" in file["filename"],
+            csv_files
+        ))
         # filter out CSV files only
         if (
                 "scan_extension" in kwargs
