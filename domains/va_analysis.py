@@ -255,16 +255,69 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         # identifier and dataframe
 
         issues = self.categorize_vulnerabilities()
+        
+        # create summary page
+        summary_page = self.create_summary_sheet(issues)
+        
         found_vulnerabilities = [
             {"dataframe": issue[1], "sheetname": f"{issue[0]}"}
             for issue in issues.items()
         ]
-
+        
+        # append the first sheet to the list of found vulnerabilities
+        found_vulnerabilities.insert(0, {"dataframe": summary_page, "sheetname": "Summary"})
+      
         self.save_vulns_to_files(
             unfiltered_data=unfiltered,
             found_vulnerabilities=found_vulnerabilities,
             output_file=output_file,
         )
+
+    def create_summary_sheet(self, issues:dict):
+        """Create a summary page for the vulnerabilities
+        :param: issues ==> Dictionary containing key, value pair of dataframe
+        :return: Dataframe
+        """
+        summary_rows =[]
+        for _, dataframe in issues.items():
+            if dataframe.empty:
+                continue
+            
+            # Group unique vulnerabilities 
+            if self.scanner == "nessus":
+                grouped = dataframe.groupby("Name")
+                title_field = 'Name'
+                desc_field = 'Description'
+                impact_field = 'Risk'
+                solution_field = 'Solution'
+            else:
+                grouped = dataframe.groupby("Vulnerability Title")
+                title_field = 'Vulnerability Title'
+                desc_field = 'Vulnerability Description'
+                impact_field = 'Vulnerability Severity Level'
+                solution_field = 'Vulnerability Solution'
+                
+            for name, group in grouped:
+                affected_hosts = ', '.join(group['Host'].unique() if self.scanner == "nessus" 
+                                     else group['Asset IP Address'].unique())
+                summary_rows.append({
+                'S.No': len(summary_rows) + 1,
+                'Observation': name,
+                'Description': '', # Empty column for manual input
+                'Impact': '', # Empty 
+                'Risk Rating': '', # Empty 
+                'Recommendation':'', # Empty 
+                'Affected Hosts': affected_hosts,
+                'Management Response': ''  # Empty column for manual input
+            })
+            
+        # Create a summary dataframe
+        summary_df = self.create_pd_dataframe(summary_rows, self.SUMMARY_SHEET_HEADERS)
+        return summary_df
+                
+
+            
+            
 
     def save_vulns_to_files(self, unfiltered_data, found_vulnerabilities, output_file):
         """Handles Saving data to File"""
