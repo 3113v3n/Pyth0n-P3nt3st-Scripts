@@ -14,7 +14,8 @@ class FileHandler(Validator, Bcolors):
         self.assessment_domain = ""  # one of [internal,external,mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
-            f"{self.working_dir}/output_directory"  # directory to save our output files
+            # directory to save our output files
+            f"{self.working_dir}/output_directory"
         )
         self.filepath = ""  # full path to saved file
         self.files = []
@@ -100,7 +101,8 @@ class FileHandler(Validator, Bcolors):
             file_header = "Unresponsive IP Addresses"
             self.unresponsive_hosts_file = file_path
 
-        data = pandas.DataFrame({file_header: [content]})  # Live Hosts : [Ip addresses]
+        # Live Hosts : [Ip addresses]
+        data = pandas.DataFrame({file_header: [content]})
 
         if self.file_exists(f"{file_path}"):
             existing_df = self.read_csv(f"{file_path}")
@@ -138,7 +140,8 @@ class FileHandler(Validator, Bcolors):
         for root, _, files in os.walk(search_path):
 
             for file in files:
-                file_object = {"filename": file, "full_path": os.path.join(root, file)}
+                file_object = {"filename": file,
+                               "full_path": os.path.join(root, file)}
                 self.files.append(file_object)
 
     def display_saved_files(self, dir_to_search, **kwargs):
@@ -159,7 +162,7 @@ class FileHandler(Validator, Bcolors):
             file
             for file in self.files
             if self.check_filetype(file["filename"], "apk")
-               or self.check_filetype(file["filename"], "ipa")
+            or self.check_filetype(file["filename"], "ipa")
         ]
 
         # Only display files containing unresponsive hosts
@@ -279,14 +282,15 @@ class FileHandler(Validator, Bcolors):
     def read_csv(dataframe, **kwargs):
         if "header" in kwargs:
             return pandas.read_csv(dataframe, header="infer")
-        return pandas.read_csv(dataframe, encoding="ISO-8859-1")  # utf-16 cp1252
+        # utf-16 cp1252
+        return pandas.read_csv(dataframe, encoding="ISO-8859-1")
 
     @staticmethod
     def read_excel_file(file, **kwargs):
         try:
-            return pandas.read_excel(file, 
+            return pandas.read_excel(file,
                                      engine="openpyxl",
-                                     skiprows=1,
+
                                      **kwargs)
         except Exception as e:
             print(f"Error reading excel file: {e}")
@@ -307,7 +311,8 @@ class FileHandler(Validator, Bcolors):
         ) as writer:
             # Copy existing sheets to writer
             for sheet_name in writer.book.sheetnames:
-                df = pandas.read_excel(file, sheet_name=sheet_name, engine="openpyxl")
+                df = pandas.read_excel(
+                    file, sheet_name=sheet_name, engine="openpyxl")
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
             # Write new data frame to new sheet
             data_frame["dataframe"].to_excel(
@@ -329,7 +334,8 @@ class FileHandler(Validator, Bcolors):
             ip_list = data_frame.iloc[:, 0].dropna().tolist()
 
             # Convert to IPAddress objects for correct numerical sorting
-            sorted_ips = sorted(ip_list, key=lambda ip: ipaddress.ip_address(ip))
+            sorted_ips = sorted(
+                ip_list, key=lambda ip: ipaddress.ip_address(ip))
 
             last_address = sorted_ips[-1]
             return last_address
