@@ -18,7 +18,7 @@ class VAConfigs:
         "See Also",
         "Plugin Output",
     ]
-    SUMMARY_PAGE_HEADERS = [
+    SUMMARY_SHEET_HEADERS = [
         "S.No",
         "Observation",
         "Description",

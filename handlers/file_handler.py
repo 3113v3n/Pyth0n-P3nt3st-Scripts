@@ -373,7 +373,12 @@ class FileHandler(Validator, Bcolors):
                 file.seek(0)
             last_line = file.readline().decode()
         return last_line
-
+    
+    @staticmethod
+    def create_pd_dataframe(data:list, columns:list):
+        """Create a pandas dataframe from a list of dictionaries"""
+        return pandas.DataFrame(data, columns=columns)
+    
     @staticmethod
     def read_all_lines(file):
         with open(file, "r") as file:
