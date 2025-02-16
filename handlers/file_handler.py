@@ -389,3 +389,7 @@ class FileHandler(Validator, Bcolors):
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
         removed_extension = Path(file).stem
         return f"{removed_extension}_{timestamp}.{extension}"
+
+    @staticmethod
+    def sort_dataframe(dataframe,order):
+        return pandas.Categorical(dataframe,categories=order,ordered=True)

@@ -255,67 +255,82 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
         # identifier and dataframe
 
         issues = self.categorize_vulnerabilities()
-        
+
         # create summary page
         summary_page = self.create_summary_sheet(issues)
-        
+
         found_vulnerabilities = [
             {"dataframe": issue[1], "sheetname": f"{issue[0]}"}
             for issue in issues.items()
         ]
-        
+
         # append the first sheet to the list of found vulnerabilities
-        found_vulnerabilities.insert(0, {"dataframe": summary_page, "sheetname": "Summary"})
-      
+        found_vulnerabilities.insert(
+            0, {"dataframe": summary_page, "sheetname": "Summary"})
+
         self.save_vulns_to_files(
             unfiltered_data=unfiltered,
             found_vulnerabilities=found_vulnerabilities,
             output_file=output_file,
         )
 
-    def create_summary_sheet(self, issues:dict):
+    def create_summary_sheet(self, issues: dict):
         """Create a summary page for the vulnerabilities
         :param: issues ==> Dictionary containing key, value pair of dataframe
         :return: Dataframe
         """
-        summary_rows =[]
-        
-         # Map category names to more readable titles
-        category_titles = (self.NESSUS_VULN_CATEGORIES if self.scanner == "nessus" else self.RAPID7_VULN_CATEGORIES)
-        category_mapping = {value: key for key, value in category_titles.items()}
-        for condition, dataframe in issues.items():
+        summary_rows = []
+
+        # Map category names to more readable titles
+        vuln_categories = (self.NESSUS_VULN_CATEGORIES if self.scanner ==
+                           "nessus" else self.RAPID7_VULN_CATEGORIES)
+
+        for condition,dataframe in issues.items():
+
             if dataframe.empty:
+                #print(f"\n{self.FAIL}DEBUG: Dataframe for: {condition} is empty..Skipping{self.ENDC}")
                 continue
-            
-            # Group unique vulnerabilities 
+
+            #print(f"\nDEBUG: Processing condition: {condition}")
+            category_name = next((name for name, cond in vuln_categories.items()
+                                  if cond == condition),condition)
+
+            # Group unique vulnerabilities by hosts
             if self.scanner == "nessus":
-                grouped = dataframe.groupby("Name")
                 hosts = dataframe['Host'].unique()
             else:
-                grouped = dataframe.groupby("Vulnerability Title")
                 hosts = dataframe['Asset IP Address'].unique()
-                
+
+            #print(f"Debug - Found {len(hosts)} hosts for {category_name}")
+
             formatted_hosts = '\n'.join(hosts)
-                
-            category_name = category_mapping.get(condition, condition)
+
             summary_rows.append({
-            'S.No': len(summary_rows) + 1,
-            'Observation': category_mapping,
-            'Description': '', # Empty column for manual input
-            'Impact': '', # Empty 
-            'Risk Rating': '', # Empty 
-            'Recommendation':'', # Empty 
-            'Affected Hosts': formatted_hosts,
-            'Management Response': ''  # Empty column for manual input
-        })
+                'S.No': len(summary_rows) + 1,
+                'Observation': category_name,
+                'Description': '',  # Empty column for manual input
+                'Impact': '',  # Empty
+                'Risk Rating': '',  # Empty
+                'Recommendation': '',  # Empty
+                'Affected Hosts': formatted_hosts,
+                'Management Response': ''  # Empty column for manual input
+            })
+            #print(f"\nDEBUG: Added row for {category_name}")
+
+        #print(f"\nDEBUG: Total summary rows created: {len(summary_rows)}")
             
         # Create a summary dataframe
-        summary_df = self.create_pd_dataframe(summary_rows, self.SUMMARY_SHEET_HEADERS)
-        return summary_df
-                
+        summary_df = self.create_pd_dataframe(
+            summary_rows, self.SUMMARY_SHEET_HEADERS)
 
-            
-            
+        risk_order = ['Critical', 'High', 'Medium']
+        summary_df['Risk Sort'] = self.sort_dataframe(
+            summary_df['Risk Rating'],
+            risk_order,
+            )
+        summary_df = summary_df.sort_values('Risk Sort').drop('Risk Sort',axis=1)
+        #print(f"\nDEBUG: - Final dataframe: {summary_df.shape}")
+        return summary_df
 
     def save_vulns_to_files(self, unfiltered_data, found_vulnerabilities, output_file):
         """Handles Saving data to File"""
