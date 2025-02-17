@@ -147,78 +147,131 @@ class FileHandler(Validator, Bcolors):
 
     def display_saved_files(self, dir_to_search, **kwargs):
         """Display to the user a list of files available
-        and returns the last ip present in that file"""
-        self.find_files(dir_to_search)
+        and returns the last ip present in that file
         
+        :param dir_to_search: Directory to search for files
+        :param kwargs: Keyword arguments
+               - resume_scan: Resume scan
+               - display_applications: Display applications
+               - scan_extension: Scan extension
+        :return: List of files
+        """
+        
+        self.find_files(dir_to_search)
+        #Get filtered files based on kwargs
+        self.files = self._get_filtered_files(**kwargs)
+        if not self.files:
+            return None
+
+        # Display file options
+        self._display_file_options()
+
+        # Resume scan
+        return self._handle_analysis(**kwargs)
+    
+    def _get_filtered_files(self, **kwargs)->list:
+        """Get filtered files based on user input
+        
+        :param kwargs: Keyword arguments
+        :return: List of filtered files
+        """
+        file_collection = self._get_file_collections()
+        
+        #Apply filters based on kwargs
+        if kwargs.get("scan_extension"):
+            return self._filter_files_by_extension(
+                file_collection, 
+                kwargs["scan_extension"]
+                )
+        elif kwargs.get("resume_scan"):
+            return self._filter_unresponsive_host_files(file_collection["csv"])
+        elif kwargs.get("display_applications"):
+            return file_collection["applications"]
+        return self.files
+    
+    def _get_file_collections(self)->dict:
+        """ Get different collections of files b type
+        :return: Dictionary of file collections
+        """
         get_files_by_type = lambda ext: list(filter(
             lambda file: self.check_filetype(file["filename"], ext),
             self.files
         ))
         csv_files = get_files_by_type("csv")
         xlsx_files = get_files_by_type("xlsx")
-        app_files = list(filter(
+        both_files = csv_files + xlsx_files
+        application_files = list(filter(
             lambda file: self.check_filetype(file["filename"], "apk") or 
             self.check_filetype(file["filename"], "ipa"),
             self.files
         ))
-        both_files = csv_files + xlsx_files
-
-        # Only display files containing unresponsive hosts
+        return {
+            "csv": csv_files,
+            "xlsx": xlsx_files,
+            "both": both_files,
+            "applications": application_files
+        }
+    
+    def _filter_unresponsive_host_files(self,csv_files)->list:
+        """
+        Filter out CSV files only who are unresponsive
         
-        unresponsive_host_files =  list(filter(
+        :param csv_files: List of CSV files
+        :return: List of unresponsive host files
+        """
+        unresponsive_file = list(filter(
             lambda file: "unresponsive_host" in file["filename"],
             csv_files
         ))
-        # filter out CSV files only
-        if (
-                "scan_extension" in kwargs
-        ):  # any(key in kwargs for key in ("display_csv", "resume_scan")):
-            # Show files selected by user
-            if kwargs['scan_extension'] == "csv":
-                self.files = csv_files
-            elif kwargs['scan_extension'] == "xlsx":
-                self.files = xlsx_files
-            elif kwargs['scan_extension'] == "both":
-                self.files = both_files
-
-        elif "resume_scan" in kwargs:
-            self.files = unresponsive_host_files
-
-        # allow user to view only apks and ios
-        elif "display_applications" in kwargs:
-            self.files = app_files
-
-        if len(self.files) != 0:
-            display_strs = []  # list to collect all display strings
-
-            for index in range(len(self.files)):
-                # Prepare the display string for each file
-                filename = f" {self.BOLD}{self.WARNING}{self.files[index]['filename']}{self.ENDC}"
-                display_str = (
-                    f"Enter [{self.OKGREEN}{self.BOLD}{index + 1}{self.ENDC}] to select"
-                    f"{filename}"
-                )
-                display_strs.append(display_str)
-
-            # print all collected strings
-            for display_str in display_strs:
-                print(display_str)
-
-            # Resume scan
-            if "scan_extension" in kwargs:
-                # Display files to perform VA analysis
-                return self.do_analysis("files")
-
-            elif "display_applications" in kwargs:
-                return self.do_analysis("applications")
-
-            elif "resume_scan" in kwargs:
-                # Handle users choice
-                # returns the last ip address
-                return self.do_analysis()
-
-        else:
+        if not unresponsive_file:
+            print(f"{self.FAIL}No unresponsive host files found{self.ENDC}")
             return None
+        return unresponsive_file
+    
+    def _filter_files_by_extension(self,collections, extension)->list:
+        """Filter files by extension
+        
+        :param
+                collections: Dictionary of file collections
+                extension: Extension to filter by
+                
+        :return: List of files filtered by extension
+        """
+        if extension not in ["csv","xlsx","both"]:
+            print(f"{self.FAIL}Invalid extension: {extension}{self.ENDC}")
+            return None
+        filtered_files = collections[extension]
+        
+        if not filtered_files:
+            print(f"{self.FAIL}No files found{self.ENDC}")
+            return None
+        
+        return filtered_files
+
+       
+    def _display_file_options(self):
+        """Display available file options to user"""
+        for index, file in enumerate(self.files, 1):
+            filename = f" {self.BOLD}{self.WARNING}{file['filename']}{self.ENDC}"
+            display_str = (
+                f"Enter [{self.OKGREEN}{self.BOLD}{index}{self.ENDC}] to select"
+                f"{filename}"
+            )
+            print(display_str)
+            
+    def _handle_analysis(self, **kwargs):
+        if kwargs.get("scan_extension"):
+            # Display files to perform VA analysis
+            return self.do_analysis("files")
+
+        elif kwargs.get("display_applications"):
+            return self.do_analysis("applications")
+
+        elif kwargs.get("resume_scan"):
+            # Handle users choice
+            # returns the last ip address
+            return self.do_analysis()
+        
 
     def index_out_of_range_display(self, input_str, data_list) -> int:
         """Takes in an input string and a data list and returns the index of the

@@ -152,7 +152,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
                     # returns an ip address if a file exists
                     # returns None if no file exists
-
+                   
                     resume_ip = self.display_files_onscreen(self.output_directory,
                                                             self.display_saved_files,
                                                             resume_scan=True)
@@ -250,7 +250,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         """Update the variables object with reference to the test domain provisioned"""
 
         # Update the output directory with respective test domain
-        # self.update_output_directory(test_domain)
+        self.update_output_directory(test_domain)
         try:
             if test_domain == "internal":
                 self.domain_variables = self.internal_ui_interaction()

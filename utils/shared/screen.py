@@ -56,9 +56,12 @@ class ScreenHandler(Bcolors):
                       display_saved_files:callable,
                       **kwargs)->tuple:
         """Display files in directory with extension filter"""
-        files = display_saved_files(directory,scan_extension=kwargs.get("scan_extension"),
-                                    resume_scan=kwargs.get("resume_scan",False),
-                                    display_applications=kwargs.get("display_applications",False))
+        files = display_saved_files(
+            directory,
+            scan_extension=kwargs.get("scan_extension"),
+            resume_scan=kwargs.get("resume_scan",False),
+            display_applications=kwargs.get("display_applications",False)
+                                    )
         if not files:
             raise FileNotFoundError(f"{self.WARNING}\n[!] No files found in {directory}{self.ENDC}")
         return files
