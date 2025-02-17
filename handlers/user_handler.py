@@ -2,7 +2,6 @@
 from utils.shared import Config
 from handlers import FileHandler
 from utils.shared import ScreenHandler
-from time import sleep
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):
@@ -79,7 +78,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 # File format of the files [CSV or XLSX ]
                 file_format_index = self.create_menu_selection(
                     menu_selection=f" \n {self.WARNING} Select the file "
-                                   f"format of the Scanned File(s):{self.ENDC} \n",
+                    f"format of the Scanned File(s):{self.ENDC} \n",
                     options=self.SCAN_FILE_FORMAT,
                     check_range_string="File Format: ",
                     check_range_function=self.index_out_of_range_display,
@@ -88,7 +87,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
                 file_extension = self.SCAN_FILE_FORMAT[file_format_index]
-                print(f"\n{self.OKCYAN}Scanning {file_extension.upper()} file extensions{self.ENDC}")
+                print(
+                    f"\n{self.OKCYAN}Scanning {file_extension.upper()} file extensions{self.ENDC}")
 
                 # file extension ensures we display the correct file extensions
 
@@ -108,7 +108,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     "output": output_filename,
                     "scanner": selected_scanner,
                 }
-
 
             except (FileExistsError, ValueError) as error:
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
@@ -137,7 +136,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     mode = input(self.internal_mode_choice).strip().lower()
 
                     if not mode:
-                        print(f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
+                        print(
+                            f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
                         continue
                     # Ensure correct mode is selected by user
                     if mode not in ["scan", "resume"]:
@@ -152,7 +152,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
                     # returns an ip address if a file exists
                     # returns None if no file exists
-                   
+
                     resume_ip = self.display_files_onscreen(self.output_directory,
                                                             self.display_saved_files,
                                                             resume_scan=True)
@@ -168,7 +168,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                             subnet = f"{resume_ip}/{cidr}"
                             break
                         else:
-                            print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
+                            print(
+                                f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
                             continue
                 else:
                     subnet = self.get_user_subnet()
@@ -189,18 +190,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             subnet = self.get_user_subnet()
             output_file = self.get_output_filename()
 
-            return {
-                "subnet": subnet,
-                "mode": mode,
-                "output": output_file,
-            }
+            
 
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
         # Reduce displayed index by 1 to avoid index error
         while True:
             try:
-                selected_index = int(input(self.formatted_question).strip()) - 1
+                selected_index = int(
+                    input(self.formatted_question).strip()) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
                 print(
@@ -266,5 +264,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 print(f"{self.FAIL}Invalid domain provided{self.ENDC}")
                 return
         except Exception as error:
-            print(f"{self.FAIL}\n[!] Error setting domain variables {error}{self.ENDC}")
+            print(
+                f"{self.FAIL}\n[!] Error setting domain variables {error}{self.ENDC}")
             raise

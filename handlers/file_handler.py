@@ -193,10 +193,18 @@ class FileHandler(Validator, Bcolors):
         """ Get different collections of files b type
         :return: Dictionary of file collections
         """
-        get_files_by_type = lambda ext: list(filter(
-            lambda file: self.check_filetype(file["filename"], ext),
-            self.files
-        ))
+        def get_files_by_type(ext):
+            """Filter files by extension type
+
+            :param
+                ext: File extension
+            :return
+                list: Files matching the extension
+            """
+            return list(filter(
+                lambda file: self.check_filetype(file["filename"], ext),
+                  self.files
+                  ))
         csv_files = get_files_by_type("csv")
         xlsx_files = get_files_by_type("xlsx")
         both_files = csv_files + xlsx_files

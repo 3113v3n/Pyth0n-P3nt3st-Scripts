@@ -26,7 +26,7 @@ class ScreenHandler(Bcolors):
     @staticmethod
     def loader(message: str, end_message: str):
         with Loader(message, end_message):
-            for i in range(10):
+            for _ in range(10):
                 sleep(0.25) 
                 
     def get_file_path(self, prompt: str):
