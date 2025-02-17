@@ -149,55 +149,15 @@ class FileHandler(Validator, Bcolors):
         """Display to the user a list of files available"""
         self.find_files(dir_to_search)
         
-        if kwargs.get('resume_scan'):
-            # Filter for unresponsive host files
-            unresponsive_files = [
-                file for file in self.files 
-                if self.check_filetype(file["filename"], "csv") and 
-                   "unresponsive_host" in file["filename"]
-            ]
-            
-            if not unresponsive_files:
-                return None
-                
-            self.files = unresponsive_files
-        elif kwargs.get('scan_extension'):
-            # ... existing scan extension logic ...
-            pass
-        elif kwargs.get('display_applications'):
-            # ... existing applications logic ...
-            pass
+        self.files = self._get_filtered_files(**kwargs)
 
         if not self.files:
             return None
 
         # Display available files
-        for index in range(len(self.files)):
-            filename = f" {self.BOLD}{self.WARNING}{self.files[index]['filename']}{self.ENDC}"
-            print(
-                f"Enter [{self.OKGREEN}{self.BOLD}{index + 1}{self.ENDC}] to select"
-                f"{filename}"
-            )
-
-        # Get user selection and process accordingly
-        try:
-            choice = int(input("\nChoice: ").strip())
-            if 1 <= choice <= len(self.files):
-                selected_file = self.files[choice - 1]
-                self.filepath = selected_file["full_path"]
-                
-                if kwargs.get('resume_scan'):
-                    return self.get_last_unresponsive_ip(self.filepath)
-                elif kwargs.get('display_applications'):
-                    return self.filepath
-                else:
-                    return self.filepath, selected_file["filename"]
-            else:
-                print(f"{self.WARNING}Invalid choice{self.ENDC}")
-                return None
-        except ValueError:
-            print(f"{self.WARNING}Please enter a valid number{self.ENDC}")
-            return None
+        self._display_file_options()
+        # Resume scan
+        return self._handle_analysis(**kwargs)
     
     def _get_filtered_files(self, **kwargs)->list:
         """Get filtered files based on user input
@@ -262,7 +222,6 @@ class FileHandler(Validator, Bcolors):
             csv_files
         ))
         if not unresponsive_file:
-            print(f"{self.FAIL}No unresponsive host files found{self.ENDC}")
             return None
         return unresponsive_file
     

@@ -166,7 +166,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 # If mode is scan or defaulted to scan
                 if mode == "scan":
                     subnet = self.get_user_subnet()
-                    output_file = input("\n[+] Provide a name for your output file: ").strip()
+                    output_file = self.get_output_filename()
 
                 return {
                     "subnet": subnet,
@@ -178,7 +178,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             print(f"{self.FAIL}[!] An error occurred: {error}{self.ENDC}")
             mode = "scan"
             subnet = self.get_user_subnet()
-            output_file = input("\n[+] Provide a name for your output file: ").strip()
+            output_file =self.get_output_filename()
             return {
                 "subnet": subnet,
                 "mode": mode,
@@ -237,26 +237,49 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
         return cidr
 
-    def set_domain_variables(self, test_domain):
-        """Update the variables object with reference to the test domain provisioned"""
+    def set_domain_variables(self, test_domain:str)->dict:
+        """Update the variables object with reference to the test domain provisioned
+        
+        :param 
+            test-domain: The domain to be tested (internal,external,mobile,va)
 
-        # Update the output directory with respective test domain
-        self.update_output_directory(test_domain)
+        :returns
+            dict: Domain-specific variables
+
+        :Raises
+            ValueError: if Invalid- domain provided
+            DomainError: If domain specific operation fails
+        """
+        domain_handlers={
+            "internal": self.internal_ui_interaction,
+            "external": self.external_ui_interaction,
+            "mobile":self.mobile_ui_interaction,
+            "va":self.va_ui_interaction
+        }
+
+        
         try:
-            if test_domain == "internal":
-                self.domain_variables = self.internal_ui_interaction()
-            elif test_domain == "external":
-                # TODO: [UNDER DEVELOPMENT !!]
-                self.domain_variables = self.external_ui_interaction()
-            elif test_domain == "mobile":
-                # TODO: [UNDER DEVELOPMENT]
-                self.domain_variables = self.mobile_ui_interaction()
-            elif test_domain == "va":
-                self.domain_variables = self.va_ui_interaction()
-            else:
-                print(f"{self.FAIL}Invalid domain provided{self.ENDC}")
-                return
+            if test_domain not in domain_handlers:
+                raise ValueError(f"Invalid domain: {test_domain}")
+            
+            #Update output directory
+            self.update_output_directory(test_domain)
+
+            # Get domain handler
+            handler = domain_handlers[test_domain]
+            self.domain_variables = handler()
+
+            if not self.domain_variables:
+                raise ValueError(f"No variables returned for domain: {test_domain}")
+            return self.domain_variables
+
         except Exception as error:
+            error_msg = f"Error in {test_domain} domain: {str(error)}"
             print(
-                f"{self.FAIL}\n[!] Error setting domain variables {error}{self.ENDC}")
-            raise
+                f"{self.FAIL}\n[!] {error_msg}{self.ENDC}")
+            raise DomainError(error_msg) from error
+
+
+class DomainError(Exception):
+    """Custom exception for domain-related errors"""
+    pass
