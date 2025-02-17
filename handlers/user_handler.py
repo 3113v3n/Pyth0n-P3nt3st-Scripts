@@ -125,54 +125,48 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         return {"target_domain": website_domain}
 
     def internal_ui_interaction(self):
+        """Handle internal assessment UI interactions"""
         try:
             while True:
                 self.loader("[*][*] Loading Internal Assessment Module...",
-                            "Starting Internal Assessment...")
+                          "Starting Internal Assessment...")
                 subnet = ""
                 output_file = ""
 
                 while True:
-                    # Check for empty input
                     mode = input(self.internal_mode_choice).strip().lower()
-
                     if not mode:
                         print(f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
                         continue
-                    # Ensure correct mode is selected by user
                     if mode not in ["scan", "resume"]:
                         mode = input(self.internal_choice_error)
                         continue
                     break
 
                 if mode == "resume":
-                    """
-                    Incase of resume module, get user subnet and append to the last ip obtained from the file
-                    """
-
-                    # returns an ip address if a file exists
-                    # returns None if no file exists
-                   
-                    resume_ip = self.display_files_onscreen(self.output_directory,
-                                                            self.display_saved_files,
-                                                            resume_scan=True)
-
+                    resume_ip = self.display_saved_files(
+                        self.output_directory,
+                        resume_scan=True
+                    )
+                    
                     if resume_ip is None:
-                        raise ValueError("No Previously saved file present")
-
-                    # Output file will be the name of unresponsive file without text 'unresponsive_hosts'
-                    output_file = self.filepath
-                    while True:
-                        cidr = self.get_cidr()
-                        if cidr:
-                            subnet = f"{resume_ip}/{cidr}"
-                            break
-                        else:
-                            print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
-                            continue
-                else:
+                        print(f"{self.WARNING}\n[!] No previous scan files found. Defaulting to scan mode.{self.ENDC}")
+                        mode = "scan"
+                    else:
+                        output_file = self.filepath
+                        while True:
+                            cidr = self.get_cidr()
+                            if cidr:
+                                subnet = f"{resume_ip}/{cidr}"
+                                break
+                            else:
+                                print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
+                                continue
+                
+                # If mode is scan or defaulted to scan
+                if mode == "scan":
                     subnet = self.get_user_subnet()
-                    output_file = self.get_output_filename()
+                    output_file = input("\n[+] Provide a name for your output file: ").strip()
 
                 return {
                     "subnet": subnet,
@@ -180,15 +174,11 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     "output": output_file,
                 }
 
-        except ValueError as error:
-            print(
-                f"{self.FAIL}[!] Cant use this module, {error}{self.ENDC}"
-            )
-            print(f"\nDefaulting to {self.OKCYAN}SCAN{self.ENDC} mode")
+        except Exception as error:
+            print(f"{self.FAIL}[!] An error occurred: {error}{self.ENDC}")
             mode = "scan"
             subnet = self.get_user_subnet()
-            output_file = self.get_output_filename()
-
+            output_file = input("\n[+] Provide a name for your output file: ").strip()
             return {
                 "subnet": subnet,
                 "mode": mode,

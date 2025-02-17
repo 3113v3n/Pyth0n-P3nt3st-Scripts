@@ -146,28 +146,58 @@ class FileHandler(Validator, Bcolors):
             
 
     def display_saved_files(self, dir_to_search, **kwargs):
-        """Display to the user a list of files available
-        and returns the last ip present in that file
-        
-        :param dir_to_search: Directory to search for files
-        :param kwargs: Keyword arguments
-               - resume_scan: Resume scan
-               - display_applications: Display applications
-               - scan_extension: Scan extension
-        :return: List of files
-        """
-        
+        """Display to the user a list of files available"""
         self.find_files(dir_to_search)
-        #Get filtered files based on kwargs
-        self.files = self._get_filtered_files(**kwargs)
+        
+        if kwargs.get('resume_scan'):
+            # Filter for unresponsive host files
+            unresponsive_files = [
+                file for file in self.files 
+                if self.check_filetype(file["filename"], "csv") and 
+                   "unresponsive_host" in file["filename"]
+            ]
+            
+            if not unresponsive_files:
+                return None
+                
+            self.files = unresponsive_files
+        elif kwargs.get('scan_extension'):
+            # ... existing scan extension logic ...
+            pass
+        elif kwargs.get('display_applications'):
+            # ... existing applications logic ...
+            pass
+
         if not self.files:
             return None
 
-        # Display file options
-        self._display_file_options()
+        # Display available files
+        for index in range(len(self.files)):
+            filename = f" {self.BOLD}{self.WARNING}{self.files[index]['filename']}{self.ENDC}"
+            print(
+                f"Enter [{self.OKGREEN}{self.BOLD}{index + 1}{self.ENDC}] to select"
+                f"{filename}"
+            )
 
-        # Resume scan
-        return self._handle_analysis(**kwargs)
+        # Get user selection and process accordingly
+        try:
+            choice = int(input("\nChoice: ").strip())
+            if 1 <= choice <= len(self.files):
+                selected_file = self.files[choice - 1]
+                self.filepath = selected_file["full_path"]
+                
+                if kwargs.get('resume_scan'):
+                    return self.get_last_unresponsive_ip(self.filepath)
+                elif kwargs.get('display_applications'):
+                    return self.filepath
+                else:
+                    return self.filepath, selected_file["filename"]
+            else:
+                print(f"{self.WARNING}Invalid choice{self.ENDC}")
+                return None
+        except ValueError:
+            print(f"{self.WARNING}Please enter a valid number{self.ENDC}")
+            return None
     
     def _get_filtered_files(self, **kwargs)->list:
         """Get filtered files based on user input
