@@ -193,6 +193,7 @@ class FileHandler(Validator, Bcolors):
         """ Get different collections of files b type
         :return: Dictionary of file collections
         """
+        
         get_files_by_type = lambda ext: list(filter(
             lambda file: self.check_filetype(file["filename"], ext),
             self.files
