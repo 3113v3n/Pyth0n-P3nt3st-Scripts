@@ -1,4 +1,6 @@
 import os
+from typing import Any, List
+
 import pandas
 from datetime import datetime
 from pathlib import Path
@@ -143,12 +145,11 @@ class FileHandler(Validator, Bcolors):
                 file_object = {"filename": file,
                                "full_path": os.path.join(root, file)}
                 self.files.append(file_object)
-            
 
     def display_saved_files(self, dir_to_search, **kwargs):
         """Display to the user a list of files available"""
         self.find_files(dir_to_search)
-        
+
         self.files = self._get_filtered_files(**kwargs)
 
         if not self.files:
@@ -158,31 +159,32 @@ class FileHandler(Validator, Bcolors):
         self._display_file_options()
         # Resume scan
         return self._handle_analysis(**kwargs)
-    
-    def _get_filtered_files(self, **kwargs)->list:
+
+    def _get_filtered_files(self, **kwargs) -> list:
         """Get filtered files based on user input
         
         :param kwargs: Keyword arguments
         :return: List of filtered files
         """
         file_collection = self._get_file_collections()
-        
+
         #Apply filters based on kwargs
         if kwargs.get("scan_extension"):
             return self._filter_files_by_extension(
-                file_collection, 
+                file_collection,
                 kwargs["scan_extension"]
-                )
+            )
         elif kwargs.get("resume_scan"):
             return self._filter_unresponsive_host_files(file_collection["csv"])
         elif kwargs.get("display_applications"):
             return file_collection["applications"]
         return self.files
-    
-    def _get_file_collections(self)->dict:
+
+    def _get_file_collections(self) -> dict:
         """ Get different collections of files b type
         :return: Dictionary of file collections
         """
+
         def get_files_by_type(ext):
             """Filter files by extension type
 
@@ -193,14 +195,15 @@ class FileHandler(Validator, Bcolors):
             """
             return list(filter(
                 lambda file: self.check_filetype(file["filename"], ext),
-                  self.files
-                  ))
+                self.files
+            ))
+
         csv_files = get_files_by_type("csv")
         xlsx_files = get_files_by_type("xlsx")
         both_files = csv_files + xlsx_files
         application_files = list(filter(
-            lambda file: self.check_filetype(file["filename"], "apk") or 
-            self.check_filetype(file["filename"], "ipa"),
+            lambda file: self.check_filetype(file["filename"], "apk") or
+                         self.check_filetype(file["filename"], "ipa"),
             self.files
         ))
         return {
@@ -209,8 +212,9 @@ class FileHandler(Validator, Bcolors):
             "both": both_files,
             "applications": application_files
         }
-    
-    def _filter_unresponsive_host_files(self,csv_files)->list:
+
+    @staticmethod
+    def _filter_unresponsive_host_files(csv_files) -> list[Any] | None:
         """
         Filter out CSV files only who are unresponsive
         
@@ -224,8 +228,8 @@ class FileHandler(Validator, Bcolors):
         if not unresponsive_file:
             return None
         return unresponsive_file
-    
-    def _filter_files_by_extension(self,collections, extension)->list:
+
+    def _filter_files_by_extension(self, collections, extension) -> Any | None:
         """Filter files by extension
         
         :param
@@ -234,18 +238,17 @@ class FileHandler(Validator, Bcolors):
                 
         :return: List of files filtered by extension
         """
-        if extension not in ["csv","xlsx","both"]:
+        if extension not in ["csv", "xlsx", "both"]:
             print(f"{self.FAIL}Invalid extension: {extension}{self.ENDC}")
             return None
         filtered_files = collections[extension]
-        
+
         if not filtered_files:
             print(f"{self.FAIL}No files found{self.ENDC}")
             return None
-        
+
         return filtered_files
 
-       
     def _display_file_options(self):
         """Display available file options to user"""
         for index, file in enumerate(self.files, 1):
@@ -255,7 +258,7 @@ class FileHandler(Validator, Bcolors):
                 f"{filename}"
             )
             print(display_str)
-            
+
     def _handle_analysis(self, **kwargs):
         if kwargs.get("scan_extension"):
             # Display files to perform VA analysis
@@ -268,7 +271,6 @@ class FileHandler(Validator, Bcolors):
             # Handle users choice
             # returns the last ip address
             return self.do_analysis()
-        
 
     def index_out_of_range_display(self, input_str, data_list) -> int:
         """Takes in an input string and a data list and returns the index of the
@@ -359,12 +361,12 @@ class FileHandler(Validator, Bcolors):
         with pandas.ExcelWriter(
                 file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
         ) as writer:
-            # Copy existing sheets to writer
+            # Copy existing sheets to a writer
             for sheet_name in writer.book.sheetnames:
                 df = pandas.read_excel(
                     file, sheet_name=sheet_name, engine="openpyxl")
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
-            # Write new data frame to new sheet
+            # Write new data frame to a new sheet
             data_frame["dataframe"].to_excel(
                 writer, sheet_name=data_frame["sheetname"], index=False
             )
@@ -423,12 +425,12 @@ class FileHandler(Validator, Bcolors):
                 file.seek(0)
             last_line = file.readline().decode()
         return last_line
-    
+
     @staticmethod
-    def create_pd_dataframe(data:list, columns:list):
+    def create_pd_dataframe(data: list, columns: list):
         """Create a pandas dataframe from a list of dictionaries"""
         return pandas.DataFrame(data, columns=columns)
-    
+
     @staticmethod
     def read_all_lines(file):
         with open(file, "r") as file:
@@ -441,5 +443,5 @@ class FileHandler(Validator, Bcolors):
         return f"{removed_extension}_{timestamp}.{extension}"
 
     @staticmethod
-    def sort_dataframe(dataframe,order):
-        return pandas.Categorical(dataframe,categories=order,ordered=True)
+    def sort_dataframe(dataframe, order):
+        return pandas.Categorical(dataframe, categories=order, ordered=True)

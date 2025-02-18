@@ -2,6 +2,7 @@
 from utils.shared import Config
 from handlers import FileHandler
 from utils.shared import ScreenHandler
+import sys
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):
@@ -185,6 +186,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 "output": output_file,
             }
 
+    @staticmethod
+    def exit_program():
+        return sys.exit(1)
+
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
         # Reduce displayed index by 1 to avoid index error
@@ -254,7 +259,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             "internal": self.internal_ui_interaction,
             "external": self.external_ui_interaction,
             "mobile": self.mobile_ui_interaction,
-            "va": self.va_ui_interaction
+            "va": self.va_ui_interaction,
+            "exit": self.exit_program
         }
 
         try:

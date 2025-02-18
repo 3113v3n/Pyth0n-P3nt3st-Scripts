@@ -78,6 +78,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
                 )
             )
         ]["Host"].tolist()
+        # hosts that passed credential check
         self.credentialed_hosts = credentialed_hosts
 
         selected_columns = self.data[

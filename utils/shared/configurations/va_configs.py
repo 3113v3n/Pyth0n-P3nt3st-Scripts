@@ -28,8 +28,8 @@ class VAConfigs:
         "Affected Hosts",
         "Management Response"
     ]
-    
-    RAPID7_HEADERS  = [
+
+    RAPID7_HEADERS = [
         "Vulnerability Title",
         "Asset Names",
         "Asset IP Address",
@@ -56,7 +56,7 @@ class VAConfigs:
         "Vulnerable Since",
         "Asset Alternate IPv4 Addresses",
     ]
-    
+
     column_mismatch_error = (
         f"{Bcolors.FAIL}{Bcolors.BOLD}[!]Column mismatch between files. "
         f" Ensure all files have the same number of columns {Bcolors.ENDC}"

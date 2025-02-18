@@ -25,6 +25,7 @@ class PentestFramework:
         """
         try:
             network_instance = NetworkHandler()
+
             return {
                 "package": PackageHandler(),
                 "command": Commands(),
@@ -224,6 +225,7 @@ class PentestFramework:
             except Exception as e:
                 print(
                     f"{Bcolors.FAIL}[!] An error occurred: {str(e)}{Bcolors.ENDC}")
+
 
 def main():
     """Entry point of the program"""
