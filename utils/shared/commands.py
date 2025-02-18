@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import platform
 
@@ -18,9 +19,11 @@ class Commands:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Command failed with exit code {e.returncode}\nError: {e.stderr}")
+            print(f"Command failed with exit code: {e.returncode}\nError: {e.stderr}")
             raise Exception(e.stderr)
         return result
+        
+        
 
     @staticmethod
     def run_git_cmd(git_command):
@@ -31,7 +34,11 @@ class Commands:
         except subprocess.CalledProcessError as e:
             print(f"Failed to install Nuclei templates: {e}")
             return False
-
+    
+    @staticmethod
+    def flush_system():
+        return sys.stdout.flush()
+    
     @staticmethod
     def get_process_output(command):
         return subprocess.getoutput(command)

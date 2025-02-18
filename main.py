@@ -19,7 +19,7 @@ class PentestFramework:
     @staticmethod
     def initialize_classes() -> dict:
         """Initialize all required classes for the framework
-        
+
         Returns:
             Dictionary containing initialized class instances
         """
@@ -35,15 +35,16 @@ class PentestFramework:
                 "internal": InternalAssessment(network_instance)
             }
         except Exception as error:
-            print(f"{Bcolors.FAIL}[!] Error initializing classes: {str(error)}{Bcolors.ENDC}")
+            print(
+                f"{Bcolors.FAIL}[!] Error initializing classes: {str(error)}{Bcolors.ENDC}")
             sys.exit(1)
 
     def check_packages(self, user_test_domain: str) -> bool:
         """Check and install required packages for the selected domain
-        
+
         Args:
             user_test_domain: Selected testing domain
-            
+
         Returns:
             Boolean indicating if all required packages are present
         """
@@ -78,7 +79,8 @@ class PentestFramework:
                 return False
             return self.check_packages(user_test_domain)
         except RuntimeError as error:
-            print(f"{Bcolors.FAIL}[!] Failed to install some packages: {error} {Bcolors.ENDC}")
+            print(
+                f"{Bcolors.FAIL}[!] Failed to install some packages: {error} {Bcolors.ENDC}")
             return False
 
     @staticmethod
@@ -157,19 +159,30 @@ class PentestFramework:
         if handler:
             handler()
         else:
-            print(f"{Bcolors.WARNING}[!] Invalid test domain selected{Bcolors.ENDC}")
+            print(
+                f"{Bcolors.WARNING}[!] Invalid test domain selected{Bcolors.ENDC}")
 
     @staticmethod
     def get_user_input() -> str:
         """Get user input for program exit"""
-        return (
-            input(
-                f"[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
-                f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
-            )
-            .strip()
-            .lower()
-        )
+        while True:
+            try:
+                # flush any pending input
+                sys.stdout.flush()
+                sys.stdin.flush()
+
+                choice = input(
+                    f"[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
+                    f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
+                ).strip().lower()
+                if choice in {'y', 'yes', 'n', 'no'}:
+                    return choice
+            except EOFError:
+                # Handle EOF error
+                continue
+            except KeyboardInterrupt:
+                # Exit on Ctrl+C
+                return 'y'
 
     def run_program(self) -> None:
         """Main program loop"""
@@ -180,7 +193,8 @@ class PentestFramework:
 
                 # Check packages before getting user input
                 if not self.check_packages(test_domain):
-                    print(f"{Bcolors.FAIL}[*] Required packages are missing. Installing them...{Bcolors.ENDC}")
+                    print(
+                        f"{Bcolors.FAIL}[*] Required packages are missing. Installing them...{Bcolors.ENDC}")
                     continue
 
                 # get user input and set domain variables
@@ -189,25 +203,27 @@ class PentestFramework:
                 self.process_domain(test_domain)
 
                 # Handle exit prompt
-                exit_request = self.get_user_input()
+
                 valid_user_choices = {"yes", "y", "no", "n"}
 
-                while exit_request not in valid_user_choices:
-                    print(f"\n{Bcolors.WARNING}[!] Invalid choice. Please enter 'y' or 'n':{Bcolors.ENDC}\n")
+                while True:
                     exit_request = self.get_user_input()
-
-                if exit_request in ["yes", "y"]:
+                    if exit_request in valid_user_choices:
+                        break
+                    print(
+                        f"\n{Bcolors.WARNING}[!] Invalid choice. Please enter 'y' or 'n': {Bcolors.ENDC}")
+                if exit_request in {"yes", "y"}:
                     self.exit_menu = True
                 else:
                     self.classes["command"].clear_screen()
 
             except KeyboardInterrupt:
-                print(f"\n{Bcolors.WARNING}[!] Program interrupted by user{Bcolors.ENDC}")
+                print(
+                    f"\n{Bcolors.WARNING}[!] Program interrupted by user{Bcolors.ENDC}")
                 self.exit_menu = True
             except Exception as e:
-                print(f"{Bcolors.FAIL}[!] An error occurred: {str(e)}{Bcolors.ENDC}")
-                self.exit_menu = True
-
+                print(
+                    f"{Bcolors.FAIL}[!] An error occurred: {str(e)}{Bcolors.ENDC}")
 
 def main():
     """Entry point of the program"""
