@@ -13,8 +13,8 @@ class MobileAssessment:
         self.package_name = data["filename"]  # application filename
         self.package_path = data["full_path"]  # fullpath to the application
 
-    def inspect_application_files(self,test_domain):
-        self.mobile_cmds.inspect_application_files(application=self.package_path,test_domain=test_domain)
+    def inspect_application_files(self, test_domain):
+        self.mobile_cmds.inspect_application_files(application=self.package_path, test_domain=test_domain)
 
     # Install web proxies cert
     # 1. Take filepath to .der

@@ -2,12 +2,17 @@ from pathlib import Path
 import os
 import re
 from handlers import FileHandler
-from utils import Commands, Config
+from utils.shared import Commands, Config, DisplayMessages
 
 base_output_dir = "./output_directory/Mobile"
 
 
-class MobileCommands(FileHandler, Config, Commands):
+class MobileCommands(
+    FileHandler,
+    Config,
+    Commands,
+    DisplayMessages
+):
     def __init__(self):
         super().__init__()
 
@@ -26,14 +31,14 @@ class MobileCommands(FileHandler, Config, Commands):
     def rename_folders_with_spaces(path):
         for root, dirs, _ in os.walk(path):
             for dir_name in dirs:
-                if " " in dir_name:  # Check if folder name contains a space
+                if " " in dir_name:  # Check if the folder name contains a space
                     new_name = dir_name.replace(
                         " ", "_"
                     )  # Replace spaces with underscores
                     old_path = os.path.join(root, dir_name)
                     new_path = os.path.join(root, new_name)
                     os.rename(old_path, new_path)  # Rename the folder
-                    print(f"Renamed: {old_path} -> {new_path}")
+                    # print(f"Renamed: {old_path} -> {new_path}")
 
     @staticmethod
     def format_content(content):
@@ -46,6 +51,10 @@ class MobileCommands(FileHandler, Config, Commands):
         self.run_os_commands(f"adb push {certificate} /storage/emulated/0/")
 
     def pull_package_with_keyword(self, keyword):
+        """Pull application apk
+            Requirement: Ensure device is connected via USB
+        """
+        # TODO: Work in progress
         pkg_cmd = (
             f"adb shell pm list packages | grep '{keyword}'|head -n 1|cut -d ':' -f2"
         )
@@ -67,60 +76,67 @@ class MobileCommands(FileHandler, Config, Commands):
             print("Package not found")
 
     # Decompile APk
+    def _get_folder_name(self, platform, package):
+        """Returns application folder name and removes spaces in case they exist
+        :param:
+            platform: Android / iOS
+            Package: This is the package name
+
+        :return:
+            Folder name
+        """
+
+        platform = platform.title() if platform == "android" else platform
+
+        base_dir = self.update_output_directory("mobile")
+
+        # Handle platform-specific file
+        self.file_type = self.get_file_extension(package)  # ipa / apk
+        filename_without_ext = self.get_filename_without_extension(package)
+        self.file_name = self.remove_spaces(filename_without_ext)
+
+        self.create_folder(platform, search_path=base_output_dir)
+        self.mobile_output_dir = f"{base_dir}/{platform}"
+        folder_name = self.remove_spaces(f"{self.mobile_output_dir}/{filename_without_ext}")
+        return folder_name
+
+    def _unzip_package(self, package, folder_name):
+        """Unzips application apk or ipa file using unzip and apktool
+
+        :param:
+            package: ==> application package
+        """
+        try:
+            android_cmd = f"apktool d '{package}' -o {folder_name}"
+            ios_cmd = f"unzip '{package}' -d {self.folder_name}"
+            command = android_cmd if self.file_type.lower() == "apk" else ios_cmd
+            if not self.check_folder_exists(folder_name):
+
+                print(
+                    f"\n Decompiling the {self.OKGREEN}{self.file_name}{self.ENDC} application ..."
+                )
+                result = self.run_os_commands(command)
+                if result.returncode == 0:
+                    print(f"\n Decompiling Successful")
+                else:
+                    raise FileNotFoundError
+        except Exception as e:
+            print(f"\n{self.FAIL}[!] Error: {e}{self.ENDC}\n")
+
     def decompile_application(self, package):
         """
         Takes an apk / ios file and decompiles them using
         apktool or unzip respectively
 
         """
-        # 1. decompile using apk tool
-        # 2. save the decompiled file to output directory
-        base_dir = self.update_output_directory("mobile")
 
-        self.file_type = self.get_file_extension(package)  # ipa / apk
-        filename_without_ext = self.get_filename_without_extension(package)
-        self.file_name = self.remove_spaces(filename_without_ext)
+        # Get folder name from provided package name
+        self.folder_name = (self._get_folder_name("android", package) if self.file_type == "apk"
+                            else self._get_folder_name("iOS", package))
 
-        if self.file_type == "apk":
-            self.create_folder("Android", search_path=base_output_dir)
-            self.mobile_output_dir = f"{base_dir}/Android"
-            self.folder_name = f"{self.mobile_output_dir}/{filename_without_ext}"
-            self.folder_name = self.remove_spaces(self.folder_name)
-
-            if not self.check_folder_exists(self.folder_name):
-                print(
-                    f"\n Decompiling the {self.OKGREEN}{self.file_name}{self.ENDC} application ..."
-                )
-                command = f"apktool d '{package}' -o {self.folder_name}"
-                self.run_os_commands(command)
-                print("Decompiling successful")
-            return self.folder_name
-
-        elif self.file_type == "ipa":
-            self.create_folder("iOS", search_path=base_output_dir)
-
-            self.mobile_output_dir = f"{base_dir}/iOS"
-            self.folder_name = f"{self.mobile_output_dir}/{self.file_name}"
-
-            if not self.check_folder_exists(self.folder_name):
-                print(f"Decompiling {self.file_name} ...")
-
-                command = f"unzip '{package}' -d {self.folder_name}"
-                try:
-                    result = self.run_os_commands(command)
-                    if result.returncode == 0:
-                        print("Decompiling successful")
-                    else:
-                        raise FileNotFoundError
-
-                except (Exception, FileNotFoundError) as error:
-                    print(f"Error during unzip: {error}")
+        self._unzip_package(package, self.folder_name)
 
         return self.folder_name
-
-        # 3. Clean up after all scans are complete
-
-        # Inspect Files
 
     def find_app_files(self, app_folder, output):
         with open(output, "a") as output_file:
@@ -243,11 +259,12 @@ class MobileCommands(FileHandler, Config, Commands):
                 try:
                     result = self.run_os_commands(command)
                     unfiltered_urls = re.findall(self.URL_REGEX, result.stdout)
-                    filtered_urls = [
-                        url
-                        for url in unfiltered_urls
-                        if not re.search(self.DEEPLINKS_IGNORE_REGEX, url)
-                    ]
+
+                    # returns a list of URLS that don't match the ignored REGEX
+                    filtered_urls = list(filter(
+                        lambda url: not re.search(self.DEEPLINKS_IGNORE_REGEX, url),
+                        unfiltered_urls
+                    ))
                     if filtered_urls:
                         filtered_urls = sorted(set(filtered_urls))
                         self.all_urls.extend([url for url in filtered_urls])
@@ -278,21 +295,21 @@ class MobileCommands(FileHandler, Config, Commands):
 
                     if "urls" in kwargs:
                         self.url_count += 1
-                        print(
-                            f"{self.OKCYAN}"
-                            f"[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: "
-                            f"{self.ENDC}"
-                        )
+                    print(
+                        f"{self.OKGREEN}"
+                        f"[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: "
+                        f"{self.ENDC}"
+                    )
                     f.write(f"{line}\n")
 
     def mobile_scripts(
-        self,
-        decompiled_folder,
-        hardcoded_filename,
-        platform,
-        basename,
-        output_dir,
-        base64_name,
+            self,
+            decompiled_folder,
+            hardcoded_filename,
+            platform,
+            basename,
+            output_dir,
+            base64_name,
     ):
         if platform == "ipa":
             self.ios_specific_scan(decompiled_folder, basename, output_dir)
@@ -338,7 +355,7 @@ class MobileCommands(FileHandler, Config, Commands):
         self.run_os_commands(db_command)
         self.run_os_commands(pl_command)
 
-    def inspect_application_files(self, application: str, test_domain:str):
+    def inspect_application_files(self, application: str, test_domain: str):
         try:
             self.update_output_directory(test_domain)
             folder_name = self.decompile_application(application)
@@ -351,6 +368,8 @@ class MobileCommands(FileHandler, Config, Commands):
             basename = f"{output_name}_{platform}"
             hardcoded = f"{basename}_hardcoded.txt"
 
+            # To store our scan results
+            self.create_subfolder()
             self.mobile_scripts(
                 decompiled_folder=folder_name,
                 hardcoded_filename=hardcoded,
@@ -360,18 +379,26 @@ class MobileCommands(FileHandler, Config, Commands):
                 base64_name=output_name,
             )
 
-            print(
-                f"[+] Application scanning complete, all your files are located here :==>\n"
-                f"{self.OKGREEN}{self.mobile_output_dir}{self.ENDC}"
+            self.success_message(
+                message="Application scanning complete, all your files are located here :==>",
+                mobile_success=self.mobile_output_dir
             )
 
         except Exception as e:
             print(f"{self.FAIL}[!] Error during mobile assessment: {e}{self.ENDC}")
 
-        
+    def create_subfolder(self):
+        """Create subfolder from the filename of package being scanned in order to score scan results"""
+        new_folder_name = f"{self.file_name}_scan_results"
+        updated_output_directory =f"{self.folder_name}_scan_results"
+
+        self.create_folder(
+            folder_name=new_folder_name,
+            search_path=self.mobile_output_dir)
+        self.mobile_output_dir = updated_output_directory
 
     def install_nuclei_template(
-        self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
+            self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
     ):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
@@ -401,7 +428,7 @@ class MobileCommands(FileHandler, Config, Commands):
         out_file = f"{output_dir}/{self.file_name}_nuclei_keys_results.txt"
         android_output = f"{output_dir}/{self.file_name}_nuclei_android_results.txt"
 
-        # Check if template exists and install
+        # Check if the template exists and install
         if not self.install_nuclei_template(nuclei_dir):
             return
 
