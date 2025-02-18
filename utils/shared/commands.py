@@ -78,4 +78,4 @@ class Commands:
     def clear_screen():
         """Clear screen"""
         return os.system('cls' if os.name == 'nt' else 'clear')
-
+ 

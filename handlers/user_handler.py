@@ -78,7 +78,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 # File format of the files [CSV or XLSX ]
                 file_format_index = self.create_menu_selection(
                     menu_selection=f" \n {self.WARNING} Select the file "
-                    f"format of the Scanned File(s):{self.ENDC} \n",
+                                   f"format of the Scanned File(s):{self.ENDC} \n",
                     options=self.SCAN_FILE_FORMAT,
                     check_range_string="File Format: ",
                     check_range_function=self.index_out_of_range_display,
@@ -128,7 +128,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         try:
             while True:
                 self.loader("[*][*] Loading Internal Assessment Module...",
-                          "Starting Internal Assessment...")
+                            "Starting Internal Assessment...")
                 subnet = ""
                 output_file = ""
 
@@ -148,7 +148,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                         self.output_directory,
                         resume_scan=True
                     )
-                    
+
                     if resume_ip is None:
                         print(f"{self.WARNING}\n[!] No previous scan files found. Defaulting to scan mode.{self.ENDC}")
                         mode = "scan"
@@ -162,7 +162,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                             else:
                                 print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
                                 continue
-                
+
                 # If mode is scan or defaulted to scan
                 if mode == "scan":
                     subnet = self.get_user_subnet()
@@ -178,7 +178,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             print(f"{self.FAIL}[!] An error occurred: {error}{self.ENDC}")
             mode = "scan"
             subnet = self.get_user_subnet()
-            output_file =self.get_output_filename()
+            output_file = self.get_output_filename()
             return {
                 "subnet": subnet,
                 "mode": mode,
@@ -237,32 +237,31 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
         return cidr
 
-    def set_domain_variables(self, test_domain:str)->dict:
+    def set_domain_variables(self, test_domain: str) -> dict:
         """Update the variables object with reference to the test domain provisioned
         
-        :param 
-            test-domain: The domain to be tested (internal,external,mobile,va)
+        param
+            test-domain: The domain to be tested (internal, external,mobile,va)
 
-        :returns
+        returns
             dict: Domain-specific variables
 
-        :Raises
-            ValueError: if Invalid- domain provided
+        Raises
+            ValueError: if Invalid-domain provided
             DomainError: If domain specific operation fails
         """
-        domain_handlers={
+        domain_handlers = {
             "internal": self.internal_ui_interaction,
             "external": self.external_ui_interaction,
-            "mobile":self.mobile_ui_interaction,
-            "va":self.va_ui_interaction
+            "mobile": self.mobile_ui_interaction,
+            "va": self.va_ui_interaction
         }
 
-        
         try:
             if test_domain not in domain_handlers:
                 raise ValueError(f"Invalid domain: {test_domain}")
-            
-            #Update output directory
+
+            # Update output directory
             self.update_output_directory(test_domain)
 
             # Get domain handler

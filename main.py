@@ -47,7 +47,7 @@ class PentestFramework:
         Returns:
             Boolean indicating if all required packages are present
         """
-        
+
         package = self.classes["package"]
 
         # Initialize OS check
@@ -135,7 +135,7 @@ class PentestFramework:
             user_test_domain: Selected testing domain
         """
 
-        # Match user_test_domain with appropriate handler
+        # Match user_test_domain with the appropriate handler
         handlers = {
             "internal": lambda: self.handle_internal_assessment(
                 self.classes["user"],
@@ -177,12 +177,12 @@ class PentestFramework:
             try:
                 user = self.classes["user"]
                 test_domain = user.get_user_domain()
-                
-                #Check packages before getting user input
+
+                # Check packages before getting user input
                 if not self.check_packages(test_domain):
                     print(f"{Bcolors.FAIL}[*] Required packages are missing. Installing them...{Bcolors.ENDC}")
                     continue
-                
+
                 # get user input and set domain variables
                 user.set_domain_variables(test_domain)
 
