@@ -339,34 +339,36 @@ class MobileCommands(FileHandler, Config, Commands):
         self.run_os_commands(pl_command)
 
     def inspect_application_files(self, application: str, test_domain:str):
+        try:
+            self.update_output_directory(test_domain)
+            folder_name = self.decompile_application(application)
+            output_name = f"{self.mobile_output_dir}/{self.file_name}"
 
-        self.update_output_directory(test_domain)
-        folder_name = self.decompile_application(application)
-        output_name = f"{self.mobile_output_dir}/{self.file_name}"
+            # Rename folder/subfolders that contain spaces to avoid errors
+            self.rename_folders_with_spaces(folder_name)
 
-        # Rename folder/subfolders that contain spaces to avoid errors
-        self.rename_folders_with_spaces(folder_name)
+            platform = "android" if self.file_type.lower() == "apk" else "ios"
+            basename = f"{output_name}_{platform}"
+            hardcoded = f"{basename}_hardcoded.txt"
 
-        if self.file_type.lower() == "apk":
-            platform = "android"
-        else:
-            platform = "ios"
-        basename = f"{output_name}_{platform}"
-        hardcoded = f"{basename}_hardcoded.txt"
+            self.mobile_scripts(
+                decompiled_folder=folder_name,
+                hardcoded_filename=hardcoded,
+                platform=platform,
+                basename=basename,
+                output_dir=self.mobile_output_dir,
+                base64_name=output_name,
+            )
 
-        self.mobile_scripts(
-            decompiled_folder=folder_name,
-            hardcoded_filename=hardcoded,
-            platform=platform,
-            basename=basename,
-            output_dir=self.mobile_output_dir,
-            base64_name=output_name,
-        )
+            print(
+                f"[+] Application scanning complete, all your files are located here :==>\n"
+                f"{self.OKGREEN}{self.mobile_output_dir}{self.ENDC}"
+            )
 
-        print(
-            f"[+] Application scanning complete, all your files are located here :==>\n"
-            f"{self.OKGREEN}{self.mobile_output_dir}{self.ENDC}"
-        )
+        except Exception as e:
+            print(f"{self.FAIL}[!] Error during mobile assessment: {e}{self.ENDC}")
+
+        
 
     def install_nuclei_template(
         self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
