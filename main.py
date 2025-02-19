@@ -170,7 +170,7 @@ class PentestFramework(DisplayMessages):
                 sys.stdin.flush()
 
                 choice = input(
-                    f"[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
+                    f"\n[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
                     f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
                 ).strip().lower()
                 if choice in {'y', 'yes', 'n', 'no'}:

@@ -95,7 +95,9 @@ class FileHandler(Validator, DisplayMessages):
             message="Filtered vulnerabilities have been written to :",
             extras=self.filepath
         ) if "unfiltered" not in kwargs else self.print_info_message(
-            message="Unfiltered vulnerabilities have been written to ", path=self.filepath)
+            message="Unfiltered vulnerabilities have been written to ",
+            file_path=self.filepath
+            )
 
     def save_to_csv(self, filename, content):
         filename = self.get_file_basename(filename)

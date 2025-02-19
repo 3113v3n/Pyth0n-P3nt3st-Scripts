@@ -22,7 +22,7 @@ class DisplayMessages(Bcolors):
         elif kwargs.get("extras"):
             extra_data = kwargs['extras']
             msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{extra_data}"
-            return pprint(msg)
+            return print(msg)
 
         print(msg)
 
@@ -48,13 +48,16 @@ class DisplayMessages(Bcolors):
                 **kwargs: Keyword arguments to handle different print actions
                     - data = list of IPs
                     - flush = Boolean value to flush messages
-
+                    - file_path = file path 
         """
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
             ip_list = kwargs["data"]
             flush = kwargs["flush"]
             return print(msg, ip_list, flush)
+        if kwargs.get("file_path"):
+            path = kwargs["file_path"]
+            msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n{path}"
 
         print(msg)
 
@@ -64,17 +67,18 @@ class DisplayMessages(Bcolors):
         :param message:  to print
             **kwargs: Keyword arguments to handle different print actions
                 - flush = Boolean value to flush messages
-                - VA_path: file path to VA scans
+                - file_path: file path to VA scans
                 - file : files being scanned in mobile module
         """
         msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
             flush = kwargs["flush"]
             return print(msg, flush)
-        if kwargs.get("VA_path"):
-            path = kwargs["VA_path"]
+        
+        if kwargs.get("file_path"):
+            path = kwargs["file_path"]
             msg = f"\n{Bcolors.HEADER}[-] Info: {message} {Bcolors.ENDC}\n{path}"
-            return print(msg, path)
+            
         elif kwargs.get("file"):
             msg = f"{msg}{kwargs['file']}"
 

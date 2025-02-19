@@ -38,8 +38,14 @@ class InternalAssessment(DisplayMessages):
         live = f"{paths['live_hosts']}"
         unresponsive = f"{paths['unresponsive_hosts']}"
 
-        self.print_success_message(message=f"Discovered hosts are saved here:\n {live}")
-        self.print_warning_message(message=f"Your Unresponsive Hosts are located here: {unresponsive}")
+        self.print_success_message(
+            message=f"Discovered hosts are saved here: ",
+            extras=live
+        )
+        self.print_warning_message(
+            message=f"Your Unresponsive Hosts are located here: ",
+            file_path=unresponsive
+        )
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module
