@@ -1,4 +1,4 @@
-from utils.shared import Bcolors, Commands
+from utils.shared import Commands
 
 
 class ExternalAssessment:
@@ -7,7 +7,6 @@ class ExternalAssessment:
     def __init__(self) -> None:
         self.target_domain = ""
         self.command = Commands()
-        self.color = Bcolors
 
     def initialize_variables(self, variables):
         # set user provided variables
@@ -15,5 +14,6 @@ class ExternalAssessment:
 
     def bbot_enum(self, output_dir):
         self.command.auto_enter_commands(
-            f"bbot -t {self.target_domain} -f subdomain-enum email-enum cloud-enum web-basic -m nmap gowitness nuclei --allow-deadly -o {output_dir}"
+            f"bbot -t {self.target_domain} -f subdomain-enum email-enum cloud-enum web-basic -m nmap gowitness nuclei "
+            f"--allow-deadly -o {output_dir}"
         )

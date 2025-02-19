@@ -1,8 +1,8 @@
 from handlers import NetworkHandler
-from utils.shared import Bcolors  # NetExec
+from utils.shared import DisplayMessages  # NetExec
 
 
-class InternalAssessment(Bcolors):
+class InternalAssessment(DisplayMessages):
     """class will be responsible for handling all Internal PT"""
 
     def __init__(self, network: NetworkHandler) -> None:
@@ -22,19 +22,17 @@ class InternalAssessment(Bcolors):
             self.output_file = output_file
 
     def enumerate_hosts(self):
-        """Enumerates all possible hosts on a network using ICMP protocol
-        In order to increase your attack surface
+        """Lists all possible hosts on a network using ICMP protocol
+         to increase your attack surface
         """
         self.network_manager.get_live_ips(
             mode=self.mode, output=self.output_file)
         paths = self.network_manager.get_file_paths()
-        live = f"{self.ENDC}{self.BOLD}{self.OKGREEN}{paths['live_hosts']}"
-        unresponsive = f"{self.ENDC}{self.BOLD}{self.WARNING}{paths['unresponsive_hosts']}"
+        live = f"{paths['live_hosts']}"
+        unresponsive = f"{paths['unresponsive_hosts']}"
 
-        print(
-            f"\n{self.OKCYAN}[+] Discovered hosts are saved here:\n {live}{self.ENDC}\n"
-            f"\n{self.HEADER}[!] Your Unresponsive Hosts are located here: {unresponsive}{self.ENDC}\n\n"
-        )
+        self.print_success_message(message=f"Discovered hosts are saved here:\n {live}")
+        self.print_warning_message(message=f"Your Unresponsive Hosts are located here: {unresponsive}")
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

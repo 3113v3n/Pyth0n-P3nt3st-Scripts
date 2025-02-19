@@ -1,10 +1,15 @@
 from typing import List, Dict, Optional
 from handlers import FileHandler
 from utils import Config, FilterVulnerabilities
-from pprint import pprint
+from utils.shared import DisplayMessages
 
 
-class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
+class VulnerabilityAnalysis(
+    FileHandler,
+    Config,
+    FilterVulnerabilities,
+    DisplayMessages
+):
     """Class that handles Vulnerability analysis tasks"""
 
     def __init__(self) -> None:
@@ -94,7 +99,7 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             (self.csv_filter_operations(selected_columns, "Risk", "notnull"))
             & (selected_columns["Risk"] != "Low")
         ].reset_index(drop=True)
-        print(f"\nCredentialed Hosts: \n{self.credentialed_hosts}")
+        self.print_success_message(message="Credentialed Hosts: ", extras=f"{self.credentialed_hosts}")
 
         # Sort Vulnerabilities using Risk
         return formated_vulnerabilities.sort_values(by='Risk')
@@ -107,7 +112,6 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             Formatted DataFrame with filtered vulnerabilities
         """
         # print("TODO: Filter further i.e Credentialed Hosts")
-        pprint(f"Headers ==> {self.headers}")
         return self.data[self.headers[:-1]]
 
     def get_missing_columns(self, dataframe, filename):
@@ -172,8 +176,10 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             return self.format_input_file()
 
         except Exception as error:
-            print(
-                f"{self.FAIL}[!] Error analyzing scan files: {str(error)}{self.ENDC}")
+            self.print_error_message(
+                message="Error analyzing scan files",
+                exception_error=error
+            )
             return None
 
     def _process_initial_file(self):
@@ -199,8 +205,11 @@ class VulnerabilityAnalysis(FileHandler, Config, FilterVulnerabilities):
             return original_file
 
         except Exception as error:
-            print(
-                f"{self.FAIL}[!] Error processing initial file: {str(error)}{self.ENDC}")
+
+            self.print_error_message(
+                message="Error processing initial file",
+                exception_error=error
+            )
             return None
 
     def filter_condition(self, filter_string: str):

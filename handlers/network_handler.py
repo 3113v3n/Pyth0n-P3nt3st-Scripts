@@ -107,7 +107,7 @@ class NetworkHandler(FileHandler, Commands):
             ]
 
     def scan_hosts(self, ip, output_file, mode, stdscr):
-        """Check if host is alive using concurrent pings and update UI"""
+        """Check if the host is alive using concurrent pings and update UI"""
         is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
 
         with self.lock:  # Prevents concurrent writes

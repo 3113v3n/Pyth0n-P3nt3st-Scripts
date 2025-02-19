@@ -56,7 +56,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     return applications
 
             except (ValueError, FileExistsError) as error:
-                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
+                self.print_error_message(error)
 
     def va_ui_interaction(self):
         self.loader("[*][*] Loading Vulnerability Analysis Module...",
@@ -88,9 +88,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
                 file_extension = self.SCAN_FILE_FORMAT[file_format_index]
-                print(
-                    f"\n{self.OKCYAN}Scanning {file_extension.upper()} file extensions{self.ENDC}")
 
+                self.print_info_message(f"Scanning {file_extension.upper()} file extensions")
                 # file extension ensures we display the correct file extensions
 
                 search_dir = self.get_file_path(
@@ -98,7 +97,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
                 files_tuple = self.display_files_onscreen(
-                    # display files depending on user selected extension
+                    # display files depending on a user selected extension
                     search_dir, self.display_saved_files, scan_extension=file_extension
                 )
 
@@ -111,7 +110,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 }
 
             except (FileExistsError, ValueError) as error:
-                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
+                self.print_error_message(error)
 
     def external_ui_interaction(self):
         self.loader("[*][*] Loading External Assessment Module...",
@@ -136,8 +135,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 while True:
                     mode = input(self.internal_mode_choice).strip().lower()
                     if not mode:
-                        print(
-                            f"{self.WARNING}\n[!] Please enter a valid choice (scan | resume){self.ENDC}")
+                        self.print_warning_message("Please enter a valid choice (scan | resume)")
                         continue
                     if mode not in ["scan", "resume"]:
                         mode = input(self.internal_choice_error)
@@ -151,7 +149,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     )
 
                     if resume_ip is None:
-                        print(f"{self.WARNING}\n[!] No previous scan files found. Defaulting to scan mode.{self.ENDC}")
+                        self.print_warning_message("No previous scan files found. Defaulting to scan mode.")
                         mode = "scan"
                     else:
                         output_file = self.filepath
@@ -161,7 +159,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                                 subnet = f"{resume_ip}/{cidr}"
                                 break
                             else:
-                                print(f"{self.WARNING}\n[!] Please enter a valid CIDR{self.ENDC}")
+                                self.print_warning_message("Please enter a valid CIDR")
                                 continue
 
                 # If mode is scan or defaulted to scan
@@ -176,7 +174,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 }
 
         except Exception as error:
-            print(f"{self.FAIL}[!] An error occurred: {error}{self.ENDC}")
+
+            self.print_error_message(message="An error occurred", exception_error=error)
             mode = "scan"
             subnet = self.get_user_subnet()
             output_file = self.get_output_filename()
@@ -199,14 +198,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     input(self.formatted_question).strip()) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
-                print(
-                    f"{self.FAIL}\n❌ Invalid choice. Please enter a number between 1 and "
-                    f"{len(self.default_test_domains)}{self.ENDC}"
+                self.print_error_message(
+                    message=f"❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
                 )
+
             except ValueError:
-                print(
-                    f"{self.FAIL}\n❌ Invalid choice. Please enter a valid number{self.ENDC}"
-                )
+                self.print_error_message(message="❌ Invalid choice. Please enter a valid number")
 
         self.domain = self.default_test_domains[selected_index]
         return self.domain
@@ -224,7 +221,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 else:
                     raise ValueError(" Invalid IP address format provided")
             except ValueError as error:
-                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
+                self.print_error_message(exception_error=error)
+
         return subnet
 
     def get_cidr(self):
@@ -239,21 +237,21 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 else:
                     raise ValueError(" Invalid CIDR provided")
             except ValueError as error:
-                print(f"{self.FAIL}\n[!]{error}{self.ENDC}")
+                self.print_error_message(exception_error=error)
         return cidr
 
     def set_domain_variables(self, test_domain: str) -> dict:
-        """Update the variables object with reference to the test domain provisioned
+        """Update the variable object with reference to the test domain provisioned
         
         param
-            test-domain: The domain to be tested (internal, external,mobile,va)
+            test-domain: The domain to be tested (internal, external, mobile, va)
 
         returns
             dict: Domain-specific variables
 
         Raises
             ValueError: if Invalid-domain provided
-            DomainError: If domain specific operation fails
+            DomainError: If domain-specific operation fails
         """
         domain_handlers = {
             "internal": self.internal_ui_interaction,
@@ -280,8 +278,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         except Exception as error:
             error_msg = f"Error in {test_domain} domain: {str(error)}"
-            print(
-                f"{self.FAIL}\n[!] {error_msg}{self.ENDC}")
+            self.print_error_message(
+                message=f"Error in {test_domain} domain",
+                exception_error=error)
+
             raise DomainError(error_msg) from error
 
 

@@ -6,18 +6,18 @@ from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 # [Handlers]
 from handlers import NetworkHandler, PackageHandler, UserHandler
 from utils import MobileCommands, ProgressBar, Commands
-from utils.shared import Bcolors
+from utils.shared import DisplayMessages, Bcolors
 
 
-class PentestFramework:
+class PentestFramework(DisplayMessages):
     def __init__(self):
         self.classes = self.initialize_classes()
         self.exit_menu = False
 
     # [Utils]
     # Initializers
-    @staticmethod
-    def initialize_classes() -> dict:
+
+    def initialize_classes(self) -> dict:
         """Initialize all required classes for the framework
 
         Returns:
@@ -36,8 +36,7 @@ class PentestFramework:
                 "internal": InternalAssessment(network_instance)
             }
         except Exception as error:
-            print(
-                f"{Bcolors.FAIL}[!] Error initializing classes: {str(error)}{Bcolors.ENDC}")
+            self.print_error_message(message="Error initializing classes", exception_error=error)
             sys.exit(1)
 
     def check_packages(self, user_test_domain: str) -> bool:
@@ -58,8 +57,7 @@ class PentestFramework:
 
         # If OS is not supported, continue without package checks
         if not package.is_supported_os:
-            print(f"{Bcolors.OKGREEN}[+] Skipping package installation "
-                  f"on unsupported OS: {Bcolors.ENDC}")
+            self.print_info_message("Skipping package installation on unsupported OS")
             return True
 
         missing_packages = package.get_missing_packages(user_test_domain)
@@ -68,11 +66,7 @@ class PentestFramework:
             return True
 
         num_of_packages = len(missing_packages)
-        print(
-            f"\n{Bcolors.WARNING}[!] Missing Packages Kindly be patient "
-            f"as we install {num_of_packages} package(s).."
-            f"{Bcolors.ENDC}"
-        )
+        self.print_warning_message(f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
         # update to run check again
         try:
             success = package.install_packages(missing_packages)
@@ -80,8 +74,11 @@ class PentestFramework:
                 return False
             return self.check_packages(user_test_domain)
         except RuntimeError as error:
-            print(
-                f"{Bcolors.FAIL}[!] Failed to install some packages: {error} {Bcolors.ENDC}")
+            self.print_error_message(
+                message="Failed to install some packages",
+                exception_error=error
+            )
+
             return False
 
     @staticmethod
@@ -160,8 +157,7 @@ class PentestFramework:
         if handler:
             handler()
         else:
-            print(
-                f"{Bcolors.WARNING}[!] Invalid test domain selected{Bcolors.ENDC}")
+            self.print_error_message("Invalid test domain selected")
 
     @staticmethod
     def get_user_input() -> str:
@@ -194,8 +190,7 @@ class PentestFramework:
 
                 # Check packages before getting user input
                 if not self.check_packages(test_domain):
-                    print(
-                        f"{Bcolors.FAIL}[*] Required packages are missing. Installing them...{Bcolors.ENDC}")
+                    self.print_info_message("Required packages are missing. Installing them...")
                     continue
 
                 # get user input and set domain variables
@@ -211,29 +206,28 @@ class PentestFramework:
                     exit_request = self.get_user_input()
                     if exit_request in valid_user_choices:
                         break
-                    print(
-                        f"\n{Bcolors.WARNING}[!] Invalid choice. Please enter 'y' or 'n': {Bcolors.ENDC}")
+                    self.print_warning_message("Invalid choice. Please enter 'y' or 'n':")
                 if exit_request in {"yes", "y"}:
                     self.exit_menu = True
                 else:
                     self.classes["command"].clear_screen()
 
             except KeyboardInterrupt:
-                print(
-                    f"\n{Bcolors.WARNING}[!] Program interrupted by user{Bcolors.ENDC}")
+                self.print_warning_message("Program interrupted by user")
                 self.exit_menu = True
             except Exception as e:
-                print(
-                    f"{Bcolors.FAIL}[!] An error occurred: {str(e)}{Bcolors.ENDC}")
+                self.print_error_message(message="An error occurred", exception_error=e)
 
 
 def main():
     """Entry point of the program"""
+    global framework
     try:
         framework = PentestFramework()
         framework.run_program()
     except Exception as e:
-        print(f"{Bcolors.FAIL}[!] Critical error: {str(e)}{Bcolors.ENDC}")
+        framework.print_error_message(message="Critical error", exception_error=e)
+
         sys.exit(1)
 
 

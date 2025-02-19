@@ -69,11 +69,11 @@ class MobileCommands(
                 # pull the APK
                 pull_cmd = f"adb pull {apk_path} ./"
                 self.run_os_commands(pull_cmd)
-                print(f"APK pulled successfully: {apk_path}")
+                self.print_success_message(f"Successfully pulled {apk_path}")
             else:
-                print("APK path not found.")
+                self.print_error_message("APK path not found.")
         else:
-            print("Package not found")
+            self.print_error_message("Package not found")
 
     # Decompile APk
     def _get_folder_name(self, platform, package):
@@ -112,16 +112,14 @@ class MobileCommands(
             command = android_cmd if self.file_type.lower() == "apk" else ios_cmd
             if not self.check_folder_exists(folder_name):
 
-                print(
-                    f"\n Decompiling the {self.OKGREEN}{self.file_name}{self.ENDC} application ..."
-                )
+                self.print_success_message(f" Decompiling the {self.file_name} application ...")
                 result = self.run_os_commands(command)
                 if result.returncode == 0:
-                    print(f"\n Decompiling Successful")
+                    self.print_success_message(" Decompiling Successful")
                 else:
                     raise FileNotFoundError
         except Exception as e:
-            print(f"\n{self.FAIL}[!] Error: {e}{self.ENDC}\n")
+            self.print_error_message(" Error", exception_error=e)
 
     def decompile_application(self, package):
         """
@@ -151,9 +149,7 @@ class MobileCommands(
         with open(output, "a") as outfile:
             for file in Path(app_folder).rglob("*"):
                 if file.is_file():
-                    print(
-                        f"{self.OKCYAN}[+] Searching For hardcoded strings in File:{self.ENDC} \n{file}"
-                    )
+                    self.print_info_message("Searching For hardcoded strings in File", file=file)
                     command = f"rabin2 -zzzqq  {file}"
                     regex_patterns = [
                         self.BEARER_REGEX,
@@ -172,10 +168,9 @@ class MobileCommands(
                             unique_lines = sorted(set(result.stdout.splitlines()))
                             joined_string = "\n".join(unique_lines) + "\n"
                             formated_string = self.format_content(joined_string)
-                            print(
-                                f"{self.OKGREEN}Writing Potential Hardcoded string to temporary file "
-                                f"{self.ENDC}\n",
-                                flush=True,
+                            self.print_info_message(
+                                f"Writing Potential Hardcoded string to temporary file ",
+                                flush=True
                             )
                             outfile.write(formated_string)
 
@@ -191,15 +186,15 @@ class MobileCommands(
             self.create_temp_file(path_2_folder)
 
         if not self.temp_base64_data:
-            print("Processing base64 strings ...\n")
+            self.print_info_message("Processing base64 strings ...")
             base64_strings = re.findall(self.BASE64_REGEX, self.temp_data)
             self.temp_base64_data = sorted(set(base64_strings))
-            print("Base64 strings processed and stored in memory.")
+            self.print_success_message("Base64 strings processed and stored in memory.")
 
         self.decode_base64(output)
 
     def create_temp_file(self, folder_path):
-        print(f"Creating in-memory temp data from folder: {folder_path}")
+        self.print_info_message("Creating in-memory temp data from folder: ", file=folder_path)
         temp_data_list = []
         folder = Path(self.folder_name)
 
@@ -213,19 +208,19 @@ class MobileCommands(
 
                     if result.stdout.strip():
                         joined_string = "\n".join(unique_lines) + "\n"
-                        print(
-                            f"{self.OKCYAN}[+] Getting strings from:{self.ENDC} \n{file}\n"
-                        )
+                        self.print_info_message(f" Getting strings from: ", file=file)
                         temp_data_list.append(joined_string)
                 except Exception as error:
-                    print(
-                        f"{self.FAIL}[!] Error processing file {self.ENDC}{file} : {error}"
+                    self.print_error_message(
+                        message="Error processing file ",
+                        exception_error=error
                     )
+
         self.temp_data = "".join(temp_data_list)
 
     def decode_base64(self, output):
         """Decode base64 strings stored in memory and write to file"""
-        print("Decoding base64 strings ==> \n")
+        self.print_info_message("Decoding base64 strings ==> \n")
         with open(output, "a") as out_f:
             for string in self.temp_base64_data:
                 string = string.strip()
@@ -235,17 +230,16 @@ class MobileCommands(
                         decoded = self.run_os_commands(command)
 
                         if decoded.stdout:
-                            print(
-                                f"{self.OKCYAN}Encoded String: {string}{self.ENDC}\nDecoded String: "
-                                f"{decoded.stdout}\n",
-                                flush=True,
-                            )
+                            self.print_info_message(
+                                message=f"Encoded String: {string}\nDecoded String: {decoded.stdout}\n"
+                                , flush=True)
                             out_f.write(
                                 f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
                             )
                     except Exception as e:
-                        print(
-                            f"{self.FAIL}[!] Error decoding base64 string {string}: {e}{self.ENDC}"
+                        self.print_error_message(
+                            message=f"Error decoding base64 string {string}",
+                            exception_error=e
                         )
 
     def get_deeplinks(self, application_folder, basename):
@@ -272,15 +266,11 @@ class MobileCommands(
                     ips = re.findall(self.IP_REGEX, result.stdout)
 
                     if len(ips) != 0:
-                        print(
-                            f"{self.WARNING}[+] Possible IP(s) found: {self.ENDC}",
-                            ips,
-                            flush=True,
-                        )
+                        self.print_warning_message(message="Possible IP(s) found", data=ips, flush=True)
                         self.all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
-                    print(f"{self.FAIL}[!] Error extracting Links {e}{self.ENDC}")
+                    self.print_error_message(message="Error extracting Links ", exception_error=e)
         # Remove all duplicates and save to file
         self.sort_urls_and_ips(ip_name, self.all_ips)
         self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
@@ -295,12 +285,10 @@ class MobileCommands(
 
                     if "urls" in kwargs:
                         self.url_count += 1
-                    print(
-                        f"{self.OKGREEN}"
-                        f"[+] Found {self.url_count} unique URL(s) from {self.file_count} application files: "
-                        f"{self.ENDC}"
-                    )
-                    f.write(f"{line}\n")
+                        f.write(f"{line}\n")
+                self.print_success_message(
+                    f" Found {self.url_count} unique URL(s) from {self.file_count} application files: "
+                )
 
     def mobile_scripts(
             self,
@@ -345,7 +333,7 @@ class MobileCommands(
                 output_file.write(f"{scheme}\n")
 
     def ios_prop_dump(self, decompiled_folder, output_dir):
-        print("dumping ios files")
+        self.print_info_message("dumping ios files")
         db_command = (
             f"property-lister -db {decompiled_folder} -o {output_dir}/results_db"
         )
@@ -359,6 +347,9 @@ class MobileCommands(
         try:
             self.update_output_directory(test_domain)
             folder_name = self.decompile_application(application)
+
+            # To store our scan results
+            self.create_subfolder()
             output_name = f"{self.mobile_output_dir}/{self.file_name}"
 
             # Rename folder/subfolders that contain spaces to avoid errors
@@ -368,8 +359,6 @@ class MobileCommands(
             basename = f"{output_name}_{platform}"
             hardcoded = f"{basename}_hardcoded.txt"
 
-            # To store our scan results
-            self.create_subfolder()
             self.mobile_scripts(
                 decompiled_folder=folder_name,
                 hardcoded_filename=hardcoded,
@@ -379,18 +368,21 @@ class MobileCommands(
                 base64_name=output_name,
             )
 
-            self.success_message(
+            self.print_success_message(
                 message="Application scanning complete, all your files are located here :==>",
                 mobile_success=self.mobile_output_dir
             )
 
         except Exception as e:
-            print(f"{self.FAIL}[!] Error during mobile assessment: {e}{self.ENDC}")
+            self.print_error_message(
+                message="Error during mobile assessment",
+                exception_error=e
+            )
 
     def create_subfolder(self):
         """Create subfolder from the filename of package being scanned in order to score scan results"""
         new_folder_name = f"{self.file_name}_scan_results"
-        updated_output_directory =f"{self.folder_name}_scan_results"
+        updated_output_directory = f"{self.folder_name}_scan_results"
 
         self.create_folder(
             folder_name=new_folder_name,
@@ -405,19 +397,20 @@ class MobileCommands(
 
         # os.environ["GOBIN"] = absolute_path
         if not self.check_folder_exists(absolute_path):
-            print(
-                f"Templates folder not present, Cloning templates into {absolute_path}"
-            )
+
+            self.print_warning_message(message=f"Templates folder not present, Cloning templates into {absolute_path}")
             github_repo = "https://github.com/optiv/mobile-nuclei-templates.git"
             command = f"git clone {github_repo} {absolute_path}"
 
             try:
 
                 self.run_os_commands(command)
-                print("[+] Nuclei template Installed successfully")
+                self.print_success_message(" Nuclei template Installed successfully")
 
             except Exception as e:
-                print(f"Error during Installation {e}")
+                self.print_error_message(
+                    message="Error during Installation ",
+                    exception_error=e)
                 return False
 
         return True
@@ -447,4 +440,4 @@ class MobileCommands(
                 self.run_os_commands(android_nuclei)
 
         except Exception as e:
-            print(f"Error running command: {e}")
+            self.print_error_message(message="Error running command", exception_error=e)

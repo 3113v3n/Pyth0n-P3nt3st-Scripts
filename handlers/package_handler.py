@@ -1,29 +1,26 @@
 import platform
-from utils.shared import Config, Bcolors, Commands
+from utils.shared import Config, DisplayMessages, Commands
 from typing import Dict, List
 
 
-class PackageHandler(Config, Bcolors, Commands):
+class PackageHandler(Config, DisplayMessages, Commands):
     """Handles package related actions such as installation of missing Packages"""
 
     def __init__(self) -> None:
         super().__init__()
         self.operating_system = platform.system().lower()
         self.is_supported_os = None
-        
 
     def _check_os_support(self) -> bool:
         supported = self.operating_system == "linux"
         if not supported:
-            print(f"{self.WARNING}[!] Warning: Operating system {self.operating_system} "
-                  f"is not supported yet.{self.ENDC}")
+            self.print_warning_message(f"Warning: Operating system {self.operating_system} is not supported yet.")
         return supported
 
     def get_missing_packages(self, test_domain) -> list[Dict[str, str]]:
         """
         Returns a list of objects containing missing packages
-        that need to be installed and command to in
-        stall them
+        that need to be installed and command to install them
         :param test_domain: Domain to check for missing packages
         :return: List of dictionaries containing package names and installation commands
         """
@@ -80,28 +77,30 @@ class PackageHandler(Config, Bcolors, Commands):
         installed_packages = []
         for package in packages:
             try:
-                print(
-                    f"[+] Installing the following package:\n{self.OKCYAN}{package['name']}{self.ENDC}\n"
-                )
+                self.print_info_message(f"Installing the following package: {package['name']}")
                 # Install Missing packages
                 install_status = self.run_os_commands(command=package["command"])
                 if install_status.returncode != 0:
-                    print(f"{self.FAIL}[!] Installation of {package['name']} failed.{self.ENDC}")
+                    self.print_error_message(f"Installation of {package['name']} failed.")
                     continue
 
                 # Verify Installation
                 if self._verify_installation(package['name']):
                     installed_packages.append(package['name'])
-                    print(f"{self.OKGREEN} [+] Successfully installed {package['name']}{self.ENDC}")
+                    self.print_success_message(f"Successfully installed {package['name']}")
                 else:
-                    print(f"{self.FAIL}[!] Installation verification of {package['name']} failed.{self.ENDC}")
+                    self.print_error_message(f"Installation of {package['name']} failed.")
+
             except Exception as error:
-                print(f"{self.WARNING}[!] Error Installing {package['name']}: {str(error)}{self.ENDC}")
+                self.print_error_message(
+                    message="Installation of {package['name']} failed.",
+                    exception=error
+                    )
+
                 continue
 
         if installed_packages:
-            print(f"\n{self.OKGREEN}[+] Successfully installed {len(installed_packages)}"
-                  f" packages.{self.ENDC} ")
+            self.print_success_message(f"Successfully installed {len(installed_packages)} packages.")
         return len(installed_packages) == len(packages)
 
     def _verify_installation(self, package_name: str) -> bool:

@@ -4,22 +4,22 @@ from typing import Any, List
 import pandas
 from datetime import datetime
 from pathlib import Path
-from utils.shared import Validator, Bcolors
+from utils.shared import Validator, DisplayMessages
 import ipaddress
 
 
-class FileHandler(Validator, Bcolors):
+class FileHandler(Validator, DisplayMessages):
     """Handle File operations"""
 
     def __init__(self) -> None:
         super().__init__()
-        self.assessment_domain = ""  # one of [internal,external,mobile]
+        self.assessment_domain = ""  # one of [internals, external, mobile]
         self.working_dir = os.getcwd()
         self.output_directory = (
             # directory to save our output files
             f"{self.working_dir}/output_directory"
         )
-        self.filepath = ""  # full path to saved file
+        self.filepath = ""  # full path to a saved file
         self.files = []
         self.mobile_dir = "Mobile"
         self.external_dir = "External"
@@ -30,7 +30,7 @@ class FileHandler(Validator, Bcolors):
 
     def update_output_directory(self, domain):
         """
-        Depending on the test domain provided
+        Depending on the test domain provided,
         we update the output directory for various file output
         """
         match domain:
@@ -73,17 +73,11 @@ class FileHandler(Validator, Bcolors):
                     dataframe["dataframe"].to_excel(
                         writer, sheet_name=dataframe["sheetname"], index=False
                     )
-        if "unfiltered" in kwargs:
-            text = (
-                f"\n\nUnfiltered vulnerabilities have been written to :"
-                f"\n{self.OKCYAN}{self.filepath}{self.ENDC}\n"
-            )
-        else:
-            text = (
-                f"Filtered vulnerabilities have been written to :"
-                f"\n{self.OKGREEN}{self.filepath}{self.ENDC}\n"
-            )
-        print(text)
+        self.print_success_message(
+            message="Filtered vulnerabilities have been written to :",
+            extras=self.filepath
+        ) if "unfiltered" not in kwargs else self.print_info_message(
+            message="Unfiltered vulnerabilities have been written to ", path=self.filepath)
 
     def save_to_csv(self, filename, content):
         filename = self.get_file_basename(filename)
@@ -168,7 +162,7 @@ class FileHandler(Validator, Bcolors):
         """
         file_collection = self._get_file_collections()
 
-        #Apply filters based on kwargs
+        # Apply filters based on kwargs
         if kwargs.get("scan_extension"):
             return self._filter_files_by_extension(
                 file_collection,
@@ -239,12 +233,12 @@ class FileHandler(Validator, Bcolors):
         :return: List of files filtered by extension
         """
         if extension not in ["csv", "xlsx", "both"]:
-            print(f"{self.FAIL}Invalid extension: {extension}{self.ENDC}")
+            self.print_error_message(f"Invalid extension: {extension}")
             return None
         filtered_files = collections[extension]
 
         if not filtered_files:
-            print(f"{self.FAIL}No files found{self.ENDC}")
+            self.print_error_message("No files found")
             return None
 
         return filtered_files
@@ -252,12 +246,7 @@ class FileHandler(Validator, Bcolors):
     def _display_file_options(self):
         """Display available file options to user"""
         for index, file in enumerate(self.files, 1):
-            filename = f" {self.BOLD}{self.WARNING}{file['filename']}{self.ENDC}"
-            display_str = (
-                f"Enter [{self.OKGREEN}{self.BOLD}{index}{self.ENDC}] to select"
-                f"{filename}"
-            )
-            print(display_str)
+            self.print_selection_items(file, index)
 
     def _handle_analysis(self, **kwargs):
         if kwargs.get("scan_extension"):
@@ -288,14 +277,10 @@ class FileHandler(Validator, Bcolors):
 
                     break
                 else:
-                    print(
-                        f"{self.FAIL}\n[!]The selected number is out of range."
-                        f" Please enter a valid number between 1 & {len(data_list)}{self.ENDC}."
-                    )
+                    self.print_error_message("The selected number is out of range."
+                                             f" Please enter a valid number between 1 & {len(data_list)}")
             except ValueError:
-                print(
-                    f"{self.FAIL}[!!] Invalid input. Please enter a number.{self.ENDC}"
-                )
+                self.print_error_message("Invalid input. Please enter a number.")
                 # return the index of selected item
         return selected_value - 1
 
@@ -373,7 +358,7 @@ class FileHandler(Validator, Bcolors):
 
     def get_last_unresponsive_ip(self, unresponsive_file):
         """
-        Takes file as an input, sorts the ips available in the list in ascending order
+        Takes a file as an input, sorts the ips available in the list in ascending order
         get the last Ip on the list to use as start_ip
         """
         try:
@@ -393,7 +378,7 @@ class FileHandler(Validator, Bcolors):
             return last_address
 
         except FileNotFoundError:
-            print("No previous unresponsive host file found")
+            self.print_error_message("No previous unresponsive host file found")
 
     @staticmethod
     def concat_dataframes(existing, newdata):
