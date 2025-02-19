@@ -10,6 +10,12 @@ class PackageHandler(Config, DisplayMessages, Commands):
         super().__init__()
         self.operating_system = platform.system().lower()
         self.is_supported_os = None
+        
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.operating_system = platform.system().lower()
+        cls.is_supported_os = None  
 
     def _check_os_support(self) -> bool:
         supported = self.operating_system == "linux"

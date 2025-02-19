@@ -31,7 +31,21 @@ class VulnerabilityAnalysis(
         self.file_list: List[Dict] = []
         self.starting_index: int = 0
         self.starting_file: str = ""
-
+        
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.data = None
+        cls.credentialed_hosts = []
+        cls.headers = None
+        cls.selected_columns = []   
+        cls.scanner = "nessus"
+        cls.vulnerabilities = []
+        cls.file_type = ""
+        cls.file_list = []
+        cls.starting_index = 0
+        cls.starting_file = ""
+    
     def set_scanner(self, scanner: str):
         """
         Set the scanner type and update related configurations

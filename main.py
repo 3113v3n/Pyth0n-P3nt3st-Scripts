@@ -11,6 +11,7 @@ from utils.shared import DisplayMessages, Bcolors
 
 class PentestFramework(DisplayMessages):
     def __init__(self):
+        super().__init__()
         self.classes = self.initialize_classes()
         self.exit_menu = False
 
@@ -180,11 +181,37 @@ class PentestFramework(DisplayMessages):
             except KeyboardInterrupt:
                 # Exit on Ctrl+C
                 return 'y'
+            
+    def reset_class_states(self):
+        """Reset the states of all classes"""
+        try:
+            self.classes = self.initialize_classes()
+            if self.classes["mobile"]:
+                self.classes["mobile"].reset_class_states()
+            if self.classes["internal"]:
+                self.classes["internal"].reset_class_states(self.classes["network"])
+            if self.classes["vulnerability"]:
+                self.classes["vulnerability"].reset_class_states()
+            if self.classes["network"]:
+                self.classes["network"].reset_class_states()
+            if self.classes["package"]:
+                self.classes["package"].reset_class_states()
+            if self.classes["user"]:
+                self.classes["user"].reset_class_states()
+           
+        except Exception as e:
+            self.print_error_message(
+                message="Error resetting class states", 
+                exception_error=e)
+            return 
 
     def run_program(self) -> None:
         """Main program loop"""
         while not self.exit_menu:
             try:
+                # Reset state at the start of each iteration
+                self.reset_class_states()
+                
                 user = self.classes["user"]
                 test_domain = user.get_user_domain()
 
@@ -195,7 +222,6 @@ class PentestFramework(DisplayMessages):
 
                 # get user input and set domain variables
                 user.set_domain_variables(test_domain)
-
                 self.process_domain(test_domain)
 
                 # Handle exit prompt
@@ -227,7 +253,6 @@ def main():
         framework.run_program()
     except Exception as e:
         framework.print_error_message(message="Critical error", exception_error=e)
-
         sys.exit(1)
 
 

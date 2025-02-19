@@ -8,6 +8,13 @@ class MobileAssessment:
         self.package_path = ""
         self.mobile_cmds = commands  # mobile specific commands
 
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.package_name = ""
+        cls.package_path = ""   
+        
+        
     def initialize_variables(self, data):
         # Sets user provided values
         self.package_name = data["filename"]  # application filename

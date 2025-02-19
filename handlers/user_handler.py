@@ -20,6 +20,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             f"\nWhat task would you like to perform?\n" f"{self.OPTIONS}\n=> "
         )
 
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.default_test_domains = []
+        cls.not_valid_domain = False
+        cls.domain = "" 
+        cls.domain_variables = ""
+        
+
     def set_test_options(self):
         # Create a list to store formatted options
         test_options = []

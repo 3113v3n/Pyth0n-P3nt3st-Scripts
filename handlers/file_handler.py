@@ -27,6 +27,24 @@ class FileHandler(Validator, DisplayMessages):
         self.va_dir = "Vulnerability_Assessment"
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
+        
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.working_dir = os.getcwd()
+        cls.output_directory = (
+            # directory to save our output files
+            f"{cls.working_dir}/output_directory"
+        )
+        cls.filepath = ""  # full path to a saved file
+        cls.files = []
+        cls.mobile_dir = "Mobile"
+        cls.external_dir = "External"
+        cls.internal_dir = "Internal"
+        cls.va_dir = "Vulnerability_Assessment"
+        cls.live_hosts_file = ""
+        cls.unresponsive_hosts_file = ""
+        
 
     def update_output_directory(self, domain):
         """

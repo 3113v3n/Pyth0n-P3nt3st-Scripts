@@ -76,7 +76,7 @@ class DisplayMessages(Bcolors):
             msg = f"\n{Bcolors.HEADER}[-] Info: {message} {Bcolors.ENDC}\n{path}"
             return print(msg, path)
         elif kwargs.get("file"):
-            msg += kwargs['file']
+            msg = f"{msg}{kwargs['file']}"
 
         print(msg)
 
@@ -92,3 +92,11 @@ class DisplayMessages(Bcolors):
             f"{filename}"
         )
         print(display_str)
+
+    @staticmethod
+    def print_debug_message(message: str):
+        """Print debug messages for debugging purposes
+        :message: message to print
+        """
+        print(f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
+              f"\n{Bcolors.WARNING}{message}{Bcolors.ENDC}")

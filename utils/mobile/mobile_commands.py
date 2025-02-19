@@ -91,7 +91,7 @@ class MobileCommands(
         base_dir = self.update_output_directory("mobile")
 
         # Handle platform-specific file
-        self.file_type = self.get_file_extension(package)  # ipa / apk
+
         filename_without_ext = self.get_filename_without_extension(package)
         self.file_name = self.remove_spaces(filename_without_ext)
 
@@ -127,6 +127,7 @@ class MobileCommands(
         apktool or unzip respectively
 
         """
+        self.file_type = self.get_file_extension(package)  # ipa / apk
 
         # Get folder name from provided package name
         self.folder_name = (self._get_folder_name("android", package) if self.file_type == "apk"
@@ -380,7 +381,7 @@ class MobileCommands(
             )
 
     def create_subfolder(self):
-        """Create subfolder from the filename of package being scanned in order to score scan results"""
+        """Create subfolder from the filename of package being scanned to score scan results"""
         new_folder_name = f"{self.file_name}_scan_results"
         updated_output_directory = f"{self.folder_name}_scan_results"
 

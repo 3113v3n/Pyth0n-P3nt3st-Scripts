@@ -28,6 +28,18 @@ class NetworkHandler(FileHandler, Commands):
         # Shell commands
         self.progress_bar = None
         self.lock = threading.Lock()  # prevent race conditions
+        
+    @classmethod
+    def reset_class_states(cls):
+        """Reset the states of the class"""
+        cls.subnet = ""
+        cls.hosts = 0
+        cls.start_ip = ""
+        cls.network_mask = ""
+        cls.user_ip_addr = ""
+        cls.host_bits = 0
+        cls.progress_bar = None
+        cls.lock = threading.Lock()
 
     def initialize_network_variables(self, variables, test_domain, progress_bar):
         # initialize the class variables with user variables

@@ -10,7 +10,14 @@ class InternalAssessment(DisplayMessages):
         self.output_file = "sample.txt"
         self.mode = "SCAN"
         self.network_manager = network
-
+        
+    @classmethod
+    def reset_class_states(cls, network: NetworkHandler):
+        """Reset the states of the class"""
+        cls.output_file = "sample.txt"
+        cls.mode = "SCAN"
+        cls.network_manager = network   
+        
     def initialize_variables(self, mode, output_file):
         # Sets user provided values
         self.mode = mode
