@@ -12,7 +12,8 @@ class DisplayMessages(Bcolors):
         :param message:  to print
                **kwargs:  keyword arguments to ensure different messages are printed accordingly
                 - mobile_success: shows the directory where mobile scans are stored
-                - extras: IPs from the VA scan
+                - extras: any extra data to print
+                - flush: flush the message
         """
         msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
 
@@ -22,7 +23,9 @@ class DisplayMessages(Bcolors):
         elif kwargs.get("extras"):
             extra_data = kwargs['extras']
             msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{extra_data}"
-            return print(msg)
+        elif kwargs.get("flush"):
+            msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{kwargs['extras']}"
+            return print(msg,flush=kwargs['flush'])
 
         print(msg)
 
@@ -54,7 +57,7 @@ class DisplayMessages(Bcolors):
         if kwargs.get("flush"):
             ip_list = kwargs["data"]
             flush = kwargs["flush"]
-            return print(msg, ip_list, flush)
+            return print(msg, ip_list, flush=flush)
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
             msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n{path}"
@@ -73,7 +76,9 @@ class DisplayMessages(Bcolors):
         msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
             flush = kwargs["flush"]
-            return print(msg, flush)
+            encoded_string = kwargs["encoded_string"]
+            msg = f"{msg}{encoded_string}"
+            return print(msg, flush=flush)
         
         if kwargs.get("file_path"):
             path = kwargs["file_path"]

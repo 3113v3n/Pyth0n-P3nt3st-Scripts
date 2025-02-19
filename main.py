@@ -1,5 +1,7 @@
-from typing import Dict, Optional
 import sys
+import termios
+import time
+from typing import Dict, Optional   
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
@@ -163,11 +165,21 @@ class PentestFramework(DisplayMessages):
     @staticmethod
     def get_user_input() -> str:
         """Get user input for program exit"""
+        def flush_input_output():
+            """Flush any pending input and output"""
+            try:
+                termios.tcflush(sys.stdin, termios.TCIFLUSH)
+            except (ImportError, AttributeError):
+                pass
+            finally:
+                sys.stdout.flush()
+
         while True:
             try:
-                # flush any pending input
-                sys.stdout.flush()
-                sys.stdin.flush()
+                # Clear buffers 
+                flush_input_output()
+                # Add a small delay to ensure all input is processed
+                time.sleep(0.1)
 
                 choice = input(
                     f"\n[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "

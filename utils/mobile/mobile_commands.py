@@ -4,8 +4,6 @@ import re
 from handlers import FileHandler
 from utils.shared import Commands, Config, DisplayMessages
 
-base_output_dir = "./output_directory/Mobile"
-
 
 class MobileCommands(
     FileHandler,
@@ -20,9 +18,6 @@ class MobileCommands(
         self.file_type = ""
         self.folder_name = ""
         self.file_name = ""
-        self.all_urls = []
-        self.all_ips = []
-        self.url_count = 0
         self.file_count = 0
         self.temp_data = ""
         self.temp_base64_data = ""
@@ -95,7 +90,7 @@ class MobileCommands(
         filename_without_ext = self.get_filename_without_extension(package)
         self.file_name = self.remove_spaces(filename_without_ext)
 
-        self.create_folder(platform, search_path=base_output_dir)
+        self.create_folder(platform, search_path=self.output_directory)
         self.mobile_output_dir = f"{base_dir}/{platform}"
         folder_name = self.remove_spaces(f"{self.mobile_output_dir}/{filename_without_ext}")
         return folder_name
@@ -232,8 +227,15 @@ class MobileCommands(
 
                         if decoded.stdout:
                             self.print_info_message(
-                                message=f"Encoded String: {string}\nDecoded String: {decoded.stdout}\n"
-                                , flush=True)
+                                message=f"Encoded String: ",
+                                flush=True,
+                                encoded_string=string
+                                )
+                            self.print_success_message(
+                                message="Decoded String ",
+                                extras=decoded.stdout,
+                                flush=True
+                                )
                             out_f.write(
                                 f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
                             )
@@ -246,10 +248,14 @@ class MobileCommands(
     def get_deeplinks(self, application_folder, basename):
         url_name = f"{basename}_URLs.txt"
         ip_name = f"{basename}_IPs.txt"
+        
+        file_count = 0
+        all_ips = []
+        all_urls = []
 
         for file in Path(application_folder).rglob("*"):
             if file.is_file():
-                self.file_count += 1  # Track how many files are scanned
+                file_count += 1  # Track how many files are scanned
                 command = f"rabin2 -zzzqq {file}"
                 try:
                     result = self.run_os_commands(command)
@@ -262,34 +268,54 @@ class MobileCommands(
                     ))
                     if filtered_urls:
                         filtered_urls = sorted(set(filtered_urls))
-                        self.all_urls.extend([url for url in filtered_urls])
+                        all_urls.extend([url for url in filtered_urls])
 
                     ips = re.findall(self.IP_REGEX, result.stdout)
 
                     if len(ips) != 0:
                         self.print_warning_message(message="Possible IP(s) found", data=ips, flush=True)
-                        self.all_ips.extend([ip for ip in ips])
+                        all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
                     self.print_error_message(message="Error extracting Links ", exception_error=e)
-        # Remove all duplicates and save to file
-        self.sort_urls_and_ips(ip_name, self.all_ips)
-        self.sort_urls_and_ips(url_name, self.all_urls, urls=True)
+        # Update instance variables
+        self.file_count = file_count
+        
+        # Process IPs and URLs
+        ip_count = self.sort_urls_and_ips(ip_name, all_ips)if all_ips else 0
+        url_count = self.sort_urls_and_ips(url_name, all_urls) if all_urls else 0
+        
+        # Print success message
+        if ip_count > 0:
+            self.print_success_message(
+                f" Found {ip_count} unique IP(s) from {file_count} application files: ",
+            )
+        if url_count > 0:
+            self.print_success_message(
+                f" Found {url_count} unique URL(s) from {file_count} application files: ",
+            )
 
     def sort_urls_and_ips(self, filename, data, **kwargs):
-        # Write to file only if it's not empty
-        if len(data) != 0:
-            with open(filename, "w") as f:
-                unique_lines = sorted(set(data))
-
-                for line in unique_lines:
-
-                    if "urls" in kwargs:
-                        self.url_count += 1
-                        f.write(f"{line}\n")
-                self.print_success_message(
-                    f" Found {self.url_count} unique URL(s) from {self.file_count} application files: "
-                )
+        """Sort and save URLs or IPs to file
+    
+        Args:
+            filename: Output file name
+            data: List of URLs or IPs to process
+            **kwargs: 
+                urls: Boolean indicating if processing URLs (vs IPs)
+        Returns:
+            int: Count of unique items written
+        """
+        if not data:
+            return
+        
+        
+        unique_lines = sorted(set(data))
+        count = len(unique_lines) # Local counter
+        with open(filename, "w") as f:
+            for line in unique_lines:
+                f.write(f"{line}\n")
+        return count
 
     def mobile_scripts(
             self,
@@ -373,10 +399,28 @@ class MobileCommands(
                 message="Application scanning complete, all your files are located here :==>",
                 mobile_success=self.mobile_output_dir
             )
-
+            self.flush_system()
         except Exception as e:
             self.print_error_message(
                 message="Error during mobile assessment",
+                exception_error=e
+            )
+        finally:
+            # Clean up remaining processes
+            self._cleanup_processes()
+
+    def _cleanup_processes(self):
+        """Clean up remaining processes"""
+        try:
+            # clean temp data
+            self.temp_data = ""
+            self.temp_base64_data = ""
+            #Flush buffers
+            self.flush_system("I/O")
+            self.kill_processes()
+        except Exception as e:
+            self.print_error_message(
+                message="Error during cleanup",
                 exception_error=e
             )
 
@@ -391,7 +435,8 @@ class MobileCommands(
         self.mobile_output_dir = updated_output_directory
 
     def install_nuclei_template(
-            self, install_path=f"{base_output_dir}/mobile-nuclei-templates"
+            self,
+            install_path
     ):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
@@ -418,7 +463,7 @@ class MobileCommands(
 
     def scan_with_nuclei(self, application_folder, output_dir, platform):
 
-        nuclei_dir = f"{base_output_dir}/mobile-nuclei-templates"
+        nuclei_dir = f"{self.output_directory}/mobile-nuclei-templates"
         out_file = f"{output_dir}/{self.file_name}_nuclei_keys_results.txt"
         android_output = f"{output_dir}/{self.file_name}_nuclei_android_results.txt"
 

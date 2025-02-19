@@ -1,12 +1,28 @@
 import os
 import sys
+import time
+import psutil
 import subprocess
 import platform
 
 
 class Commands:
     """Class handles commands that will be used by the script"""
-
+    @staticmethod
+    def kill_processes():
+        """Kill processes"""
+        current_process = psutil.Process()
+        for child in current_process.children(recursive=True):
+            try:
+                child.terminate()
+            except (
+                psutil.NoSuchProcess,
+                psutil.AccessDenied,
+                psutil.ZombieProcess
+                ):
+                pass
+    
+                        
     @staticmethod
     def run_os_commands(command):
         """Executes shell commands such as [apt and sudo]"""
@@ -34,8 +50,14 @@ class Commands:
             return False
 
     @staticmethod
-    def flush_system():
-        return sys.stdout.flush()
+    def flush_system(*args):
+        """Flush the system"""
+        if args:
+            sys.stdout.flush()
+            sys.stdin.flush()
+        else:
+            sys.stdout.flush()
+            time.sleep(0.1)
 
     @staticmethod
     def get_process_output(command):
