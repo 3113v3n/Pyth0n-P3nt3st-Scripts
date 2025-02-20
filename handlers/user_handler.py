@@ -48,10 +48,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         return "".join(test_options)
 
     def mobile_ui_interaction(self):
+        self.show_loader(
+            "Loading Mobile Assessment Module... ",
+            "Starting Mobile Assessment...\n"
+        )
         while True:
             try:
-                self.loader("[*][*] Loading Mobile Assessment Module...",
-                            "Starting Mobile Assessment...\n")
+                
 
                 package_path = self.get_file_path(
                     "Please provide the Path to your mobile application(s)\nPath to File:  ",
@@ -66,10 +69,14 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
             except (ValueError, FileExistsError) as error:
                 self.print_error_message(error)
+            
 
     def va_ui_interaction(self):
-        self.loader("[*][*] Loading Vulnerability Analysis Module...",
-                    "Starting Vulnerability Analysis...\n")
+        self.show_loader(
+            "Loading Vulnerability Analysis Module... ",
+            "Starting Vulnerability Analysis...\n",
+            spinner_type="pipe"
+        )
         while True:
 
             try:
@@ -121,24 +128,35 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
             except (FileExistsError, ValueError) as error:
                 self.print_error_message(error)
+            
 
     def external_ui_interaction(self):
-        self.loader("[*][*] Loading External Assessment Module...",
-                    "Starting External Assessment...\n")
-        website_domain = (
-            self.get_user_input("Enter domain to enumerate (example.domain.com)")
+        self.show_loader(
+            "Loading External Assessment Module... ",
+            "Starting External Assessment...\n",
+            spinner_type="arc"
         )
+        try:
+            website_domain = (
+                self.get_user_input("Enter domain to enumerate (example.domain.com)")
+            )
 
-        # TODO: strip https://
+            # TODO: strip https://
 
-        return {"target_domain": website_domain}
+            return {"target_domain": website_domain}
+        except Exception as error:
+            self.print_error_message(error)
 
     def internal_ui_interaction(self):
         """Handle internal assessment UI interactions"""
+        self.show_loader(
+            "Loading Internal Assessment Module... ",
+            "Starting Internal Assessment...\n",
+            spinner_type="bounce"
+        )
         try:
             while True:
-                self.loader("[*][*] Loading Internal Assessment Module...",
-                            "Starting Internal Assessment...\n")
+                
                 subnet = ""
                 output_file = ""
 
@@ -194,6 +212,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 "mode": mode,
                 "output": output_file,
             }
+        
 
     @staticmethod
     def exit_program():

@@ -225,37 +225,38 @@ class MobileCommands(
         loader = self.show_loader(
             "Decoding base64 strings ",
             "Decoding Complete",
+            continuous=True
            
         )
         try:
             with open(output, "a") as out_f:
             # Set loading variable
-            for string in self.temp_base64_data:
-                string = string.strip()
-                if string:  # Check if string is not empty
-                    try:
-                        command = f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
-                        decoded = self.run_os_commands(command)
+                for string in self.temp_base64_data:
+                    string = string.strip()
+                    if string:  # Check if string is not empty
+                        try:
+                            command = f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
+                            decoded = self.run_os_commands(command)
 
-                        if decoded.stdout:
-                            self.print_info_message(
-                                message=f"Encoded String: ",
-                                flush=True,
-                                encoded_string=string
+                            if decoded.stdout:
+                                self.print_info_message(
+                                    message=f"Encoded String: ",
+                                    flush=True,
+                                    encoded_string=string
+                                )
+                                self.print_success_message(
+                                    message="Decoded String ",
+                                    extras=decoded.stdout,
+                                    flush=True
+                                )
+                                out_f.write(
+                                    f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
+                                )
+                        except Exception as e:
+                            self.print_error_message(
+                                message=f"Error decoding base64 string {string}",
+                                exception_error=e
                             )
-                            self.print_success_message(
-                                message="Decoded String ",
-                                extras=decoded.stdout,
-                                flush=True
-                            )
-                            out_f.write(
-                                f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
-                            )
-                    except Exception as e:
-                        self.print_error_message(
-                            message=f"Error decoding base64 string {string}",
-                            exception_error=e
-                        )
         except Exception as e:
             self.print_error_message(
                 message="Error decoding base64 strings",

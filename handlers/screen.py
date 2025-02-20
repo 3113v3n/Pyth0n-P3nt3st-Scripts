@@ -29,22 +29,26 @@ class ScreenHandler(DisplayHandler):
     def show_loader(
         message: str,
         end_message: str,
-        loading_state: bool=True,
         spinner_type: str="dots",
+        continuous: bool=False
         ):
         """Display Loading functionality to a user
         :param message: message to display
         :param end_message: a message to display after loading complete
-        :param loading_: arguments to pass to Loader class (Boolean to control timer)
+        :param continuous: Boolean to control timer
+        :param spinner_type: type of spinner to use
         """
         loader = Loader(
             desc=message,
             end=end_message,
-            loading_state=loading_state,
-            spinner_type=spinner_type
+            spinner_type=spinner_type,
+            continuous=continuous
             )
         loader.start()
-        return loader
+        if continuous:
+            return loader # return loader only for continuous loading
+                    
+        return None
     def get_file_path(self, prompt: str, check_folder_exists: callable):
         """Get and validate a file path from user"""
         while True:

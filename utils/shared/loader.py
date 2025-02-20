@@ -30,14 +30,14 @@ class Loader:
                  end: str="Done!", 
                  timeout: float=0.1,
                  spinner_type: str="dots",
-                 loading_state: bool=False
+                 continuous: bool=False
                  ):     
         
         self.desc = desc
         self.end = end
         self.timeout = max(0.1, timeout)
         self.spinner = self.DEFAULT_SPINNER.get(spinner_type, self.DEFAULT_SPINNER["dots"])
-        self.loading_state = loading_state
+        self.continuous = continuous
         
         self._done = Event()
         self._thread: Optional[Thread] = None
@@ -49,20 +49,32 @@ class Loader:
             self._done.clear()
             self._thread = Thread(target=self._animate, daemon=True)
             self._thread.start()
+            if not self.continuous:
+                # Timed loading
+                self._thread.join()
        
 
     def _animate(self)->None:
         try:
-            for frame in cycle(self.spinner):
-                if self._done.is_set() or not self.loading_state:
-                    break
-                    
-                output = f"\r{self.desc} {frame}"
-                if len(output) > self._cols:
-                    output = output[:self._cols]
+            spinner_cycle = cycle(self.spinner)
+            # Continuous loading until explicitly stopped
+            if self.continuous:
+                while not self._done.is_set():
+                    frame = next(spinner_cycle)
+                    output = f"\r{self.desc} {frame} "
+                    print(output, flush=True, end="")
+                    sleep(self.timeout)
                 
-                print(output, flush=True, end="")
-                sleep(self.timeout)
+            else:
+                # Timed loading
+                for _ in range(20):
+                    if self._done.is_set():
+                        break
+                    
+                    frame = next(spinner_cycle)
+                    print(f"\r{self.desc} {frame} ", flush=True, end="")
+                    sleep(self.timeout)
+                self._done.set()
                 
         finally:
             # Clear the line and print end message
@@ -74,7 +86,6 @@ class Loader:
 
     def stop(self):
         """Stop Animation"""
-        self.loading_state = False
         self._done.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=self.timeout * 2)
