@@ -25,9 +25,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         """Reset the states of the class"""
         cls.default_test_domains = []
         cls.not_valid_domain = False
-        cls.domain = "" 
+        cls.domain = ""
         cls.domain_variables = ""
-        
 
     def set_test_options(self):
         # Create a list to store formatted options
@@ -52,10 +51,11 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         while True:
             try:
                 self.loader("[*][*] Loading Mobile Assessment Module...",
-                            "Starting Mobile Assessment...")
+                            "Starting Mobile Assessment...\n")
 
                 package_path = self.get_file_path(
-                    "Please provide the Path to your mobile application(s)\nPath to File:  "
+                    "Please provide the Path to your mobile application(s)\nPath to File:  ",
+                    self.check_folder_exists
                 )
 
                 applications = self.display_files_onscreen(package_path,
@@ -69,7 +69,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def va_ui_interaction(self):
         self.loader("[*][*] Loading Vulnerability Analysis Module...",
-                    "Starting Vulnerability Analysis...")
+                    "Starting Vulnerability Analysis...\n")
         while True:
 
             try:
@@ -102,7 +102,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 # file extension ensures we display the correct file extensions
 
                 search_dir = self.get_file_path(
-                    "\nEnter Location Where your Scan files are located \n"
+                    "\nEnter Location Where your Scan files are located \n",
+                    self.check_folder_exists
                 )
 
                 files_tuple = self.display_files_onscreen(
@@ -123,9 +124,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def external_ui_interaction(self):
         self.loader("[*][*] Loading External Assessment Module...",
-                    "Starting External Assessment...")
+                    "Starting External Assessment...\n")
         website_domain = (
-            input("Enter domain to enumerate (example.domain.com)").strip().lower()
+            self.get_user_input("Enter domain to enumerate (example.domain.com)")
         )
 
         # TODO: strip https://
@@ -137,17 +138,17 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         try:
             while True:
                 self.loader("[*][*] Loading Internal Assessment Module...",
-                            "Starting Internal Assessment...")
+                            "Starting Internal Assessment...\n")
                 subnet = ""
                 output_file = ""
 
                 while True:
-                    mode = input(self.internal_mode_choice).strip().lower()
+                    mode = self.get_user_input(self.internal_mode_choice)
                     if not mode:
                         self.print_warning_message("Please enter a valid choice (scan | resume)")
                         continue
                     if mode not in ["scan", "resume"]:
-                        mode = input(self.internal_choice_error)
+                        mode = self.get_user_input(self.internal_choice_error)
                         continue
                     break
 
@@ -201,10 +202,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
     def get_user_domain(self) -> str:
         """Interacts with user to gather the target test domain"""
         # Reduce displayed index by 1 to avoid index error
+
         while True:
             try:
-                selected_index = int(
-                    input(self.formatted_question).strip()) - 1
+                selected_index = int(self.get_user_input(self.formatted_question)) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
                 self.print_error_message(
@@ -222,9 +223,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         while True:
             try:
-                subnet = input(
-                    "\n[+] Please provide a valid subnet [10.0.0.0/24]\n"
-                ).strip()
+                subnet = self.get_user_input("\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
                 if self.validate_ip_and_cidr(subnet):
                     break
                 else:
@@ -238,9 +237,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         # Validate CIDR
         while True:
             try:
-                cidr = input(
+                cidr = self.get_user_input(
                     "\n[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
-                ).strip()
+                )
                 if self.validate_cidr(cidr):
                     break
                 else:

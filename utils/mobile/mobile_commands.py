@@ -2,7 +2,12 @@ from pathlib import Path
 import os
 import re
 from handlers import FileHandler
-from utils.shared import Commands, Config, DisplayMessages
+from utils.shared import (
+    Commands,
+    Config,
+    DisplayMessages,
+    Loader
+)
 
 
 class MobileCommands(
@@ -21,6 +26,7 @@ class MobileCommands(
         self.file_count = 0
         self.temp_data = ""
         self.temp_base64_data = ""
+        self.templates_folder = ""
 
     @staticmethod
     def rename_folders_with_spaces(path):
@@ -80,7 +86,7 @@ class MobileCommands(
         :return:
             Folder name
         """
-
+        self.templates_folder = self.output_directory + "/mobile-nuclei-templates"
         platform = platform.title() if platform == "android" else platform
 
         base_dir = self.update_output_directory("mobile")
@@ -230,12 +236,12 @@ class MobileCommands(
                                 message=f"Encoded String: ",
                                 flush=True,
                                 encoded_string=string
-                                )
+                            )
                             self.print_success_message(
                                 message="Decoded String ",
                                 extras=decoded.stdout,
                                 flush=True
-                                )
+                            )
                             out_f.write(
                                 f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
                             )
@@ -248,7 +254,7 @@ class MobileCommands(
     def get_deeplinks(self, application_folder, basename):
         url_name = f"{basename}_URLs.txt"
         ip_name = f"{basename}_IPs.txt"
-        
+
         file_count = 0
         all_ips = []
         all_urls = []
@@ -280,11 +286,11 @@ class MobileCommands(
                     self.print_error_message(message="Error extracting Links ", exception_error=e)
         # Update instance variables
         self.file_count = file_count
-        
+
         # Process IPs and URLs
-        ip_count = self.sort_urls_and_ips(ip_name, all_ips)if all_ips else 0
+        ip_count = self.sort_urls_and_ips(ip_name, all_ips) if all_ips else 0
         url_count = self.sort_urls_and_ips(url_name, all_urls) if all_urls else 0
-        
+
         # Print success message
         if ip_count > 0:
             self.print_success_message(
@@ -295,23 +301,21 @@ class MobileCommands(
                 f" Found {url_count} unique URL(s) from {file_count} application files: ",
             )
 
-    def sort_urls_and_ips(self, filename, data, **kwargs):
+    @staticmethod
+    def sort_urls_and_ips(filename, data):
         """Sort and save URLs or IPs to file
     
         Args:
             filename: Output file name
             data: List of URLs or IPs to process
-            **kwargs: 
-                urls: Boolean indicating if processing URLs (vs IPs)
         Returns:
             int: Count of unique items written
         """
         if not data:
             return
-        
-        
+
         unique_lines = sorted(set(data))
-        count = len(unique_lines) # Local counter
+        count = len(unique_lines)  # Local counter
         with open(filename, "w") as f:
             for line in unique_lines:
                 f.write(f"{line}\n")
@@ -415,7 +419,7 @@ class MobileCommands(
             # clean temp data
             self.temp_data = ""
             self.temp_base64_data = ""
-            #Flush buffers
+            # Flush buffers
             self.flush_system("I/O")
             self.kill_processes()
         except Exception as e:
@@ -444,7 +448,8 @@ class MobileCommands(
         # os.environ["GOBIN"] = absolute_path
         if not self.check_folder_exists(absolute_path):
 
-            self.print_warning_message(message=f"Templates folder not present, Cloning templates into {absolute_path}")
+            self.print_warning_message(message=f"Templates folder not present, Cloning templates into ",
+                                       file_path=absolute_path)
             github_repo = "https://github.com/optiv/mobile-nuclei-templates.git"
             command = f"git clone {github_repo} {absolute_path}"
 
@@ -463,7 +468,7 @@ class MobileCommands(
 
     def scan_with_nuclei(self, application_folder, output_dir, platform):
 
-        nuclei_dir = f"{self.output_directory}/mobile-nuclei-templates"
+        nuclei_dir = self.templates_folder
         out_file = f"{output_dir}/{self.file_name}_nuclei_keys_results.txt"
         android_output = f"{output_dir}/{self.file_name}_nuclei_android_results.txt"
 

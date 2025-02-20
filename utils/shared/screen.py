@@ -1,19 +1,21 @@
-from utils.shared.colors import Bcolors
-from utils.shared import Loader
 from time import sleep
-class ScreenHandler(Bcolors):
+from .messages import DisplayMessages
+from .loader import Loader
+
+
+class ScreenHandler(DisplayMessages):
     def __init__(self):
-       pass 
-   
+        super().__init__()
+
     @staticmethod
     def create_menu_selection(
-                     menu_selection: str,
-                     options: list | tuple,
-                     check_range_string: str,
-                     check_range_function: callable,
-                     start_color: str,
-                     end_color: str,
-                     **kwargs):
+            menu_selection: str,
+            options: list | tuple,
+            check_range_string: str,
+            check_range_function: callable,
+            start_color: str,
+            end_color: str,
+            **kwargs):
         print(menu_selection)
         for option in options:
             # Ensure both scanner menu and file extension are sorted for
@@ -22,48 +24,60 @@ class ScreenHandler(Bcolors):
                   f" {display_option}"
                   )
         return check_range_function(f"\n {check_range_string}", options)
-    
+
     @staticmethod
     def loader(message: str, end_message: str):
         with Loader(message, end_message):
             for _ in range(10):
-                sleep(0.25) 
-                
-    def get_file_path(self, prompt: str):
-        """Get and validate file path from user"""
+                sleep(0.25)
+
+    def get_file_path(self, prompt: str, check_folder_exists: callable):
+        """Get and validate a file path from user"""
         while True:
             file_path = input(prompt).strip()
             if not file_path:
-                print(f"{self.WARNING}\n[!] Path cannot be empty{self.ENDC}")
+                self.print_warning_message("Path cannot be empty")
+
                 continue
-            if not self.check_folder_exists(file_path):
-                print(f"{self.FAIL}\n[!] No such folder exists{self.ENDC}")
+            if not check_folder_exists(file_path):
+                self.print_error_message("No such folder exists")
                 continue
             return file_path
-        
-    def get_output_filename(self, prompt: str = "[+] Please enter the output filename: "): 
+
+    def get_output_filename(self, prompt: str = "[+] Please enter the output filename: "):
         """Get output filename from user"""
-        
+
         while True:
             filename = input(prompt).strip()
             if not filename:
-                print(f"{self.WARNING}\n[!] Filename cannot be empty{self.ENDC}")
+                self.print_warning_message("Filename cannot be empty")
                 continue
             return filename
-        
-    def display_files_onscreen(self,
-                      directory:str,  
-                      display_saved_files:callable,
-                      **kwargs)->tuple:
+
+    def get_user_input(self, prompt: str):
+        """Get user input
+        :param prompt: Text to display to user
+        : return user input
+        """
+        while True:
+            user_input = input(prompt).strip().lower()
+            if not user_input:
+                self.print_warning_message("Input cannot be empty")
+                continue
+            return user_input
+
+    @staticmethod
+    def display_files_onscreen(
+            directory: str,
+            display_saved_files: callable,
+            **kwargs) -> tuple:
         """Display files in directory with extension filter"""
         files = display_saved_files(
             directory,
             scan_extension=kwargs.get("scan_extension"),
-            resume_scan=kwargs.get("resume_scan",False),
-            display_applications=kwargs.get("display_applications",False)
-                                    )
+            resume_scan=kwargs.get("resume_scan", False),
+            display_applications=kwargs.get("display_applications", False)
+        )
         if not files:
-            raise FileNotFoundError(f"{self.WARNING}\n[!] No files found in {directory}{self.ENDC}")
+            raise FileNotFoundError(f"\n[!] No files found in {directory}")
         return files
-    
-    

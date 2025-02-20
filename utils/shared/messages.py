@@ -61,7 +61,7 @@ class DisplayMessages(Bcolors):
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
             msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n{path}"
-
+        
         print(msg)
 
     @staticmethod
