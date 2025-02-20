@@ -1,9 +1,14 @@
 import platform
-from utils.shared import Config, DisplayMessages, Commands
+from handlers.messages import DisplayHandler
+from utils.shared import Config, Commands
 from typing import Dict, List
 
 
-class PackageHandler(Config, DisplayMessages, Commands):
+class PackageHandler(
+    Config,
+    DisplayHandler,
+    Commands
+):
     """Handles package related actions such as installation of missing Packages"""
 
     def __init__(self) -> None:

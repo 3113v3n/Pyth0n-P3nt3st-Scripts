@@ -5,13 +5,19 @@ from typing import Dict, Optional
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
-# [Handlers]
-from handlers import NetworkHandler, PackageHandler, UserHandler
+# [Utils]
 from utils import MobileCommands, ProgressBar, Commands
-from utils.shared import DisplayMessages, Bcolors
+from utils.shared import Bcolors
+# [Handlers]
+from handlers import (
+    NetworkHandler,
+    PackageHandler,
+    UserHandler,
+    DisplayHandler
+)
 
 
-class PentestFramework(DisplayMessages):
+class PentestFramework(DisplayHandler):
     def __init__(self):
         super().__init__()
         self.classes = self.initialize_classes()

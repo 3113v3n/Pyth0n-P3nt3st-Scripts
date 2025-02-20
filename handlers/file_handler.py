@@ -4,11 +4,12 @@ from typing import Any, List
 import pandas
 from datetime import datetime
 from pathlib import Path
-from utils.shared import Validator, DisplayMessages
+from handlers.messages import DisplayHandler
+from utils.shared import Validator
 import ipaddress
 
 
-class FileHandler(Validator, DisplayMessages):
+class FileHandler(Validator, DisplayHandler):
     """Handle File operations"""
 
     def __init__(self) -> None:
@@ -27,7 +28,7 @@ class FileHandler(Validator, DisplayMessages):
         self.va_dir = "Vulnerability_Assessment"
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
-        
+
     @classmethod
     def reset_class_states(cls):
         """Reset the states of the class"""
@@ -44,7 +45,6 @@ class FileHandler(Validator, DisplayMessages):
         cls.va_dir = "Vulnerability_Assessment"
         cls.live_hosts_file = ""
         cls.unresponsive_hosts_file = ""
-        
 
     def update_output_directory(self, domain):
         """
@@ -97,7 +97,7 @@ class FileHandler(Validator, DisplayMessages):
         ) if "unfiltered" not in kwargs else self.print_info_message(
             message="Unfiltered vulnerabilities have been written to ",
             file_path=self.filepath
-            )
+        )
 
     def save_to_csv(self, filename, content):
         filename = self.get_file_basename(filename)
@@ -312,7 +312,7 @@ class FileHandler(Validator, DisplayMessages):
             return Tuple containing the list of CSV files and the index to start scan
             """
             selected_file = self.index_out_of_range_display(
-                "Please enter the file number you would like scan first :", self.files
+                "Please enter the file number you would like scan first : ", self.files
             )
             return self.files, selected_file
         elif to_analyze == "applications":

@@ -1,7 +1,7 @@
 from ..colors import Bcolors
 
 
-class InternalConfigs():
+class InternalConfigs:
     def __init__(self):
         pass
     internal_packages = [

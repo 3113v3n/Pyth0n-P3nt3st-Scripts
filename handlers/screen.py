@@ -1,9 +1,9 @@
 from time import sleep
-from .messages import DisplayMessages
-from .loader import Loader
+from .messages import DisplayHandler
+from utils.shared.loader import Loader
 
 
-class ScreenHandler(DisplayMessages):
+class ScreenHandler(DisplayHandler):
     def __init__(self):
         super().__init__()
 
@@ -26,11 +26,25 @@ class ScreenHandler(DisplayMessages):
         return check_range_function(f"\n {check_range_string}", options)
 
     @staticmethod
-    def loader(message: str, end_message: str):
-        with Loader(message, end_message):
-            for _ in range(10):
-                sleep(0.25)
-
+    def show_loader(
+        message: str,
+        end_message: str,
+        loading_state: bool=True,
+        spinner_type: str="dots",
+        ):
+        """Display Loading functionality to a user
+        :param message: message to display
+        :param end_message: a message to display after loading complete
+        :param loading_: arguments to pass to Loader class (Boolean to control timer)
+        """
+        loader = Loader(
+            desc=message,
+            end=end_message,
+            loading_state=loading_state,
+            spinner_type=spinner_type
+            )
+        loader.start()
+        return loader
     def get_file_path(self, prompt: str, check_folder_exists: callable):
         """Get and validate a file path from user"""
         while True:

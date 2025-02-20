@@ -1,8 +1,8 @@
 # trunk-ignore-all(black)
-from utils.shared import Config
-from handlers import FileHandler
-from utils.shared import ScreenHandler
 import sys
+from utils.shared import Config
+from .file_handler import FileHandler
+from .screen import ScreenHandler
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):

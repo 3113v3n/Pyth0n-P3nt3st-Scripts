@@ -1,20 +1,18 @@
 from pathlib import Path
 import os
 import re
-from handlers import FileHandler
-from utils.shared import (
-    Commands,
-    Config,
-    DisplayMessages,
-    Loader
+from handlers import (
+    FileHandler,
+    ScreenHandler
 )
+from utils.shared import Commands, Config
 
 
 class MobileCommands(
     FileHandler,
     Config,
     Commands,
-    DisplayMessages
+    ScreenHandler
 ):
     def __init__(self):
         super().__init__()
@@ -222,8 +220,16 @@ class MobileCommands(
 
     def decode_base64(self, output):
         """Decode base64 strings stored in memory and write to file"""
-        self.print_info_message("Decoding base64 strings ==> \n")
-        with open(output, "a") as out_f:
+        
+        self.print_debug_message("Decoder started")
+        loader = self.show_loader(
+            "Decoding base64 strings ",
+            "Decoding Complete",
+           
+        )
+        try:
+            with open(output, "a") as out_f:
+            # Set loading variable
             for string in self.temp_base64_data:
                 string = string.strip()
                 if string:  # Check if string is not empty
@@ -250,6 +256,13 @@ class MobileCommands(
                             message=f"Error decoding base64 string {string}",
                             exception_error=e
                         )
+        except Exception as e:
+            self.print_error_message(
+                message="Error decoding base64 strings",
+                exception_error=e
+            )
+        finally:
+            loader.stop()
 
     def get_deeplinks(self, application_folder, basename):
         url_name = f"{basename}_URLs.txt"

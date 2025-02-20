@@ -1,8 +1,8 @@
-from .colors import Bcolors
+from utils.shared.colors import Bcolors
 from pprint import pprint
 
 
-class DisplayMessages(Bcolors):
+class DisplayHandler(Bcolors):
     def __init__(self):
         pass
 
@@ -25,7 +25,7 @@ class DisplayMessages(Bcolors):
             msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{extra_data}"
         elif kwargs.get("flush"):
             msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{kwargs['extras']}"
-            return print(msg,flush=kwargs['flush'])
+            return print(msg, flush=kwargs['flush'])
 
         print(msg)
 
@@ -61,7 +61,7 @@ class DisplayMessages(Bcolors):
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
             msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n{path}"
-        
+
         print(msg)
 
     @staticmethod
@@ -79,11 +79,11 @@ class DisplayMessages(Bcolors):
             encoded_string = kwargs["encoded_string"]
             msg = f"{msg}{encoded_string}"
             return print(msg, flush=flush)
-        
+
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
             msg = f"\n{Bcolors.HEADER}[-] Info: {message} {Bcolors.ENDC}\n{path}"
-            
+
         elif kwargs.get("file"):
             msg = f"{msg}{kwargs['file']}"
 

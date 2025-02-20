@@ -12,9 +12,8 @@ class MobileAssessment:
     def reset_class_states(cls):
         """Reset the states of the class"""
         cls.package_name = ""
-        cls.package_path = ""   
-        
-        
+        cls.package_path = ""
+
     def initialize_variables(self, data):
         # Sets user provided values
         self.package_name = data["filename"]  # application filename
@@ -24,7 +23,7 @@ class MobileAssessment:
         return self.mobile_cmds.inspect_application_files(
             application=self.package_path,
             test_domain=test_domain
-            )
+        )
 
     # Install web proxies cert
     # 1. Take filepath to .der

@@ -1,8 +1,9 @@
-from handlers import NetworkHandler
-from utils.shared import DisplayMessages  # NetExec
+from handlers import NetworkHandler, DisplayHandler
 
 
-class InternalAssessment(DisplayMessages):
+# NetExec
+
+class InternalAssessment(DisplayHandler):
     """class will be responsible for handling all Internal PT"""
 
     def __init__(self, network: NetworkHandler) -> None:
@@ -10,14 +11,14 @@ class InternalAssessment(DisplayMessages):
         self.output_file = "sample.txt"
         self.mode = "SCAN"
         self.network_manager = network
-        
+
     @classmethod
     def reset_class_states(cls, network: NetworkHandler):
         """Reset the states of the class"""
         cls.output_file = "sample.txt"
         cls.mode = "SCAN"
-        cls.network_manager = network   
-        
+        cls.network_manager = network
+
     def initialize_variables(self, mode, output_file):
         # Sets user provided values
         self.mode = mode

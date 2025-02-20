@@ -1,14 +1,13 @@
 from typing import List, Dict, Optional
-from handlers import FileHandler
+from handlers import FileHandler, DisplayHandler
 from utils import Config, FilterVulnerabilities
-from utils.shared import DisplayMessages
 
 
 class VulnerabilityAnalysis(
     FileHandler,
     Config,
     FilterVulnerabilities,
-    DisplayMessages
+    DisplayHandler
 ):
     """Class that handles Vulnerability analysis tasks"""
 
