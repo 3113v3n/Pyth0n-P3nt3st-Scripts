@@ -32,39 +32,40 @@ class VAConfigs:
     RAPID7_HEADERS = [
         "Vulnerability Title",
         "Asset Names",
+        "Custom Tag",
         "Asset IP Address",
+        "Asset Alternate IPv4 Addresses",
         "Asset OS Name",
+        "Asset OS Family",
         "Service Name",
+        "Asset OS Version",
         "Service Port",
         "Vulnerability Description",
-        "Vulnerability Solution",
+        "Vulnerability CVE IDs",
         "Vulnerability CVSS Score",
-        "Asset MAC Addresses",
-        "Custom Tag",
-        "Asset OS Family",
-        "Asset OS Version",
+        "Vulnerability Solution",
         "Exploit Count",
         "Exploit URLs",
         "Malware Kit Count",
         "Exploit Minimum Skill",
         "Asset Risk Score",
+        "Asset MAC Addresses",
         "Vulnerability Severity Level",
-        "Vulnerability CVE IDs",
         "Vulnerability CVE URLs",
         "Vulnerability Risk Score",
         "Vulnerability PCI Compliance Status",
         "Vulnerable Since",
-        "Asset Alternate IPv4 Addresses",
     ]
 
     column_mismatch_error = (
         f"{Bcolors.FAIL}{Bcolors.BOLD}[!]Column mismatch between files. "
         f" Ensure all files have the same number of columns {Bcolors.ENDC}"
     )
+    # TODO: combine strings and categories
     NESSUS_STRINGS_TO_FILTER = [
         "ssl_condition",
         "missing_patch_condition",
-        "unsupported_software",
+        "unsupported_software_condition",
         "kaspersky_condition",
         "insecure_condition",
         "winverify_condition",
@@ -84,7 +85,7 @@ class VAConfigs:
     NESSUS_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
         "Missing Patches": "missing_patch_condition",
-        "Unsupported Software": "unsupported_software",
+        "Unsupported Software": "unsupported_software_condition",
         "Kaspersky": "kaspersky_condition",
         "Insecure Service": "insecure_condition",
         "Winverify": "winverify_condition",
@@ -101,14 +102,21 @@ class VAConfigs:
         "Web Application Issues": "web_condition",
     }
     # strings and categories need to be same number
-    RAPID7_STRINGS_TO_FILTER = ["ssl_condition", "missing_patch_condition",
-                                "unsupported_software", "web_condition",
-                                "compliance_condition", "ssh_condition", ]
+    RAPID7_STRINGS_TO_FILTER = [
+        "ssl_condition",
+        "missing_patch_condition",
+        "unsupported_software_condition",
+        "web_condition",
+        "compliance_condition",
+        "ssh_condition",
+        "database_condition"
+    ]
     RAPID7_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
         "Missing Patches": "missing_patch_condition",
-        "Unsupported Software": "unsupported_software",
+        "Unsupported Software": "unsupported_software_condition",
         "SSH Misconfig": "ssh_condition",
+        "Database Misconfigurations": "database_condition",
         "Web Application Issues": "web_condition",
         "Compliance": "compliance_condition",
     }

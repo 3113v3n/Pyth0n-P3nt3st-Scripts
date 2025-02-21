@@ -247,7 +247,7 @@ class VulnerabilityAnalysis(
             categorized_vulnerabilities["rce"] = self.vulnerabilities[
                 self.filter_condition("rce_condition")
                 & ~self.filter_condition("missing_patch_condition")
-                & ~self.filter_condition("unsupported_software")
+                & ~self.filter_condition("unsupported_software_condition")
             ]
 
         elif self.scanner == "rapid":
