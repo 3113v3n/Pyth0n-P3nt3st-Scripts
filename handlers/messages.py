@@ -1,10 +1,19 @@
 from utils.shared.colors import Bcolors
-from pprint import pprint
 
 
 class DisplayHandler(Bcolors):
     def __init__(self):
         pass
+
+    @staticmethod
+    def print_debug_message(message: str):
+        """Print debug messages for debugging purposes
+        :message: message to print
+        """
+        print(
+            f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
+            f"\n{Bcolors.WARNING}{message}{Bcolors.ENDC}"
+        )
 
     @staticmethod
     def print_success_message(message: str, **kwargs):
@@ -15,17 +24,20 @@ class DisplayHandler(Bcolors):
                 - extras: any extra data to print
                 - flush: flush the message
         """
-        msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
+        msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n"
 
         if kwargs.get("mobile_success"):
-            msg = (f"\n{Bcolors.WARNING}[+]{Bcolors.ENDC} {message}\n"
-                   f"{Bcolors.OKGREEN}{Bcolors.UNDERLINE}{kwargs["mobile_success"]}{Bcolors.ENDC}\n")
+            msg = (
+                f"\n{Bcolors.WARNING}[+]{Bcolors.ENDC} {message}\n"
+                f"{Bcolors.OKGREEN}{Bcolors.UNDERLINE}{kwargs["mobile_success"]}{Bcolors.ENDC}\n"
+            )
         elif kwargs.get("extras"):
-            extra_data = kwargs['extras']
-            msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{extra_data}"
+            extra_data = kwargs["extras"]
+            msg = f"{msg}{extra_data}"
         elif kwargs.get("flush"):
-            msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n{kwargs['extras']}"
-            return print(msg, flush=kwargs['flush'])
+            extra_data = kwargs.get("extras", "")  # Default to empty string if absent
+            msg = f"{msg}{extra_data}"
+            return print(msg, flush=kwargs["flush"])
 
         print(msg)
 
@@ -39,7 +51,7 @@ class DisplayHandler(Bcolors):
         msg = f"\n{Bcolors.FAIL}[!] Error: {message} {Bcolors.ENDC}"
 
         if kwargs.get("exception_error"):
-            error = kwargs['exception_error']
+            error = kwargs["exception_error"]
             msg = f"\n{Bcolors.FAIL}[!] {message}: {str(error)}{Bcolors.ENDC}"
 
         print(msg)
@@ -51,16 +63,17 @@ class DisplayHandler(Bcolors):
                 **kwargs: Keyword arguments to handle different print actions
                     - data = list of IPs
                     - flush = Boolean value to flush messages
-                    - file_path = file path 
+                    - file_path = file path
         """
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
+            msg =f"\n{Bcolors.HEADER}[#] Summary: {message} {Bcolors.ENDC}\n"
             ip_list = kwargs["data"]
             flush = kwargs["flush"]
             return print(msg, ip_list, flush=flush)
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
-            msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n{path}"
+            msg = f"{msg}{path}"
 
         print(msg)
 
@@ -76,7 +89,7 @@ class DisplayHandler(Bcolors):
         msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
             flush = kwargs["flush"]
-            encoded_string = kwargs["encoded_string"]
+            encoded_string = kwargs.get("encoded_string", "")
             msg = f"{msg}{encoded_string}"
             return print(msg, flush=flush)
 
@@ -101,11 +114,3 @@ class DisplayHandler(Bcolors):
             f"{filename}"
         )
         print(display_str)
-
-    @staticmethod
-    def print_debug_message(message: str):
-        """Print debug messages for debugging purposes
-        :message: message to print
-        """
-        print(f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
-              f"\n{Bcolors.WARNING}{message}{Bcolors.ENDC}")

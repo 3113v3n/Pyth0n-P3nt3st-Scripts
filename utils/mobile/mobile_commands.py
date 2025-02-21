@@ -1,19 +1,11 @@
 from pathlib import Path
 import os
 import re
-from handlers import (
-    FileHandler,
-    ScreenHandler
-)
+from handlers import FileHandler, ScreenHandler
 from utils.shared import Commands, Config
 
 
-class MobileCommands(
-    FileHandler,
-    Config,
-    Commands,
-    ScreenHandler
-):
+class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
     def __init__(self):
         super().__init__()
 
@@ -51,7 +43,7 @@ class MobileCommands(
 
     def pull_package_with_keyword(self, keyword):
         """Pull application apk
-            Requirement: Ensure device is connected via USB
+        Requirement: Ensure device is connected via USB
         """
         # TODO: Work in progress
         pkg_cmd = (
@@ -96,7 +88,9 @@ class MobileCommands(
 
         self.create_folder(platform, search_path=self.output_directory)
         self.mobile_output_dir = f"{base_dir}/{platform}"
-        folder_name = self.remove_spaces(f"{self.mobile_output_dir}/{filename_without_ext}")
+        folder_name = self.remove_spaces(
+            f"{self.mobile_output_dir}/{filename_without_ext}"
+        )
         return folder_name
 
     def _unzip_package(self, package, folder_name):
@@ -111,7 +105,9 @@ class MobileCommands(
             command = android_cmd if self.file_type.lower() == "apk" else ios_cmd
             if not self.check_folder_exists(folder_name):
 
-                self.print_success_message(f" Decompiling the {self.file_name} application ...")
+                self.print_success_message(
+                    f" Decompiling the {self.file_name} application ..."
+                )
                 result = self.run_os_commands(command)
                 if result.returncode == 0:
                     self.print_success_message(" Decompiling Successful")
@@ -129,8 +125,11 @@ class MobileCommands(
         self.file_type = self.get_file_extension(package)  # ipa / apk
 
         # Get folder name from provided package name
-        self.folder_name = (self._get_folder_name("android", package) if self.file_type == "apk"
-                            else self._get_folder_name("iOS", package))
+        self.folder_name = (
+            self._get_folder_name("android", package)
+            if self.file_type == "apk"
+            else self._get_folder_name("iOS", package)
+        )
 
         self._unzip_package(package, self.folder_name)
 
@@ -149,7 +148,9 @@ class MobileCommands(
         with open(output, "a") as outfile:
             for file in Path(app_folder).rglob("*"):
                 if file.is_file():
-                    self.print_info_message("Searching For hardcoded strings in File", file=file)
+                    self.print_info_message(
+                        "Searching For hardcoded strings in File", file=file
+                    )
                     command = f"rabin2 -zzzqq  {file}"
                     regex_patterns = [
                         self.BEARER_REGEX,
@@ -168,9 +169,9 @@ class MobileCommands(
                             unique_lines = sorted(set(result.stdout.splitlines()))
                             joined_string = "\n".join(unique_lines) + "\n"
                             formated_string = self.format_content(joined_string)
-                            self.print_info_message(
-                                f"Writing Potential Hardcoded string to temporary file ",
-                                flush=True
+                            self.print_success_message(
+                                "Writing Potential Hardcoded string to temporary file ",
+                                flush=True,
                             )
                             outfile.write(formated_string)
 
@@ -194,7 +195,9 @@ class MobileCommands(
         self.decode_base64(output)
 
     def create_temp_file(self, folder_path):
-        self.print_info_message("Creating in-memory temp data from folder: ", file=folder_path)
+        self.print_info_message(
+            "Creating in-memory temp data from folder: ", file=folder_path
+        )
         temp_data_list = []
         folder = Path(self.folder_name)
 
@@ -208,46 +211,44 @@ class MobileCommands(
 
                     if result.stdout.strip():
                         joined_string = "\n".join(unique_lines) + "\n"
-                        self.print_info_message(f" Getting strings from: ", file=file)
+                        self.print_info_message(" Getting strings from: ", file=file)
                         temp_data_list.append(joined_string)
                 except Exception as error:
                     self.print_error_message(
-                        message="Error processing file ",
-                        exception_error=error
+                        message="Error processing file ", exception_error=error
                     )
 
         self.temp_data = "".join(temp_data_list)
 
     def decode_base64(self, output):
         """Decode base64 strings stored in memory and write to file"""
-        
+
         self.print_debug_message("Decoder started")
         loader = self.show_loader(
-            "Decoding base64 strings ",
-            "Decoding Complete",
-            continuous=True
-           
+            "Decoding base64 strings ", "Decoding Complete", continuous=True
         )
         try:
             with open(output, "a") as out_f:
-            # Set loading variable
+                # Set loading variable
                 for string in self.temp_base64_data:
                     string = string.strip()
                     if string:  # Check if string is not empty
                         try:
-                            command = f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
+                            command = (
+                                f"echo '{string}' | base64 -d | grep -PI '[\\s\\S]+'"
+                            )
                             decoded = self.run_os_commands(command)
 
                             if decoded.stdout:
                                 self.print_info_message(
-                                    message=f"Encoded String: ",
+                                    message="Encoded String: ",
                                     flush=True,
-                                    encoded_string=string
+                                    encoded_string=string,
                                 )
                                 self.print_success_message(
-                                    message="Decoded String ",
+                                    message="Decoded String: ",
                                     extras=decoded.stdout,
-                                    flush=True
+                                    flush=True,
                                 )
                                 out_f.write(
                                     f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
@@ -255,12 +256,11 @@ class MobileCommands(
                         except Exception as e:
                             self.print_error_message(
                                 message=f"Error decoding base64 string {string}",
-                                exception_error=e
+                                exception_error=e,
                             )
         except Exception as e:
             self.print_error_message(
-                message="Error decoding base64 strings",
-                exception_error=e
+                message="Error decoding base64 strings", exception_error=e
             )
         finally:
             loader.stop()
@@ -282,10 +282,12 @@ class MobileCommands(
                     unfiltered_urls = re.findall(self.URL_REGEX, result.stdout)
 
                     # returns a list of URLS that don't match the ignored REGEX
-                    filtered_urls = list(filter(
-                        lambda url: not re.search(self.DEEPLINKS_IGNORE_REGEX, url),
-                        unfiltered_urls
-                    ))
+                    filtered_urls = list(
+                        filter(
+                            lambda url: not re.search(self.DEEPLINKS_IGNORE_REGEX, url),
+                            unfiltered_urls,
+                        )
+                    )
                     if filtered_urls:
                         filtered_urls = sorted(set(filtered_urls))
                         all_urls.extend([url for url in filtered_urls])
@@ -293,11 +295,15 @@ class MobileCommands(
                     ips = re.findall(self.IP_REGEX, result.stdout)
 
                     if len(ips) != 0:
-                        self.print_warning_message(message="Possible IP(s) found", data=ips, flush=True)
+                        self.print_warning_message(
+                            message="Possible IP(s) found", data=ips, flush=True
+                        )
                         all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
-                    self.print_error_message(message="Error extracting Links ", exception_error=e)
+                    self.print_error_message(
+                        message="Error extracting Links ", exception_error=e
+                    )
         # Update instance variables
         self.file_count = file_count
 
@@ -318,7 +324,7 @@ class MobileCommands(
     @staticmethod
     def sort_urls_and_ips(filename, data):
         """Sort and save URLs or IPs to file
-    
+
         Args:
             filename: Output file name
             data: List of URLs or IPs to process
@@ -336,13 +342,13 @@ class MobileCommands(
         return count
 
     def mobile_scripts(
-            self,
-            decompiled_folder,
-            hardcoded_filename,
-            platform,
-            basename,
-            output_dir,
-            base64_name,
+        self,
+        decompiled_folder,
+        hardcoded_filename,
+        platform,
+        basename,
+        output_dir,
+        base64_name,
     ):
         if platform == "ipa":
             self.ios_specific_scan(decompiled_folder, basename, output_dir)
@@ -415,13 +421,12 @@ class MobileCommands(
 
             self.print_success_message(
                 message="Application scanning complete, all your files are located here :==>",
-                mobile_success=self.mobile_output_dir
+                mobile_success=self.mobile_output_dir,
             )
             self.flush_system()
         except Exception as e:
             self.print_error_message(
-                message="Error during mobile assessment",
-                exception_error=e
+                message="Error during mobile assessment", exception_error=e
             )
         finally:
             # Clean up remaining processes
@@ -437,10 +442,7 @@ class MobileCommands(
             self.flush_system("I/O")
             self.kill_processes()
         except Exception as e:
-            self.print_error_message(
-                message="Error during cleanup",
-                exception_error=e
-            )
+            self.print_error_message(message="Error during cleanup", exception_error=e)
 
     def create_subfolder(self):
         """Create subfolder from the filename of package being scanned to score scan results"""
@@ -448,22 +450,21 @@ class MobileCommands(
         updated_output_directory = f"{self.folder_name}_scan_results"
 
         self.create_folder(
-            folder_name=new_folder_name,
-            search_path=self.mobile_output_dir)
+            folder_name=new_folder_name, search_path=self.mobile_output_dir
+        )
         self.mobile_output_dir = updated_output_directory
 
-    def install_nuclei_template(
-            self,
-            install_path
-    ):
+    def install_nuclei_template(self, install_path):
         template_dir = Path(f"{install_path}")
         absolute_path = str(template_dir.resolve())
 
         # os.environ["GOBIN"] = absolute_path
         if not self.check_folder_exists(absolute_path):
 
-            self.print_warning_message(message=f"Templates folder not present, Cloning templates into ",
-                                       file_path=absolute_path)
+            self.print_warning_message(
+                message="Templates folder not present, Cloning templates into ",
+                file_path=absolute_path,
+            )
             github_repo = "https://github.com/optiv/mobile-nuclei-templates.git"
             command = f"git clone {github_repo} {absolute_path}"
 
@@ -474,8 +475,8 @@ class MobileCommands(
 
             except Exception as e:
                 self.print_error_message(
-                    message="Error during Installation ",
-                    exception_error=e)
+                    message="Error during Installation ", exception_error=e
+                )
                 return False
 
         return True
