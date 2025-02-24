@@ -99,7 +99,15 @@ class FileHandler(Validator, DisplayHandler):
             file_path=self.filepath
         )
 
-    def save_to_csv(self, filename, content):
+    def save_to_csv(self, filename, content, *args):
+        """ 
+        Save contents to CSV file
+
+        :param filename: name of the file the content is going to be saved to
+        :param content: content to be saved
+        :param args: extra argument if necessary
+        """
+
         filename = self.get_file_basename(filename)
 
         # If filename is not full path prepend output_directory
@@ -176,7 +184,7 @@ class FileHandler(Validator, DisplayHandler):
 
     def _get_filtered_files(self, **kwargs) -> list:
         """Get filtered files based on user input
-        
+
         :param kwargs: Keyword arguments
         :return: List of filtered files
         """
@@ -217,7 +225,7 @@ class FileHandler(Validator, DisplayHandler):
         both_files = csv_files + xlsx_files
         application_files = list(filter(
             lambda file: self.check_filetype(file["filename"], "apk") or
-                         self.check_filetype(file["filename"], "ipa"),
+            self.check_filetype(file["filename"], "ipa"),
             self.files
         ))
         return {
@@ -231,7 +239,7 @@ class FileHandler(Validator, DisplayHandler):
     def _filter_unresponsive_host_files(csv_files) -> list[Any] | None:
         """
         Filter out CSV files only who are unresponsive
-        
+
         :param csv_files: List of CSV files
         :return: List of unresponsive host files
         """
@@ -245,11 +253,11 @@ class FileHandler(Validator, DisplayHandler):
 
     def _filter_files_by_extension(self, collections, extension) -> Any | None:
         """Filter files by extension
-        
+
         :param
                 collections: Dictionary of file collections
                 extension: Extension to filter by
-                
+
         :return: List of files filtered by extension
         """
         if extension not in ["csv", "xlsx", "both"]:
@@ -300,7 +308,8 @@ class FileHandler(Validator, DisplayHandler):
                     self.print_error_message("The selected number is out of range."
                                              f" Please enter a valid number between 1 & {len(data_list)}")
             except ValueError:
-                self.print_error_message("Invalid input. Please enter a number.")
+                self.print_error_message(
+                    "Invalid input. Please enter a number.")
                 # return the index of selected item
         return selected_value - 1
 
@@ -398,7 +407,8 @@ class FileHandler(Validator, DisplayHandler):
             return last_address
 
         except FileNotFoundError:
-            self.print_error_message("No previous unresponsive host file found")
+            self.print_error_message(
+                "No previous unresponsive host file found")
 
     @staticmethod
     def concat_dataframes(existing, newdata):

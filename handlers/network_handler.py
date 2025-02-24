@@ -27,8 +27,9 @@ class NetworkHandler(FileHandler, Commands):
         self.host_bits = 0
         # Shell commands
         self.progress_bar = None
+        self.live_ip_count = 0
         self.lock = threading.Lock()  # prevent race conditions
-        
+
     @classmethod
     def reset_class_states(cls):
         """Reset the states of the class"""
@@ -52,20 +53,14 @@ class NetworkHandler(FileHandler, Commands):
         self.progress_bar = progress_bar(self.hosts)
         self.update_output_directory(test_domain)
 
-    def get_live_ips(self, mode, output):
+    def get_live_ips(self, mode: str, output: str) -> int:
+        """Enumerates all IPs in a given network using ICMP ping command
+        :param mode: mode to use (SCAN | RESUME)
+               output: Name of the output file
+        :return number of ips that are alive
+        """
         curses.wrapper(self.scan_network, mode, output)
-        return self.progress_bar.live_hosts
-
-    def configure_progress_bar(self, stdscr, ip, output_file, mode):
-        is_alive = self.ping_hosts(ip)
-        self.progress_bar.update_ips(
-            self.save_to_csv,
-            output_file=output_file,
-            stdscr=stdscr,
-            ip=ip,
-            is_alive=is_alive,
-            mode=mode,
-        )
+        return len(self.progress_bar.live_hosts)
 
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
@@ -86,7 +81,13 @@ class NetworkHandler(FileHandler, Commands):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
             futures = {
-                executor.submit(self.scan_hosts, ip, output_file, mode, stdscr): ip
+                executor.submit(
+                    self.set_progressbar,
+                    ip,
+                    output_file,
+                    mode,
+                    stdscr
+                ): ip
                 for ip in ip_ranges
             }
             for _ in tqdm(
@@ -118,7 +119,7 @@ class NetworkHandler(FileHandler, Commands):
                 for z, y, x in itertools.product(range(256), repeat=3)
             ]
 
-    def scan_hosts(self, ip, output_file, mode, stdscr):
+    def set_progressbar(self, ip, output_file, mode, stdscr):
         """Check if the host is alive using concurrent pings and update UI"""
         is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
 
@@ -131,7 +132,6 @@ class NetworkHandler(FileHandler, Commands):
                 is_alive=is_alive,
                 mode=mode,
             )
-
     # @staticmethod
     # def scapy_ping(ip) -> bool:
     #     """Sends an ICMP Echo Request using scapy and returns boolean value"""

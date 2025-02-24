@@ -33,18 +33,20 @@ class InternalAssessment(DisplayHandler):
         """Lists all possible hosts on a network using ICMP protocol
          to increase your attack surface
         """
-        self.network_manager.get_live_ips(
-            mode=self.mode, output=self.output_file)
+        live_ip_count = self.network_manager.get_live_ips(
+            mode=self.mode,
+            output=self.output_file
+            )
         paths = self.network_manager.get_file_paths()
         live = f"{paths['live_hosts']}"
         unresponsive = f"{paths['unresponsive_hosts']}"
 
         self.print_success_message(
-            message=f"Discovered hosts are saved here: ",
+            message=f"Discovered {live_ip_count} hosts, and saved them to: ",
             extras=live
         )
         self.print_warning_message(
-            message=f"Your Unresponsive Hosts are located here: ",
+            message="Your Unresponsive Hosts are located here: ",
             file_path=unresponsive
         )
 
