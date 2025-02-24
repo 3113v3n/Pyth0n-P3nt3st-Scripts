@@ -22,10 +22,6 @@ class FileHandler(Validator, DisplayHandler):
         )
         self.filepath = ""  # full path to a saved file
         self.files = []
-        self.mobile_dir = "Mobile"
-        self.external_dir = "External"
-        self.internal_dir = "Internal"
-        self.va_dir = "Vulnerability_Assessment"
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
 
@@ -39,41 +35,34 @@ class FileHandler(Validator, DisplayHandler):
         )
         cls.filepath = ""  # full path to a saved file
         cls.files = []
-        cls.mobile_dir = "Mobile"
-        cls.external_dir = "External"
-        cls.internal_dir = "Internal"
-        cls.va_dir = "Vulnerability_Assessment"
         cls.live_hosts_file = ""
         cls.unresponsive_hosts_file = ""
+
+    def set_new_dir(self, new_path):
+        """Universal function to update output directory"""
+        base_dir = f"{self.output_directory}/{new_path}"
+        # create the directory if its absent
+        self.create_folder(new_path)
+        return base_dir
 
     def update_output_directory(self, domain):
         """
         Depending on the test domain provided,
         we update the output directory for various file output
         """
-        match domain:
-            case "mobile":
-                self.output_directory = f"{self.output_directory}/{self.mobile_dir}"
-                # create folder if not existent
-                self.create_folder(self.mobile_dir)
-                return self.output_directory
-            case "internal":
-                self.output_directory = f"{self.output_directory}/{self.internal_dir}"
-                # create folder if not existent
-                self.create_folder(self.internal_dir)
-                return self.output_directory
-            case "external":
-                self.output_directory = f"{self.output_directory}/{self.external_dir}"
-                # create folder if not existent
-                self.create_folder(self.external_dir)
-                return self.output_directory
-            case "va":
-                self.output_directory = f"{self.output_directory}/{self.va_dir}"
-                # create folder if not existent
-                self.create_folder(self.va_dir)
-                return self.output_directory
-            case _:
-                return
+        handlers = {
+            "internal": lambda: self.set_new_dir("Internal"),
+            "mobile": lambda: self.set_new_dir("Mobile"),
+            "external": lambda: self.set_new_dir("External"),
+            "va": lambda: self.set_new_dir("Vulnerability-Assessment")
+        }
+        dir_handler = handlers.get(domain)
+        if dir_handler:
+            return dir_handler()
+        else:
+            self.print_error_message(
+                f"Can not create directory for invalid domain: {domain}"
+            )
 
     def save_txt_file(self, filename, content):
         self.filepath = f"{self.output_directory}/{filename}"
@@ -216,7 +205,10 @@ class FileHandler(Validator, DisplayHandler):
                 list: Files matching the extension
             """
             return list(filter(
-                lambda file: self.check_filetype(file["filename"], ext),
+                lambda file: self.check_filetype(
+                    file["filename"],
+                    ext
+                ),
                 self.files
             ))
 
@@ -354,10 +346,11 @@ class FileHandler(Validator, DisplayHandler):
     @staticmethod
     def read_excel_file(file, **kwargs):
         try:
-            return pandas.read_excel(file,
-                                     engine="openpyxl",
-
-                                     **kwargs)
+            return pandas.read_excel(
+                file,
+                engine="openpyxl",
+                **kwargs
+            )
         except Exception as e:
             print(f"Error reading excel file: {e}")
             raise

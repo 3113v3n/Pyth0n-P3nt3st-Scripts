@@ -1,4 +1,3 @@
-from time import sleep
 from .messages import DisplayHandler
 from utils.shared.loader import Loader
 

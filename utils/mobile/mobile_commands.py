@@ -130,8 +130,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             if self.file_type == "apk"
             else self._get_folder_name("iOS", package)
         )
-
-        self._unzip_package(package, self.folder_name)
+        #self._unzip_package(package, self.folder_name)
 
         return self.folder_name
 
@@ -222,8 +221,6 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
     def decode_base64(self, output):
         """Decode base64 strings stored in memory and write to file"""
-
-        self.print_debug_message("Decoder started")
         loader = self.show_loader(
             "Decoding base64 strings ", "Decoding Complete", continuous=True
         )
@@ -410,14 +407,14 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             basename = f"{output_name}_{platform}"
             hardcoded = f"{basename}_hardcoded.txt"
 
-            self.mobile_scripts(
-                decompiled_folder=folder_name,
-                hardcoded_filename=hardcoded,
-                platform=platform,
-                basename=basename,
-                output_dir=self.mobile_output_dir,
-                base64_name=output_name,
-            )
+            # self.mobile_scripts(
+            #     decompiled_folder=folder_name,
+            #     hardcoded_filename=hardcoded,
+            #     platform=platform,
+            #     basename=basename,
+            #     output_dir=self.mobile_output_dir,
+            #     base64_name=output_name,
+            # )
 
             self.print_success_message(
                 message="Application scanning complete, all your files are located here :==>",
