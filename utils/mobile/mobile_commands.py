@@ -79,14 +79,14 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
         self.templates_folder = self.output_directory + "/mobile-nuclei-templates"
         platform = platform.title() if platform == "android" else platform
 
-        base_dir = self.update_output_directory("mobile")
+        base_dir = self.output_directory
 
         # Handle platform-specific file
 
         filename_without_ext = self.get_filename_without_extension(package)
         self.file_name = self.remove_spaces(filename_without_ext)
 
-        self.create_folder(platform, search_path=self.output_directory)
+        self.create_folder(platform, search_path=base_dir)
         self.mobile_output_dir = f"{base_dir}/{platform}"
         folder_name = self.remove_spaces(
             f"{self.mobile_output_dir}/{filename_without_ext}"
@@ -130,7 +130,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             if self.file_type == "apk"
             else self._get_folder_name("iOS", package)
         )
-        #self._unzip_package(package, self.folder_name)
+        self._unzip_package(package, self.folder_name)
 
         return self.folder_name
 
@@ -407,14 +407,14 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             basename = f"{output_name}_{platform}"
             hardcoded = f"{basename}_hardcoded.txt"
 
-            # self.mobile_scripts(
-            #     decompiled_folder=folder_name,
-            #     hardcoded_filename=hardcoded,
-            #     platform=platform,
-            #     basename=basename,
-            #     output_dir=self.mobile_output_dir,
-            #     base64_name=output_name,
-            # )
+            self.mobile_scripts(
+                decompiled_folder=folder_name,
+                hardcoded_filename=hardcoded,
+                platform=platform,
+                basename=basename,
+                output_dir=self.mobile_output_dir,
+                base64_name=output_name,
+            )
 
             self.print_success_message(
                 message="Application scanning complete, all your files are located here :==>",

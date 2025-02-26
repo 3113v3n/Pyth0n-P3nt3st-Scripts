@@ -1,5 +1,5 @@
 import os
-from typing import Any, List
+from typing import Any
 
 import pandas
 from datetime import datetime
@@ -41,6 +41,7 @@ class FileHandler(Validator, DisplayHandler):
     def set_new_dir(self, new_path):
         """Universal function to update output directory"""
         base_dir = f"{self.output_directory}/{new_path}"
+                
         # create the directory if its absent
         self.create_folder(new_path)
         return base_dir

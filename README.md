@@ -11,7 +11,7 @@ Some of the Scope covered or in progress include but not limited to:
 
 | Domain                       | Script Target                                     |
 |------------------------------|---------------------------------------------------|
-| External Penetration Testing | 1. Enumerate subdomains     [coming soon]         |
+| External Penetration Testing | 1. Enumerate subdomains     [coming_soon]         |
 |                              |                                                   |
 | Internal Penetration Testing | 1. Enumerate IPs give CIDR [completed]            |
 |                              | 2. Run netexec         des                        |
@@ -41,10 +41,11 @@ Some of the Scope covered or in progress include but not limited to:
 ```text
 Resume mode will however require you to select the filename that contains the unresponsive IP addresses
 It then sorts the IPs and selects the last IP in the file and resumes scan from there.
+The script then looks for a file with a similar filename excluding "unresponsive" to update
 
 The user is however required to provide the subnet that was being scanned initially i.e /8 /16 /24 e.t.c
 
-
+ 
 
 ```
 ![Resume_scan](images/internal_resume.png)
