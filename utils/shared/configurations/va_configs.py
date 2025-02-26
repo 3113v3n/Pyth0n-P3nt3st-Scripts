@@ -81,6 +81,8 @@ class VAConfigs:
         "information_condition",
         "web_condition",
         "rce_condition",
+        "reboot_condition"
+
     ]
     NESSUS_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
@@ -100,6 +102,7 @@ class VAConfigs:
         "Telnet": "telnet_condition",
         "Information Disclosure": "information_condition",
         "Web Application Issues": "web_condition",
+        "Windows Update Reboot":"reboot_condition"
     }
     # strings and categories need to be same number
     RAPID7_STRINGS_TO_FILTER = [
@@ -109,7 +112,8 @@ class VAConfigs:
         "web_condition",
         "compliance_condition",
         "ssh_condition",
-        "database_condition"
+        "database_condition",
+       
     ]
     RAPID7_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
@@ -118,6 +122,7 @@ class VAConfigs:
         "SSH Misconfig": "ssh_condition",
         "Database Misconfigurations": "database_condition",
         "Web Application Issues": "web_condition",
+
         "Compliance": "compliance_condition",
     }
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
