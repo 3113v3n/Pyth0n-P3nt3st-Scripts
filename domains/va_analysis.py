@@ -112,7 +112,10 @@ class VulnerabilityAnalysis(
             (self.csv_filter_operations(selected_columns, "Risk", "notnull"))
             & (selected_columns["Risk"] != "Low")
         ].reset_index(drop=True)
-        self.print_success_message(message="Credentialed Hosts: ", extras=f"{self.credentialed_hosts}")
+        self.print_success_message(
+            message=f"Credentialed Hosts [{len(self.credentialed_hosts)}]: ",
+            extras=f"{self.credentialed_hosts}"
+            )
 
         # Sort Vulnerabilities using Risk
         return formated_vulnerabilities.sort_values(by='Risk')

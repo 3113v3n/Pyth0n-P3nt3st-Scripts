@@ -54,16 +54,16 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         )
         while True:
             try:
-                
-
                 package_path = self.get_file_path(
                     "Please provide the Path to your mobile application(s)\nPath to File:  ",
                     self.check_folder_exists
                 )
 
-                applications = self.display_files_onscreen(package_path,
-                                                           self.display_saved_files,
-                                                           display_applications=True)
+                applications = self.display_files_onscreen(
+                    package_path,
+                    self.display_saved_files,
+                    display_applications=True
+                    )
                 if applications:
                     return applications
 
@@ -293,7 +293,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 raise ValueError(f"Invalid domain: {test_domain}")
 
             # Update output directory
-            self.update_output_directory(test_domain)
+            if test_domain != "exit":
+                self.update_output_directory(test_domain)
 
             # Get domain handler
             handler = domain_handlers[test_domain]
