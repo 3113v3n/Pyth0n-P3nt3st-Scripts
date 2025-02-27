@@ -4,6 +4,15 @@ from .config import Config
 from .progress_bar import ProgressBar
 from .validators import Validator
 from .loader import Loader
+from .configurations.va_configs import VAConfigs
 
 
-__all__ = [Bcolors, Commands, Config, ProgressBar, Validator, Loader]
+__all__ = [
+    Bcolors,
+    Commands,
+    Config,
+    ProgressBar,
+    Validator,
+    Loader,
+    VAConfigs
+]

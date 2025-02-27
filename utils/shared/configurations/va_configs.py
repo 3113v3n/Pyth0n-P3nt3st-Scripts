@@ -123,3 +123,30 @@ class VAConfigs:
         "Compliance": "compliance_condition",
     }
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
+    SSL_FILTER_STRINGS ="SSL|TLS|POODLE|Diffie-Hellman"
+    PATCH_FILTER_STRINGS = "patches|updates|security update|Microsoft has released|Update|update"
+    UPGRADE_FILTER_STRINGS = (
+        "no longer supported|unsupported|Unsupported Version|Obsolete Version|end-of-life|Upgrade|upgrade|discontinued"
+    )
+    REBOOT_FILTER_STRINGS = "reboot|Reboot"
+    RDP_FILTER_STRINGS = "Terminal Services|Remote Desktop Protocol"
+    WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS"
+    UNIVERSAL_IGNORE_FILTER = "Upgrade|Update|upgrade|update|patch"
+    WEB_IGNORE_FILTER = "TLS|SSL"
+
+    # Scanner-specific column mappings
+    COLUMNS = {
+        'nessus': {
+            'title': 'Name',
+            'solution': 'Solution',
+            'description': 'Description',
+            'synopsis': 'Synopsis',
+            'risk': 'Risk'
+        },
+        'rapid': {
+            'title': 'Vulnerability Title',
+            'solution': 'Vulnerability Solution',
+            'service': 'Service Name',
+            'pci_status': 'Vulnerability PCI Compliance Status'
+        }
+    }

@@ -1,6 +1,7 @@
 from typing import List, Dict, Optional
 from handlers import FileHandler, DisplayHandler
 from utils import Config, FilterVulnerabilities
+from functools import reduce
 
 
 class VulnerabilityAnalysis(
@@ -30,21 +31,21 @@ class VulnerabilityAnalysis(
         self.file_list: List[Dict] = []
         self.starting_index: int = 0
         self.starting_file: str = ""
-        
+
     @classmethod
     def reset_class_states(cls):
         """Reset the states of the class"""
         cls.data = None
         cls.credentialed_hosts = []
         cls.headers = None
-        cls.selected_columns = []   
+        cls.selected_columns = []
         cls.scanner = "nessus"
         cls.vulnerabilities = []
         cls.file_type = ""
         cls.file_list = []
         cls.starting_index = 0
         cls.starting_file = ""
-    
+
     def set_scanner(self, scanner: str):
         """
         Set the scanner type and update related configurations
@@ -115,7 +116,7 @@ class VulnerabilityAnalysis(
         self.print_success_message(
             message=f"Credentialed Hosts [{len(self.credentialed_hosts)}]: ",
             extras=f"{self.credentialed_hosts}"
-            )
+        )
 
         # Sort Vulnerabilities using Risk
         return formated_vulnerabilities.sort_values(by='Risk')
@@ -128,7 +129,7 @@ class VulnerabilityAnalysis(
             Formatted DataFrame with filtered vulnerabilities
         """
         # print("TODO: Filter further i.e Credentialed Hosts")
-        return self.data[self.headers[:-1]]
+        return self.data[self.headers[:-2]]
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
@@ -255,28 +256,38 @@ class VulnerabilityAnalysis(
 
         elif self.scanner == "rapid":
             categories = self.RAPID7_VULN_CATEGORIES
-
-        categorized_vulnerabilities = {
+        categorized_vulnerabilities.update({
             key: self.vulnerabilities[self.filter_condition(value)]
             for key, value in categories.items()
-        }
+        })
+
         return categorized_vulnerabilities
 
-    def sort_vulnerabilities(self, vulnerabilities, output_file):
-        self.vulnerabilities = vulnerabilities
+    def _apply_filter(self):
+        """Filters based on selected vulnerability scanner"""
         filter_strings = (self.NESSUS_STRINGS_TO_FILTER if self.scanner ==
                           "nessus" else self.RAPID7_STRINGS_TO_FILTER)
 
         # Show remaining data after filtering
         # Start loop from the second value and append results
         # to combined filter
+        if filter_strings:
+            # combined_filter = ~self.filter_condition(filter_strings[0])
+            # for condition in filter_strings[1:]:
+            #     combined_filter &= ~self.filter_condition(condition)
 
-        combined_filter = ~self.filter_condition(filter_strings[0])
-        for condition in filter_strings[1:]:
-            combined_filter &= ~self.filter_condition(condition)
+            combined_filter = reduce(
+                lambda acc,
+                cond: acc & ~self.filter_condition(cond),
+                filter_strings,
+                ~self.filter_condition(filter_strings[0]))
 
-        unfiltered = self.vulnerabilities[combined_filter]
+        return self.vulnerabilities[combined_filter]
 
+    def sort_vulnerabilities(self, vulnerabilities, output_file):
+        self.vulnerabilities = vulnerabilities
+
+        unfiltered = self._apply_filter()
         # returns tuple containing key, value pair of dataframe
         # identifier and dataframe
 
@@ -311,15 +322,15 @@ class VulnerabilityAnalysis(
         vuln_categories = (self.NESSUS_VULN_CATEGORIES if self.scanner ==
                            "nessus" else self.RAPID7_VULN_CATEGORIES)
 
-        for condition,dataframe in issues.items():
+        for condition, dataframe in issues.items():
 
             if dataframe.empty:
-                #print(f"\n{self.FAIL}DEBUG: Dataframe for: {condition} is empty..Skipping{self.ENDC}")
+                # print(f"\n{self.FAIL}DEBUG: Dataframe for: {condition} is empty..Skipping{self.ENDC}")
                 continue
 
-            #print(f"\nDEBUG: Processing condition: {condition}")
+            # print(f"\nDEBUG: Processing condition: {condition}")
             category_name = next((name for name, cond in vuln_categories.items()
-                                  if cond == condition),condition)
+                                  if cond == condition), condition)
 
             # Group unique vulnerabilities by hosts
             if self.scanner == "nessus":
@@ -327,7 +338,7 @@ class VulnerabilityAnalysis(
             else:
                 hosts = dataframe['Asset IP Address'].unique()
 
-            #print(f"Debug - Found {len(hosts)} hosts for {category_name}")
+            # print(f"Debug - Found {len(hosts)} hosts for {category_name}")
 
             formatted_hosts = '\n'.join(hosts)
 
@@ -341,10 +352,10 @@ class VulnerabilityAnalysis(
                 'Affected Hosts': formatted_hosts,
                 'Management Response': ''  # Empty column for manual input
             })
-            #print(f"\nDEBUG: Added row for {category_name}")
+            # print(f"\nDEBUG: Added row for {category_name}")
 
-        #print(f"\nDEBUG: Total summary rows created: {len(summary_rows)}")
-            
+        # print(f"\nDEBUG: Total summary rows created: {len(summary_rows)}")
+
         # Create a summary dataframe
         summary_df = self.create_pd_dataframe(
             summary_rows, self.SUMMARY_SHEET_HEADERS)
@@ -353,9 +364,10 @@ class VulnerabilityAnalysis(
         summary_df['Risk Sort'] = self.sort_dataframe(
             summary_df['Risk Rating'],
             risk_order,
-            )
-        summary_df = summary_df.sort_values('Risk Sort').drop('Risk Sort',axis=1)
-        #print(f"\nDEBUG: - Final dataframe: {summary_df.shape}")
+        )
+        summary_df = summary_df.sort_values(
+            'Risk Sort').drop('Risk Sort', axis=1)
+        # print(f"\nDEBUG: - Final dataframe: {summary_df.shape}")
         return summary_df
 
     def save_vulns_to_files(self, unfiltered_data, found_vulnerabilities, output_file):
