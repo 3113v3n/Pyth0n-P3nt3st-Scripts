@@ -105,7 +105,7 @@ class VulnerabilityAnalysis(
                 self.data, "Host", "in", in_key=self.credentialed_hosts
             )
         ][
-            self.headers[:-1]  # ignore the last item in our headers list
+            self.headers[:-2]  # ignore the last 2 items in our headers list
         ]
 
         # Return only [ Critical | High | Medium ] Risks and notnull values
@@ -129,7 +129,7 @@ class VulnerabilityAnalysis(
             Formatted DataFrame with filtered vulnerabilities
         """
         # print("TODO: Filter further i.e Credentialed Hosts")
-        return self.data[self.headers[:-2]]
+        return self.data[self.headers[:-1]]
 
     def get_missing_columns(self, dataframe, filename):
         # compare the headers from our defined headers and provided dataframe
