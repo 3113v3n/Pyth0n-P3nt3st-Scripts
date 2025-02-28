@@ -75,13 +75,13 @@ class VAConfigs:
         "AD_condition",
         "defender_condition",
         "rdp_condition",
-        "compliance_condition",
         "ssh_condition",
         "telnet_condition",
         "information_condition",
         "web_condition",
         "rce_condition",
         "reboot_condition",
+        #"compliance_condition",
     ]
     NESSUS_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
@@ -96,12 +96,12 @@ class VAConfigs:
         "Active Directory": "AD_condition",
         "Windows Defender": "defender_condition",
         "RDP Misconfig": "rdp_condition",
-        "Compliance": "compliance_condition",
         "SSH Misconfig": "ssh_condition",
         "Telnet": "telnet_condition",
         "Information Disclosure": "information_condition",
         "Web Application Issues": "web_condition",
         "Windows Update Reboot": "reboot_condition",
+        #"Compliance": "compliance_condition",
     }
     # strings and categories need to be same number
     RAPID7_STRINGS_TO_FILTER = [
@@ -109,9 +109,9 @@ class VAConfigs:
         "missing_patch_condition",
         "unsupported_software_condition",
         "web_condition",
-        "compliance_condition",
         "ssh_condition",
         "database_condition",
+        "compliance_condition",
     ]
     RAPID7_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",

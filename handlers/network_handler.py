@@ -1,6 +1,7 @@
 import curses
 import itertools
 import threading
+import psutil
 from tqdm import tqdm
 import concurrent.futures
 from handlers import FileHandler
@@ -25,6 +26,7 @@ class NetworkHandler(FileHandler, Commands):
         self.user_ip_addr = ""
         # remaining usable host bits
         self.host_bits = 0
+        self.mode = "scan"
         # Shell commands
         self.progress_bar = None
         self.live_ip_count = 0
@@ -39,6 +41,7 @@ class NetworkHandler(FileHandler, Commands):
         cls.network_mask = ""
         cls.user_ip_addr = ""
         cls.host_bits = 0
+        cls.mode = "scan"
         cls.progress_bar = None
         cls.lock = threading.Lock()
 
@@ -69,69 +72,78 @@ class NetworkHandler(FileHandler, Commands):
         pass
 
     def scan_network(self, stdscr, mode, output_file):
+        # Check Memory
+        self.print_info_message(
+            f"Memory usage: {psutil.virtual_memory().percent}%")
         base_ip = self.user_ip_addr.split(".")
         ip_ranges = self.generate_ip_ranges(base_ip)
+        self.mode = mode
 
-        # Find the index of the start IP in the generated IP Ranges
-        if mode == "resume":
-            start_index = ip_ranges.index(self.user_ip_addr)
-            ip_ranges = ip_ranges[
-                start_index:
-            ]  # slice list to start from last unresponsive IP
+        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+            futures = {}
+            for ip in ip_ranges:
+                future = executor.submit(
+                    self.set_progressbar, ip, output_file, mode, stdscr)
+                futures[future] = ip
+                while len(futures) >= 1000:
+                    for future in concurrent.futures.as_completed(futures):
+                        del futures[future]
+                        break
+            remaining_hosts = self.hosts - (
+                int(base_ip[1]) * 256 * 256 +
+                int(base_ip[2]) * 256 + int(base_ip[3])
+            ) + 1 if mode == "resume" else self.hosts
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=200) as executor:
-            futures = {
-                executor.submit(
-                    self.set_progressbar,
-                    ip,
-                    output_file,
-                    mode,
-                    stdscr
-                ): ip
-                for ip in ip_ranges
-            }
             for _ in tqdm(
-                    concurrent.futures.as_completed(futures),
-                    total=len(ip_ranges),
-                    desc="Scanning Network",
-                    leave=False,
+                concurrent.futures.as_completed(futures),
+                total=remaining_hosts,
+                desc="Scanning Network",
+                leave=False,
             ):
                 pass  # UI updates are handled inside scan_host()
 
-    def generate_ip_ranges(self, base_ip) -> list:
-        """Generate IP addresses based on CIDR subnet provided"""
-
-        base_ip = list(map(int, base_ip))  # ==> [192,168,0,1]
+    def generate_ip_ranges(self, base_ip) -> iter:
+        """Generate IP addresses based on CIDR subnet provided """
+        base_ip = list(map(int, base_ip))
+        start_ip = self.user_ip_addr.split(
+            ".") if self.mode == "resume" else None
+        if start_ip:
+            start_ip = list(map(int, start_ip))
 
         if self.host_bits <= 8:
-            return [
-                f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}" for x in range(1, 256)
-            ]
+            start_x = start_ip[3] if start_ip else 1
+            for x in range(start_x, 256):
+                yield f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}"
         elif 16 >= self.host_bits > 8:
-            return [
-                f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
-                for y in range(256)
-                for x in range(256)
-            ]
+            start_y = start_ip[2] if start_ip else 0
+            start_x = start_ip[3] if start_ip else 0
+            for y, x in itertools.product(range(start_y, 256), range(start_x, 256)):
+                if y == start_y and x < start_x:
+                    continue
+                yield f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
         elif 24 >= self.host_bits > 16:
-            return [
-                f"{base_ip[0]}.{z}.{y}.{x}"
-                for z, y, x in itertools.product(range(256), repeat=3)
-            ]
+            start_z = start_ip[1] if start_ip else 0
+            start_y = start_ip[2] if start_ip else 0
+            start_x = start_ip[3] if start_ip else 0
+            for z, y, x in itertools.product(range(start_z, 256), range(start_y, 256), range(start_x, 256)):
+                if z == start_z and y == start_y and x < start_x:
+                    continue
+                yield f"{base_ip[0]}.{z}.{y}.{x}"
 
     def set_progressbar(self, ip, output_file, mode, stdscr):
         """Check if the host is alive using concurrent pings and update UI"""
-        is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
+        try:
+            is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
 
-        with self.lock:  # Prevents concurrent writes
-            self.progress_bar.update_ips(
-                self.save_to_csv,
-                output_file=output_file,
-                stdscr=stdscr,
-                ip=ip,
-                is_alive=is_alive,
-                mode=mode,
-            )
+            with self.lock:  # Prevents concurrent writes
+                self.progress_bar.update_ips(
+                    self.save_to_csv, output_file=output_file, stdscr=stdscr,
+                    ip=ip,
+                    is_alive=is_alive,
+                    mode=mode,
+                )
+        except Exception as e:
+            self.print_error_message(exception_error=e)
     # @staticmethod
     # def scapy_ping(ip) -> bool:
     #     """Sends an ICMP Echo Request using scapy and returns boolean value"""

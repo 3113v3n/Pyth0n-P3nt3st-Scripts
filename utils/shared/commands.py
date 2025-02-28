@@ -86,7 +86,7 @@ class Commands:
         try:
             # Building the command. Ex: "ping -c 1 google.com"
             command = ["ping", param, "1", host]
-
+            #time.sleep(0.001)  # 1ms delay,
             subprocess.run(
                 command,
                 stdout=subprocess.DEVNULL,
