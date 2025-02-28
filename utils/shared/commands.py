@@ -36,7 +36,7 @@ class Commands:
             )
         except subprocess.CalledProcessError as e:
             print(f"Command failed with exit code: {e.returncode}\nError: {e.stderr}")
-            raise Exception(e.stderr)
+            #raise Exception(e.stderr)
         return result
 
     @staticmethod

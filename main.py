@@ -94,14 +94,10 @@ class PentestFramework(DisplayHandler):
     def handle_internal_assessment(user, network, internal):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
-        network.initialize_network_variables(
-            user.domain_variables, user.domain, ProgressBar)
+        network.initialize_network_variables(user.domain_variables, user.domain, ProgressBar)
 
         internal.initialize_variables(
-            mode=user.domain_variables["mode"],
-            output_file=user.domain_variables["output"],
-        )
-
+            mode=user.domain_variables["mode"],output_file=user.domain_variables["output"])
         internal.enumerate_hosts()
 
     @staticmethod

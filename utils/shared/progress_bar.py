@@ -7,12 +7,15 @@ class ProgressBar(Validator):
     Filehandler Module
     """
 
-    def __init__(self, total) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.total_scanned = 0
-        self.total_hosts = total
+        self.total_hosts = 0 #total
         self.live_hosts = []
         self.unresponsive_hosts = []
+
+    def set_total_hosts(self,total:int):
+        self.total_hosts = total
 
     def update_ips(self, save_file_to_csv, output_file, stdscr, ip, is_alive, mode):
         """Update the scan progress and save both live and unresponsive hosts"""

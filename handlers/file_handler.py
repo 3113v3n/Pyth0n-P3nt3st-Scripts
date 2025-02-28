@@ -444,6 +444,14 @@ class FileHandler(Validator, DisplayHandler):
     def read_all_lines(file):
         with open(file, "r") as file:
             return file.readlines()
+        
+    def remove_file(self,file):
+        """Delete file from system"""
+        try:
+            file_path = Path(file)
+            file_path.unlink(missing_ok=True)
+        except Exception as e:
+            self.print_error_message(exception_error=e)
 
     @staticmethod
     def generate_unique_name(file, extension) -> str:

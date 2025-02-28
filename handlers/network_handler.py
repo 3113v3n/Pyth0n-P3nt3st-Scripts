@@ -1,5 +1,4 @@
 import curses
-import itertools
 import threading
 import psutil
 from tqdm import tqdm
@@ -50,19 +49,20 @@ class NetworkHandler(FileHandler, Commands):
         self.subnet = variables["subnet"]
         network_info = self.get_network_info(self.subnet)
         self.hosts = network_info["hosts"]
+        self.mode = variables["mode"]
         self.user_ip_addr = network_info["ip_address"]
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
-        self.progress_bar = progress_bar(self.hosts)
+        self.progress_bar = progress_bar()
         self.update_output_directory(test_domain)
 
-    def get_live_ips(self, mode: str, output: str) -> int:
+    def get_live_ips(self, output: str) -> int:
         """Enumerates all IPs in a given network using ICMP ping command
         :param mode: mode to use (SCAN | RESUME)
                output: Name of the output file
         :return number of ips that are alive
         """
-        curses.wrapper(self.scan_network, mode, output)
+        curses.wrapper(self.scan_network, self.mode, output)
         return len(self.progress_bar.live_hosts)
 
     def port_discovery(self):
@@ -105,7 +105,14 @@ class NetworkHandler(FileHandler, Commands):
     def generate_ip_ranges(self, base_ip) -> iter:
         """Generate IP addresses based on CIDR subnet provided """
         base_ip = list(map(int, base_ip))
-        start_ip = self.user_ip_addr.split(".") if self.mode == "resume" else None
+        self.hosts = self.calculate_remaining_hosts(
+            self.user_ip_addr
+            ) if self.mode == "resume" else self.hosts
+        
+        #update the total host values in progress bar
+        self.progress_bar.set_total_hosts(self.hosts)
+        start_ip = self.user_ip_addr.split(
+            ".") if self.mode == "resume" else None
         if start_ip:
             start_ip = list(map(int, start_ip))
 
@@ -130,7 +137,6 @@ class NetworkHandler(FileHandler, Commands):
                     x_start = start_x if z == start_z and y == start_y and self.mode == "resume" else 0
                     for x in range(x_start, 256):
                         yield f"{base_ip[0]}.{z}.{y}.{x}"
-
 
     def set_progressbar(self, ip, output_file, mode, stdscr):
         """Check if the host is alive using concurrent pings and update UI"""
@@ -170,3 +176,49 @@ class NetworkHandler(FileHandler, Commands):
             "host_bits": bits,
         }
         return ip_info
+
+    def calculate_remaining_hosts(self, ip_string: str) -> int:
+        """Converts IP to decimal equivalent
+            w.x.y.z
+            [STEPS]
+            1. split IP into individual values [w, x, y, z]
+            2. Multiply each octet by the corresponding power of 256
+
+                w * 256³ = W
+                x * 256² = X
+                y * 256¹ = Y
+                z * 256⁰ = Z
+
+            3. Add the values together
+                ( W + X + Y + Z )
+
+        :param ip_string: IP address to convert
+        :return decimal equivalent:
+        """
+        try:
+            octets = [int(x) for x in ip_string.split(".")]  # [w, x, y, z]
+            # result = 0
+            # for i in range(1,3):
+            #     result += (int(octets[i]) * (256 ** (3-i)))
+            # return result
+            total_hosts = self.hosts
+            """
+            octet[0] << 24
+            example: 10 --> 00001010
+                    <<  --> 00001010 00000000 00000000 00000000 ==> 167772160
+            """
+            start_ip_int = (octets[0] << 24) + (octets[1]
+                                                << 16) + (octets[2] << 8) + octets[3]
+
+            # Calculate network base address
+            network_bits = 32 - self.network_mask
+            network_mask = 0xFFFFFFFF << network_bits
+            network_base = start_ip_int & network_mask
+
+            # Calculate last IP in subnet
+            last_ip_int = network_base + total_hosts - 1
+            # Calculate remaining hosts
+            remaining_hosts = last_ip_int - start_ip_int + 1
+            return remaining_hosts
+        except Exception as e:
+            self.print_error_message(exception_error=e)
