@@ -105,8 +105,7 @@ class NetworkHandler(FileHandler, Commands):
     def generate_ip_ranges(self, base_ip) -> iter:
         """Generate IP addresses based on CIDR subnet provided """
         base_ip = list(map(int, base_ip))
-        start_ip = self.user_ip_addr.split(
-            ".") if self.mode == "resume" else None
+        start_ip = self.user_ip_addr.split(".") if self.mode == "resume" else None
         if start_ip:
             start_ip = list(map(int, start_ip))
 
@@ -117,18 +116,21 @@ class NetworkHandler(FileHandler, Commands):
         elif 16 >= self.host_bits > 8:
             start_y = start_ip[2] if start_ip else 0
             start_x = start_ip[3] if start_ip else 0
-            for y, x in itertools.product(range(start_y, 256), range(start_x, 256)):
-                if y == start_y and x < start_x:
-                    continue
-                yield f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
+            for y in range(start_y, 256):
+                x_start = start_x if y == start_y and self.mode == "resume" else 0
+                for x in range(x_start, 256):
+                    yield f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
         elif 24 >= self.host_bits > 16:
             start_z = start_ip[1] if start_ip else 0
             start_y = start_ip[2] if start_ip else 0
             start_x = start_ip[3] if start_ip else 0
-            for z, y, x in itertools.product(range(start_z, 256), range(start_y, 256), range(start_x, 256)):
-                if z == start_z and y == start_y and x < start_x:
-                    continue
-                yield f"{base_ip[0]}.{z}.{y}.{x}"
+            for z in range(start_z, 256):
+                y_start = start_y if z == start_z and self.mode == "resume" else 0
+                for y in range(y_start, 256):
+                    x_start = start_x if z == start_z and y == start_y and self.mode == "resume" else 0
+                    for x in range(x_start, 256):
+                        yield f"{base_ip[0]}.{z}.{y}.{x}"
+
 
     def set_progressbar(self, ip, output_file, mode, stdscr):
         """Check if the host is alive using concurrent pings and update UI"""
