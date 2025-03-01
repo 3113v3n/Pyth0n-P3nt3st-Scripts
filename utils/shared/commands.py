@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import psutil
+import asyncio
+import aioping
 import subprocess
 import platform
 
@@ -19,10 +21,9 @@ class Commands:
                 psutil.NoSuchProcess,
                 psutil.AccessDenied,
                 psutil.ZombieProcess
-                ):
+            ):
                 pass
-    
-                        
+
     @staticmethod
     def run_os_commands(command):
         """Executes shell commands such as [apt and sudo]"""
@@ -35,8 +36,9 @@ class Commands:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Command failed with exit code: {e.returncode}\nError: {e.stderr}")
-            #raise Exception(e.stderr)
+            print(
+                f"Command failed with exit code: {e.returncode}\nError: {e.stderr}")
+            # raise Exception(e.stderr)
         return result
 
     @staticmethod
@@ -86,7 +88,7 @@ class Commands:
         try:
             # Building the command. Ex: "ping -c 1 google.com"
             command = ["ping", param, "1", host]
-            #time.sleep(0.001)  # 1ms delay,
+            # time.sleep(0.001)  # 1ms delay,
             subprocess.run(
                 command,
                 stdout=subprocess.DEVNULL,
@@ -105,3 +107,28 @@ class Commands:
     def clear_screen():
         """Clear screen"""
         return os.system('cls' if os.name == 'nt' else 'clear')
+
+    @staticmethod
+    async def async_host_ping(ip) -> bool:
+        """Asynchronous ping
+
+        :param ip: IP address to test
+        :return boolean
+        """
+        try:
+            await aioping.ping(ip, timeout=0.5)
+            return True
+        except Exception:
+            return False
+
+    def start_async_ping(self, ip) -> bool:
+        try:
+            loop = asyncio.new_event_loop() # create a new loop for this thread
+            asyncio.set_event_loop(loop)
+            is_alive = loop.run_until_complete(self.async_host_ping(ip))
+            loop.close()
+            return is_alive
+        except Exception as e:
+            print(f"Async ping failed for IP: {ip}: {str(e)}")
+            return False
+        

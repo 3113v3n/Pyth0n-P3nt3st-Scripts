@@ -1,8 +1,9 @@
 import curses
 import threading
-import psutil
+# import psutil
+import os
 from tqdm import tqdm
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from handlers import FileHandler
 # from scapy.all import IP, ICMP, sr1
 from utils.shared import Commands
@@ -25,7 +26,9 @@ class NetworkHandler(FileHandler, Commands):
         self.user_ip_addr = ""
         # remaining usable host bits
         self.host_bits = 0
+        self.ip_alive = False
         self.mode = "scan"
+        self.network_base_int = 0
         # Shell commands
         self.progress_bar = None
         self.live_ip_count = 0
@@ -53,6 +56,7 @@ class NetworkHandler(FileHandler, Commands):
         self.user_ip_addr = network_info["ip_address"]
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
+        self.network_base_int = network_info["network_base_int"]
         self.progress_bar = progress_bar()
         self.update_output_directory(test_domain)
 
@@ -62,7 +66,10 @@ class NetworkHandler(FileHandler, Commands):
                output: Name of the output file
         :return number of ips that are alive
         """
+
         curses.wrapper(self.scan_network, self.mode, output)
+        # debug without curser
+        # self.scan_network(None,self.mode,output)
         return len(self.progress_bar.live_hosts)
 
     def port_discovery(self):
@@ -71,92 +78,140 @@ class NetworkHandler(FileHandler, Commands):
         # masscan -p20,21-23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080 199.66.11.0/24
         pass
 
+    def generate_filename(self, mode: str, is_alive: bool, filename: str) -> str:
+        """
+        Generate a filename based on mode and host responsiveness.
+
+        :param mode: Operation mode ('scan' or 'resume')
+        :param is_alive: Whether the host responded
+        :param filename: Base filename to modify
+        :return: Formatted filename
+        """
+        basename = self.get_filename_without_extension(filename)
+        extension = ".csv"
+        suffix = "_unresponsive_hosts"
+
+        if is_alive:
+            if mode == "resume":
+                return filename.replace(suffix, "")
+            return filename
+
+        if suffix not in basename:
+            return f"{basename}{suffix}{extension}"
+        return f"{basename}{extension}"
+
     def scan_network(self, stdscr, mode, output_file):
+
         # Check Memory
-        self.print_info_message(
-            f"Memory usage: {psutil.virtual_memory().percent}%")
+        # self.print_info_message(
+        #     f"Memory usage: {psutil.virtual_memory().percent}%")
         base_ip = self.user_ip_addr.split(".")
-        ip_ranges = self.generate_ip_ranges(base_ip)
         self.mode = mode
+        remaining_hosts = self.calculate_remaining_hosts(
+            self.user_ip_addr) if self.mode == "resume" else self.hosts
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-            futures = {}
-            for ip in ip_ranges:
-                future = executor.submit(
-                    self.set_progressbar, ip, output_file, mode, stdscr)
-                futures[future] = ip
-                while len(futures) >= 1000:
-                    for future in concurrent.futures.as_completed(futures):
-                        del futures[future]
-                        break
-            remaining_hosts = self.hosts - (
-                int(base_ip[1]) * 256 * 256 +
-                int(base_ip[2]) * 256 + int(base_ip[3])
-            ) + 1 if mode == "resume" else self.hosts
+        # Dynamically adjust num of workers based on CPU cores
+        max_workers = min(50, os.cpu_count() * 2)
+        processed = 0
 
-            for _ in tqdm(
-                concurrent.futures.as_completed(futures),
-                total=remaining_hosts,
-                desc="Scanning Network",
-                leave=False,
-            ):
-                pass  # UI updates are handled inside scan_host()
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with tqdm(total=remaining_hosts, desc="Scanning Network", leave=False)as pbar:
+                batches = list(self.generate_ip_in_batches(base_ip))
+                for ip_batch in batches:
+                    futures = {executor.submit(
+                        self.set_progressbar, mode, output_file, ip, stdscr
+                    ): ip for ip in ip_batch}
+                    for _ in as_completed(futures):
+                        processed += 1
+                        if processed % 100 == 0:  # Update UI every 100 IPs
+                            # self.save_ips(mode, filename=output_file)
+                            pbar.update(100)
+                    pbar.update(processed % 100)
 
-    def generate_ip_ranges(self, base_ip) -> iter:
-        """Generate IP addresses based on CIDR subnet provided """
+        # Final flush
+        # self.save_ips(mode, filename=output_file)
+
+    def save_ips(self, mode, filename):
+        with self.lock:
+            if self.progress_bar.live_hosts:
+                self.save_to_csv(
+                    filename,
+                    list(self.progress_bar.live_hosts))
+                # self.progress_bar.live_hosts.clear()
+            else:
+                self.save_to_csv(
+                    filename,
+                    list(self.progress_bar.unresponsive_hosts))
+                # self.progress_bar.unresponsive_hosts.clear()
+
+    def generate_ip_in_batches(self, base_ip, batch_size=2000):
+        """Generates IP ranges in batches"""
         base_ip = list(map(int, base_ip))
         self.hosts = self.calculate_remaining_hosts(
-            self.user_ip_addr
-            ) if self.mode == "resume" else self.hosts
-        
-        #update the total host values in progress bar
+            self.user_ip_addr) if self.mode == "resume" else self.hosts
+        # update the total host values in progress bar
         self.progress_bar.set_total_hosts(self.hosts)
-        start_ip = self.user_ip_addr.split(
-            ".") if self.mode == "resume" else None
-        if start_ip:
-            start_ip = list(map(int, start_ip))
+        start_ip = list(map(int, self.user_ip_addr.split("."))
+                        ) if self.mode == "resume" else None
 
-        if self.host_bits <= 8:
-            start_x = start_ip[3] if start_ip else 1
-            for x in range(start_x, 256):
-                yield f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}"
-        elif 16 >= self.host_bits > 8:
-            start_y = start_ip[2] if start_ip else 0
-            start_x = start_ip[3] if start_ip else 0
-            for y in range(start_y, 256):
-                x_start = start_x if y == start_y and self.mode == "resume" else 0
-                for x in range(x_start, 256):
-                    yield f"{base_ip[0]}.{base_ip[1]}.{y}.{x}"
-        elif 24 >= self.host_bits > 16:
-            start_z = start_ip[1] if start_ip else 0
-            start_y = start_ip[2] if start_ip else 0
-            start_x = start_ip[3] if start_ip else 0
-            for z in range(start_z, 256):
-                y_start = start_y if z == start_z and self.mode == "resume" else 0
-                for y in range(y_start, 256):
-                    x_start = start_x if z == start_z and y == start_y and self.mode == "resume" else 0
+        def chunked_ips():
+            ip_list = []
+            if self.host_bits <= 8:
+                # 10.2.3.X
+                start_x = start_ip[3] if start_ip else 0
+                for x in range(start_x, 256):
+                    ip_list.append(
+                        f"{base_ip[0]}.{base_ip[1]}.{base_ip[2]}.{x}")
+                    if len(ip_list) >= batch_size:
+                        yield ip_list
+                        ip_list = []
+                if ip_list:
+                    yield ip_list
+
+            elif 16 >= self.host_bits > 8:
+                # 10.2.Y.X
+                start_x = start_ip[3] if start_ip else 0
+                start_y = start_ip[2] if start_ip else 0
+                for y in range(start_y, 256):
+                    x_start = start_x if y == start_y and self.mode == "resume" else 0
                     for x in range(x_start, 256):
-                        yield f"{base_ip[0]}.{z}.{y}.{x}"
+                        ip_list.append(f"{base_ip[0]}.{base_ip[1]}.{y}.{x}")
+                        if len(ip_list) >= batch_size:
+                            yield ip_list
+                            ip_list = []
+                    if ip_list:
+                        yield ip_list
+            elif 24 >= self.host_bits > 16:
+                # 10.Z.Y.X
 
-    def set_progressbar(self, ip, output_file, mode, stdscr):
-        """Check if the host is alive using concurrent pings and update UI"""
+                start_x = start_ip[3] if start_ip else 0
+                start_y = start_ip[2] if start_ip else 0
+                start_z = start_ip[1] if start_ip else 0
+                for z in range(start_z, 256):
+                    y_start = start_y if z == start_z and self.mode == "resume" else 0
+                    for y in range(y_start, 256):
+                        x_start = start_x if y == start_y and self.mode == "resume" else 0
+                        for x in range(x_start, 256):
+                            ip_list.append(f"{base_ip[0]}.{z}.{y}.{x}")
+                            if len(ip_list) >= batch_size:
+                                yield ip_list
+                                ip_list = []
+                        if ip_list:
+                            yield ip_list
+
+        return chunked_ips()
+
+    def set_progressbar(self, mode, filename, ip, stdscr):
+        """Check if the host is alive using asynchronous pings and update UI"""
         try:
-            is_alive = self.ping_hosts(ip)  # self.scapy_ping(ip)
-
+            is_alive = self.start_async_ping(ip)  # self.ping_hosts(ip)
             with self.lock:  # Prevents concurrent writes
+                filename_ = self.generate_filename(mode, is_alive, filename)
                 self.progress_bar.update_ips(
-                    self.save_to_csv, output_file=output_file, stdscr=stdscr,
-                    ip=ip,
-                    is_alive=is_alive,
-                    mode=mode,
-                )
-        except Exception as e:
-            self.print_error_message(exception_error=e)
-    # @staticmethod
-    # def scapy_ping(ip) -> bool:
-    #     """Sends an ICMP Echo Request using scapy and returns boolean value"""
-    #     response = sr1(IP(dst=ip) / ICMP(), timeout=0.5, verbose=False)
-    #     return response is not None
+                    self.save_to_csv, filename_, mode, ip, is_alive, stdscr, self.existing_unresponsive_ips)
+        except Exception as error:
+            self.print_error_message(
+                f"set Progress bar failed for IP: {ip} : ", exception_error=error)
 
     @staticmethod
     def get_network_info(subnet) -> dict:
@@ -167,15 +222,22 @@ class NetworkHandler(FileHandler, Commands):
         """
         # determine num of hosts from IP addr
         # 2^(remaining bits)-2 = usable_hosts
-        network_mask = subnet.split("/")[1]
-        bits = 32 - int(network_mask)
-        ip_info = {
-            "ip_address": subnet.split("/")[0],
-            "hosts": (2 ** bits),  # - 2
-            "network_mask": int(network_mask),
+        ip, mask = subnet.split("/")
+        mask = int(mask)
+        bits = 32 - mask
+        total_hosts = (2 ** bits)
+        octets = list(map(int, ip.split(".")))
+        network_mask_int = 0xFFFFFFFF << bits
+        ip_int = (octets[0] << 24) + (octets[1] << 16) + \
+            (octets[2] << 8) + octets[3]
+        network_base_int = ip_int & network_mask_int
+        return {
+            "ip_address": ip,
+            "hosts": total_hosts,  # - 2
+            "network_mask": mask,
             "host_bits": bits,
+            "network_base_int": network_base_int
         }
-        return ip_info
 
     def calculate_remaining_hosts(self, ip_string: str) -> int:
         """Converts IP to decimal equivalent
@@ -207,18 +269,13 @@ class NetworkHandler(FileHandler, Commands):
             example: 10 --> 00001010
                     <<  --> 00001010 00000000 00000000 00000000 ==> 167772160
             """
-            start_ip_int = (octets[0] << 24) + (octets[1]
-                                                << 16) + (octets[2] << 8) + octets[3]
-
-            # Calculate network base address
-            network_bits = 32 - self.network_mask
-            network_mask = 0xFFFFFFFF << network_bits
-            network_base = start_ip_int & network_mask
+            start_ip_int = (octets[0] << 24) + (octets[1] << 16)\
+                + (octets[2] << 8) + octets[3]
 
             # Calculate last IP in subnet
-            last_ip_int = network_base + total_hosts - 1
+            last_ip_int = self.network_base_int + total_hosts - 1
             # Calculate remaining hosts
-            remaining_hosts = last_ip_int - start_ip_int + 1
-            return remaining_hosts
+            return last_ip_int - start_ip_int + 1
+
         except Exception as e:
             self.print_error_message(exception_error=e)
