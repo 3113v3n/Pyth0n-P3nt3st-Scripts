@@ -43,7 +43,8 @@ class InternalAssessment(DisplayHandler):
             extras=live
         )
         # remove unresponsive hosts if scan completes uninterrupted
-        self.network_manager.remove_file(unresponsive)
+        if unresponsive:
+         self.network_manager.remove_file(unresponsive)
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

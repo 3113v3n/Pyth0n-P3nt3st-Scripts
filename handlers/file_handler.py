@@ -1,6 +1,5 @@
 import os
 from typing import Any
-
 import pandas
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +23,7 @@ class FileHandler(Validator, DisplayHandler):
         self.files = []
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
+        self.existing_unresponsive_ips = set()
 
     @classmethod
     def reset_class_states(cls):
@@ -41,7 +41,7 @@ class FileHandler(Validator, DisplayHandler):
     def set_new_dir(self, new_path):
         """Universal function to update output directory"""
         base_dir = f"{self.output_directory}/{new_path}"
-                
+
         # create the directory if its absent
         self.create_folder(new_path)
         return base_dir
@@ -108,15 +108,25 @@ class FileHandler(Validator, DisplayHandler):
 
         # TODO: Remove CSV headers
         if "unresponsive_hosts" not in filename:
-            file_header = "Live Host IP Addresses"
+            # column_name = "Live Host IP Addresses"
             self.live_hosts_file = file_path
 
         else:
-            file_header = "Unresponsive IP Addresses"
+            # column_name = "Unresponsive IP Addresses"
             self.unresponsive_hosts_file = file_path
 
-        # Live Hosts : [Ip addresses]
-        data = pandas.DataFrame({file_header: [content]})
+        # Ensure content is a list (handles single value or multiple values)
+        if not isinstance(content, (list, tuple)):
+            content = [content]
+
+        # Flatten nested lists if present
+        flat_content = []
+        for item in content:
+            if isinstance(item, (list, tuple)):
+                flat_content.extend(item)
+            else:
+                flat_content.append(item)
+        data = pandas.DataFrame(flat_content, columns=None)
 
         if self.file_exists(f"{file_path}"):
             existing_df = self.read_csv(f"{file_path}")
@@ -124,7 +134,8 @@ class FileHandler(Validator, DisplayHandler):
         else:
             updated_df = data
 
-        updated_df.to_csv(f"{file_path}", index=False)
+        updated_df.to_csv(f"{file_path}", header=False, index=False,
+                          lineterminator='\n')  # save without header
 
     def get_file_paths(self) -> dict:
         """Return stored file paths for live and unresponsive hosts"""
@@ -342,7 +353,7 @@ class FileHandler(Validator, DisplayHandler):
         if "header" in kwargs:
             return pandas.read_csv(dataframe, header="infer")
         # utf-16 cp1252
-        return pandas.read_csv(dataframe, encoding="ISO-8859-1")
+        return pandas.read_csv(dataframe, encoding="ISO-8859-1", header=None)
 
     @staticmethod
     def read_excel_file(file, **kwargs):
@@ -383,26 +394,28 @@ class FileHandler(Validator, DisplayHandler):
         """
         Takes a file as an input, sorts the ips available in the list in ascending order
         get the last Ip on the list to use as start_ip
+
         """
-        try:
-            data_frame = self.read_csv(unresponsive_file)
-
-            if data_frame.empty:
-                return None
-
-            # Extract Ips from the first column
-            ip_list = data_frame.iloc[:, 0].dropna().tolist()
-
-            # Convert to IPAddress objects for correct numerical sorting
-            sorted_ips = sorted(
-                ip_list, key=lambda ip: ipaddress.ip_address(ip))
-
+        self.existing_unresponsive_ips = self.load_existing_ips(
+            unresponsive_file)
+        ip_list = list(self.existing_unresponsive_ips)
+        sorted_ips = sorted(
+            ip_list, key=lambda ip: ipaddress.ip_address(ip)
+        )
+        if sorted_ips:
             last_address = sorted_ips[-1]
+            self.print_info_message(
+                "Resuming scan from IP address : ", file_path=last_address)
             return last_address
 
-        except FileNotFoundError:
-            self.print_error_message(
-                "No previous unresponsive host file found")
+    def load_existing_ips(self, datafile):
+        existing_ips = set()
+        with open(datafile, 'r') as file:
+            for line in file:
+                ip = line.strip()
+                if ip:
+                    existing_ips.add(ip)
+        return existing_ips
 
     @staticmethod
     def concat_dataframes(existing, newdata):
@@ -444,8 +457,8 @@ class FileHandler(Validator, DisplayHandler):
     def read_all_lines(file):
         with open(file, "r") as file:
             return file.readlines()
-        
-    def remove_file(self,file):
+
+    def remove_file(self, file):
         """Delete file from system"""
         try:
             file_path = Path(file)
