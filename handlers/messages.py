@@ -35,7 +35,8 @@ class DisplayHandler(Bcolors):
             extra_data = kwargs["extras"]
             msg = f"{msg}{extra_data}"
         elif kwargs.get("flush"):
-            extra_data = kwargs.get("extras", "")  # Default to empty string if absent
+            # Default to empty string if absent
+            extra_data = kwargs.get("extras", "")
             msg = f"{msg}{extra_data}"
             return print(msg, flush=kwargs["flush"])
 
@@ -67,7 +68,7 @@ class DisplayHandler(Bcolors):
         """
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
-            msg =f"\n{Bcolors.HEADER}[#] Summary: {message} {Bcolors.ENDC}\n"
+            msg = f"\n{Bcolors.HEADER}[#] Summary: {message} {Bcolors.ENDC}\n"
             ip_list = kwargs["data"]
             flush = kwargs["flush"]
             return print(msg, ip_list, flush=flush)
@@ -75,6 +76,12 @@ class DisplayHandler(Bcolors):
             path = kwargs["file_path"]
             msg = f"{msg}{path}"
 
+        print(msg)
+
+    @staticmethod
+    def print_trace_message(message: str):
+        """print trace messages on terminal"""
+        msg = f"\n {Bcolors.HEADER}[TRACE]{Bcolors.ENDC} {message}"
         print(msg)
 
     @staticmethod
