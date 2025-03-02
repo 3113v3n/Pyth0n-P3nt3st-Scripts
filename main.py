@@ -253,7 +253,7 @@ class PentestFramework(DisplayHandler):
                     self.classes["command"].clear_screen()
 
             except KeyboardInterrupt:
-                self.print_warning_message("Program interrupted by user")
+                self.print_error_message("Program interrupted by user")
                 self.exit_menu = True
             except Exception as e:
                 self.print_error_message(message="An error occurred", exception_error=e)

@@ -1,5 +1,7 @@
 import curses
+import signal
 import threading
+import sys
 # import psutil
 import os
 from tqdm import tqdm
@@ -33,6 +35,8 @@ class NetworkHandler(FileHandler, Commands):
         self.progress_bar = None
         self.live_ip_count = 0
         self.lock = threading.Lock()  # prevent race conditions
+        self.shutdown_event = threading.Event()
+        
 
     @classmethod
     def reset_class_states(cls):
@@ -46,6 +50,7 @@ class NetworkHandler(FileHandler, Commands):
         cls.mode = "scan"
         cls.progress_bar = None
         cls.lock = threading.Lock()
+        cls.shutdown_event = threading.Event()
 
     def initialize_network_variables(self, variables, test_domain, progress_bar):
         # initialize the class variables with user variables
@@ -60,17 +65,12 @@ class NetworkHandler(FileHandler, Commands):
         self.progress_bar = progress_bar()
         self.update_output_directory(test_domain)
 
-    def get_live_ips(self, output: str) -> int:
-        """Enumerates all IPs in a given network using ICMP ping command
-        :param mode: mode to use (SCAN | RESUME)
-               output: Name of the output file
-        :return number of ips that are alive
-        """
-
-        curses.wrapper(self.scan_network, self.mode, output)
+    def getliveips_curses(self, stdscr, output):
+        """Wrapper to initialize curses and call scan_network"""
         # debug without curser
         # self.scan_network(None,self.mode,output)
-        return len(self.progress_bar.live_hosts)
+        self.scan_network(self.mode, output)
+        return len(self.progress_bar.live_hosts) if self.progress_bar else 0
 
     def port_discovery(self):
         # use masscan to discover open ports incase ICMP is disabled
@@ -100,36 +100,161 @@ class NetworkHandler(FileHandler, Commands):
             return f"{basename}{suffix}{extension}"
         return f"{basename}{extension}"
 
-    def scan_network(self, stdscr, mode, output_file):
+    def scan_network(self, mode, output_file):
+        if not self.curses_active or self.stdscr is None:
+            raise RuntimeError("Curses not initialized properly")
+
+        self.stdscr.clear()
+        self.stdscr.addstr(0, 0, "Network Scanner - Press Ctrl+C to stop")
+        self.stdscr.refresh()
+        curses.curs_set(0)
+        curses.echo(False)
+
+        # Signal handler for SIGINT (Ctrl+C)
+        def signal_handler(sig, frame):
+            print("Signal received!")
+            self.shutdown_event.set()
+            self.stdscr.addstr(4, 0, "Shutting down...")
+            self.stdscr.refresh()
+            curses.napms(500)
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        executor = None
+        try:
+            base_ip = self.user_ip_addr.split(".")
+            self.mode = mode
+            remaining_hosts = self.calculate_remaining_hosts(
+                self.user_ip_addr) if self.mode == "resume" else self.hosts
+
+            max_workers = min(50, os.cpu_count() * 2)
+            processed = 0
+            total = remaining_hosts
+
+            executor = ThreadPoolExecutor(max_workers=max_workers)
+            with executor:
+                batches = list(self.generate_ip_in_batches(base_ip))
+                self.stdscr.addstr(2, 0, f"Scanning: {processed}/{total} (0%)")
+                self.stdscr.refresh()
+
+                for ip_batch in batches:
+                    if self.shutdown_event.is_set():
+                        break
+                    futures = {
+                        executor.submit(self.set_progressbar, mode, output_file, ip, self.stdscr): ip
+                        for ip in ip_batch
+                    }
+                    for _ in as_completed(futures):
+                        if self.shutdown_event.is_set():
+                            break
+                        processed += 1
+                        if processed % 100 == 0 or processed == total:
+                            percent = (processed / total) * 100
+                            self.stdscr.addstr(
+                                2, 0, f"Scanning: {processed}/{total} ({percent:.1f}%)")
+                            self.stdscr.refresh()
+
+        except Exception as e:
+            self.stdscr.addstr(4, 0, f"Error: {e}")
+            self.stdscr.refresh()
+            curses.napms(1000)
+        finally:
+            print("Final cleanup...")
+            if executor:
+                executor.shutdown(wait=False)
 
         # Check Memory
         # self.print_info_message(
         #     f"Memory usage: {psutil.virtual_memory().percent}%")
-        base_ip = self.user_ip_addr.split(".")
-        self.mode = mode
-        remaining_hosts = self.calculate_remaining_hosts(
-            self.user_ip_addr) if self.mode == "resume" else self.hosts
+        # try:
+        #     base_ip = self.user_ip_addr.split(".")
+        #     self.mode = mode
+        #     remaining_hosts = self.calculate_remaining_hosts(
+        #         self.user_ip_addr) if self.mode == "resume" else self.hosts
 
-        # Dynamically adjust num of workers based on CPU cores
-        max_workers = min(50, os.cpu_count() * 2)
-        processed = 0
+        #     # Dynamically adjust num of workers based on CPU cores
+        #     max_workers = min(50, os.cpu_count() * 2)
+        #     processed = 0
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            with tqdm(total=remaining_hosts, desc="Scanning Network", leave=False)as pbar:
-                batches = list(self.generate_ip_in_batches(base_ip))
-                for ip_batch in batches:
-                    futures = {executor.submit(
-                        self.set_progressbar, mode, output_file, ip, stdscr
-                    ): ip for ip in ip_batch}
-                    for _ in as_completed(futures):
-                        processed += 1
-                        if processed % 100 == 0:  # Update UI every 100 IPs
-                            # self.save_ips(mode, filename=output_file)
-                            pbar.update(100)
-                    pbar.update(processed % 100)
+        #     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # with tqdm(total=remaining_hosts, desc="Scanning Network", leave=False)as pbar:
+                #     batches = list(self.generate_ip_in_batches(base_ip))
+                #     for ip_batch in batches:
+                #         futures = {executor.submit(
+                #             self.set_progressbar, mode, output_file, ip, stdscr
+                #         ): ip for ip in ip_batch}
+                #         for _ in as_completed(futures):
+                #             processed += 1
+                #             if processed % 100 == 0 or processed == total:  # Update UI every 100 IPs
+                #                 # self.save_ips(mode, filename=output_file)
+                #                 pbar.update(100)
+                #         pbar.update(processed % 100)
+
+        # except KeyboardInterrupt:
+        #     self.print_error_message("Scan interrupted by user")
+        #     if stdscr is not None:
+        #         curses.endwin() # reset terminal on interrupt
+        #     raise
+        # finally:
+        #     # Gracefully reset terminal incase of any other exception
+        #     if stdscr is not None:
+        #         curses.endwin() # reset terminal on interrupt
 
         # Final flush
         # self.save_ips(mode, filename=output_file)
+
+    def get_live_ips(self, output: str) -> int:
+        """Enumerates all IPs in a given network using ICMP ping command
+        :param mode: mode to use (SCAN | RESUME)
+               output: Name of the output file
+        :return number of ips that are alive
+        """
+        self.shutdown_event.clear()  # Reset shutdown flag
+        self.stdscr = None
+        try:
+            self.stdscr = curses.initscr()
+            if self.stdscr is None:
+                raise RuntimeError("Failed to initialize curses")
+            curses.curs_set(0)
+            curses.echo(False)
+            self.curses_active = True
+            self.scan_network(self.mode, output)
+            return len(self.progress_bar.live_hosts) if self.progress_bar else 0
+        except KeyboardInterrupt:
+            print("\nProgram terminated by user.")
+            return len(self.progress_bar.live_hosts) if self.progress_bar else 0
+        except Exception as e:
+            if self.curses_active:
+                self.stdscr.addstr(4, 0, f"Error: {e}")
+                self.stdscr.refresh()
+                curses.napms(1000)
+            else:
+                print(f"Error before curses: {e}")
+            return 0
+        finally:
+            if self.curses_active and self.stdscr is not None:
+                curses.echo()
+                curses.curs_set(1)
+                result = curses.endwin()
+                self.curses_active = False
+                self.stdscr = None
+
+                self.print_debug_message(
+                    f"Curses active: {self.curses_active}, stdscr: {self.stdscr}")
+                if result == curses.ERR:
+                    self.print_error_message(
+                        "endwin() failed", exception_error=result)
+                    sys.exit(1)
+            if self.shutdown_event.is_set():
+                sys.exit(0)
+
+    # Override print_error_message to use curses
+    def print_error_message(self, message, exception_error=None):
+        if self.curses_active and self.stdscr is not None:
+            self.stdscr.addstr(5, 0, f"{message}{exception_error}")
+            self.stdscr.refresh()
+        else:
+            print(f"{message}{exception_error}")
 
     def save_ips(self, mode, filename):
         with self.lock:
@@ -203,12 +328,18 @@ class NetworkHandler(FileHandler, Commands):
 
     def set_progressbar(self, mode, filename, ip, stdscr):
         """Check if the host is alive using asynchronous pings and update UI"""
+        if self.shutdown_event.is_set():
+            return
         try:
             is_alive = self.start_async_ping(ip)  # self.ping_hosts(ip)
             with self.lock:  # Prevents concurrent writes
                 filename_ = self.generate_filename(mode, is_alive, filename)
                 self.progress_bar.update_ips(
                     self.save_to_csv, filename_, mode, ip, is_alive, stdscr, self.existing_unresponsive_ips)
+                # Update live IP count on screen
+                self.live_ip_count = len(self.progress_bar.live_hosts)
+                stdscr.addstr(3, 0, f"Live IPs found: {self.live_ip_count}")
+                stdscr.refresh()
         except Exception as error:
             self.print_error_message(
                 f"set Progress bar failed for IP: {ip} : ", exception_error=error)
@@ -279,3 +410,7 @@ class NetworkHandler(FileHandler, Commands):
 
         except Exception as e:
             self.print_error_message(exception_error=e)
+
+# TODO: include interface check before scanning
+# TODO: sort keyboard interrupt curses
+# TODO: duplication in loop
