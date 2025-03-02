@@ -316,3 +316,5 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 class DomainError(Exception):
     """Custom exception for domain-related errors"""
     pass
+
+# TODO: fix wrong selection in mode

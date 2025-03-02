@@ -24,13 +24,14 @@ class ProgressBar(Validator):
         self.unresponsive_hosts.add(ip)
 
     def update_ips(self,
-                   save_file: callable,
                    filename: str,
                    mode: str,
                    ip: str,
                    is_alive: bool,
                    stdscr,
-                   existing_unresponsive_ips):
+                   save_file: callable,
+                   generate_filename: callable,
+                   existing_unresponsive_ips: set):
         """Update the scan progress and save both live and unresponsive hosts
 
         :param save_file:                 Function to save csv file
@@ -40,19 +41,19 @@ class ProgressBar(Validator):
         :param is_alive:                  True or False 
         :param existing_unresponsive_ips: Set containing unresponsive IPs [avoid duplication]
         """
-
+        filename_ = generate_filename(mode,is_alive,filename)
         if is_alive:
-            self.live_hosts.add(ip)
-            save_file(filename, ip)
+            self.live_hosts.add(ip)  
+            save_file(filename_, ip)
 
         else:
             self.unresponsive_hosts.add(ip)
-            if (mode == "scan" or mode == "resume" and ip not in existing_unresponsive_ips):
-                save_file(filename, ip)
+            condition = mode == "scan" or (mode == "resume" and ip not in existing_unresponsive_ips)
+            if condition:
+                save_file(filename_, ip)
                 if mode == "resume":
-                    existing_unresponsive_ips.add(ip)
-
-            # self.unresponsive_hosts.clear()
+                    existing_unresponsive_ips.add(ip)  
+        
         self.total_scanned += 1
         if stdscr is not None:  # Only update UI if curses is active
             self.display(stdscr)

@@ -1,7 +1,7 @@
 import sys
 import termios
 import time
-from typing import Dict, Optional   
+from typing import Dict, Optional
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 
@@ -34,18 +34,18 @@ class PentestFramework(DisplayHandler):
         """
         try:
             network_instance = NetworkHandler()
-
             return {
                 "package": PackageHandler(),
-                "command": Commands(),
+                "command":  Commands(),
                 "user": UserHandler(),
                 "network": network_instance,
-                "mobile": MobileAssessment(MobileCommands()),
+                "mobile":  MobileAssessment(MobileCommands()),
                 "vulnerability": VulnerabilityAnalysis(),
                 "internal": InternalAssessment(network_instance)
             }
         except Exception as error:
-            self.print_error_message(message="Error initializing classes", exception_error=error)
+            self.print_error_message(
+                message="Error initializing classes", exception_error=error)
             sys.exit(1)
 
     def check_packages(self, user_test_domain: str) -> bool:
@@ -66,7 +66,8 @@ class PentestFramework(DisplayHandler):
 
         # If OS is not supported, continue without package checks
         if not package.is_supported_os:
-            self.print_info_message("Skipping package installation on unsupported OS")
+            self.print_info_message(
+                "Skipping package installation on unsupported OS")
             return True
 
         missing_packages = package.get_missing_packages(user_test_domain)
@@ -75,7 +76,8 @@ class PentestFramework(DisplayHandler):
             return True
 
         num_of_packages = len(missing_packages)
-        self.print_warning_message(f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
+        self.print_warning_message(
+            f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
         # update to run check again
         try:
             success = package.install_packages(missing_packages)
@@ -94,10 +96,15 @@ class PentestFramework(DisplayHandler):
     def handle_internal_assessment(user, network, internal):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
-        network.initialize_network_variables(user.domain_variables, user.domain, ProgressBar)
+        network.initialize_network_variables(
+            user.domain_variables, user.domain, ProgressBar)
+
+        if user.domain_variables["mode"] == "resume":
+            # copies content of the instance
+            network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
         internal.initialize_variables(
-            mode=user.domain_variables["mode"],output_file=user.domain_variables["output"])
+            mode=user.domain_variables["mode"], output_file=user.domain_variables["output"])
         internal.enumerate_hosts()
 
     @staticmethod
@@ -178,7 +185,7 @@ class PentestFramework(DisplayHandler):
 
         while True:
             try:
-                # Clear buffers 
+                # Clear buffers
                 flush_input_output()
                 # Add a small delay to ensure all input is processed
                 time.sleep(0.1)
@@ -195,7 +202,7 @@ class PentestFramework(DisplayHandler):
             except KeyboardInterrupt:
                 # Exit on Ctrl+C
                 return 'y'
-            
+
     def reset_class_states(self):
         """Reset the states of all classes"""
         try:
@@ -203,7 +210,8 @@ class PentestFramework(DisplayHandler):
             if self.classes["mobile"]:
                 self.classes["mobile"].reset_class_states()
             if self.classes["internal"]:
-                self.classes["internal"].reset_class_states(self.classes["network"])
+                self.classes["internal"].reset_class_states(
+                    self.classes["network"])
             if self.classes["vulnerability"]:
                 self.classes["vulnerability"].reset_class_states()
             if self.classes["network"]:
@@ -212,12 +220,12 @@ class PentestFramework(DisplayHandler):
                 self.classes["package"].reset_class_states()
             if self.classes["user"]:
                 self.classes["user"].reset_class_states()
-           
+
         except Exception as e:
             self.print_error_message(
-                message="Error resetting class states", 
+                message="Error resetting class states",
                 exception_error=e)
-            return 
+            return
 
     def run_program(self) -> None:
         """Main program loop"""
@@ -225,13 +233,14 @@ class PentestFramework(DisplayHandler):
             try:
                 # Reset state at the start of each iteration
                 self.reset_class_states()
-                
+
                 user = self.classes["user"]
                 test_domain = user.get_user_domain()
 
                 # Check packages before getting user input
                 if not self.check_packages(test_domain):
-                    self.print_info_message("Required packages are missing. Installing them...")
+                    self.print_info_message(
+                        "Required packages are missing. Installing them...")
                     continue
 
                 # get user input and set domain variables
@@ -246,7 +255,8 @@ class PentestFramework(DisplayHandler):
                     exit_request = self.get_user_input()
                     if exit_request in valid_user_choices:
                         break
-                    self.print_warning_message("Invalid choice. Please enter 'y' or 'n':")
+                    self.print_warning_message(
+                        "Invalid choice. Please enter 'y' or 'n':")
                 if exit_request in {"yes", "y"}:
                     self.exit_menu = True
                 else:
@@ -256,17 +266,18 @@ class PentestFramework(DisplayHandler):
                 self.print_error_message("Program interrupted by user")
                 self.exit_menu = True
             except Exception as e:
-                self.print_error_message(message="An error occurred", exception_error=e)
+                self.print_error_message(
+                    message="An error occurred", exception_error=e)
 
 
 def main():
     """Entry point of the program"""
-    global framework
+    framework = PentestFramework()
     try:
-        framework = PentestFramework()
         framework.run_program()
     except Exception as e:
-        framework.print_error_message(message="Critical error", exception_error=e)
+        framework.print_error_message(
+            message="Critical error", exception_error=e)
         sys.exit(1)
 
 

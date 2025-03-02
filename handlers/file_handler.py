@@ -120,17 +120,18 @@ class FileHandler(Validator, DisplayHandler):
             content = [content]
 
         # Flatten nested lists if present
-        flat_content = []
-        for item in content:
-            if isinstance(item, (list, tuple)):
-                flat_content.extend(item)
-            else:
-                flat_content.append(item)
+        flat_content = [item if not isinstance(
+            item, (list, tuple))else item[0] for item in content]
         data = pandas.DataFrame(flat_content, columns=None)
 
         if self.file_exists(f"{file_path}"):
             existing_df = self.read_csv(f"{file_path}")
-            updated_df = self.concat_dataframes(existing_df, data)
+            # remove duplicates by converting to set and back to dataFrame
+            existing_ips = set(existing_df[0].to_list())
+            new_ips = set(flat_content)
+            combined_ips = existing_ips.union(new_ips)
+            # updated_df = self.concat_dataframes(existing_df, data)
+            updated_df = pandas.DataFrame(list(combined_ips), columns=None)
         else:
             updated_df = data
 
@@ -402,6 +403,8 @@ class FileHandler(Validator, DisplayHandler):
         sorted_ips = sorted(
             ip_list, key=lambda ip: ipaddress.ip_address(ip)
         )
+        total = len(self.existing_unresponsive_ips)
+        self.print_info_message("Total IPs loaded ", file_path=total)
         if sorted_ips:
             last_address = sorted_ips[-1]
             self.print_info_message(
