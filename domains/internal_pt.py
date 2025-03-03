@@ -39,7 +39,7 @@ class InternalAssessment(DisplayHandler):
         live = f"{paths['live_hosts']}"
         unresponsive = f"{paths['unresponsive_hosts']}"
 
-        if live:
+        if live_ip_count > 0:
             self.print_success_message(
                 message=f"Discovered {live_ip_count} hosts, and saved them to: ",
                 extras=live

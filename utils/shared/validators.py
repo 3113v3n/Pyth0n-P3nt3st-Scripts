@@ -3,8 +3,7 @@ import os
 
 
 class Validator:
-    def __init__(self):
-        pass
+   
 
     @staticmethod
     def validate_ip_addr(addr) -> bool:
