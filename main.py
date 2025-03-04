@@ -1,7 +1,7 @@
 import sys
 import termios
 import time
-from typing import Dict, Optional
+
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
 

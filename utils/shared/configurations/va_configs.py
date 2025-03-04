@@ -81,7 +81,7 @@ class VAConfigs:
         "web_condition",
         "rce_condition",
         "reboot_condition",
-        #"compliance_condition",
+        "compliance_condition",
     ]
     NESSUS_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
@@ -98,10 +98,11 @@ class VAConfigs:
         "RDP Misconfig": "rdp_condition",
         "SSH Misconfig": "ssh_condition",
         "Telnet": "telnet_condition",
+        "Remote Code Execution": "rce_condition",
         "Information Disclosure": "information_condition",
         "Web Application Issues": "web_condition",
         "Windows Update Reboot": "reboot_condition",
-        #"Compliance": "compliance_condition",
+        "Compliance": "compliance_condition",
     }
     # strings and categories need to be same number
     RAPID7_STRINGS_TO_FILTER = [

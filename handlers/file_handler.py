@@ -125,7 +125,7 @@ class FileHandler(Validator, DisplayHandler):
         data = pandas.DataFrame(flat_content, columns=None)
 
         if self.file_exists(f"{file_path}"):
-            existing_df = self.read_csv(f"{file_path}")
+            existing_df = self.read_csv(f"{file_path}",ip_list=True)
             # remove duplicates by converting to set and back to dataFrame
             existing_ips = set(existing_df[0].to_list())
             new_ips = set(flat_content)
@@ -351,10 +351,18 @@ class FileHandler(Validator, DisplayHandler):
 
     @staticmethod
     def read_csv(dataframe, **kwargs):
+        """Handles reading of CSV files
+        :param dataframe : The file to be read
+        :param kwargs: Keyword arguments
+               header
+               ip_list : handles file that have ips
+        """
         if "header" in kwargs:
             return pandas.read_csv(dataframe, header="infer")
         # utf-16 cp1252
-        return pandas.read_csv(dataframe, encoding="ISO-8859-1", header=None)
+        if kwargs.get("ip_list"):
+            return pandas.read_csv(dataframe, encoding="ISO-8859-1", header=None)
+        return pandas.read_csv(dataframe, encoding="ISO-8859-1")
 
     @staticmethod
     def read_excel_file(file, **kwargs):

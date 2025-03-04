@@ -217,6 +217,7 @@ class VulnerabilityAnalysis(
             else:
                 raise ValueError(
                     f"Unsupported file extension: {file_extension}")
+           #self.print_debug_message(f"Original file headers {original_file.columns}")
 
             self.get_missing_columns(original_file, filename)
             return original_file
@@ -248,7 +249,7 @@ class VulnerabilityAnalysis(
         if self.scanner == "nessus":
             categories = self.NESSUS_VULN_CATEGORIES
             # Special case for RCE condition
-            categorized_vulnerabilities["rce"] = self.vulnerabilities[
+            categorized_vulnerabilities["Remote Code Execution"] = self.vulnerabilities[
                 self.filter_condition("rce_condition")
                 & ~self.filter_condition("missing_patch_condition")
                 & ~self.filter_condition("unsupported_software_condition")
@@ -256,10 +257,15 @@ class VulnerabilityAnalysis(
 
         elif self.scanner == "rapid":
             categories = self.RAPID7_VULN_CATEGORIES
-        categorized_vulnerabilities.update({
-            key: self.vulnerabilities[self.filter_condition(value)]
-            for key, value in categories.items()
-        })
+        # categorized_vulnerabilities.update({
+        #     key: self.vulnerabilities[self.filter_condition(value)]
+        #     for key, value in categories.items()
+        # })
+        for key, value in categories.items():
+            result = self.filter_condition(value)
+            self.print_debug_message(f"Category '{key}' ({value}): {result.sum()} matches")
+            self.print_debug_message(f"Sample matching rows:\n{self.vulnerabilities[result].head()}")
+            categorized_vulnerabilities[key] = self.vulnerabilities[result]
 
         return categorized_vulnerabilities
 
@@ -281,7 +287,7 @@ class VulnerabilityAnalysis(
                 cond: acc & ~self.filter_condition(cond),
                 filter_strings,
                 ~self.filter_condition(filter_strings[0]))
-
+        self.print_debug_message(f"Unfiltered rows: {combined_filter.sum()}")
         return self.vulnerabilities[combined_filter]
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
