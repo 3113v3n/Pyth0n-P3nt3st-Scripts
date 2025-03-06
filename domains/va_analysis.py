@@ -257,16 +257,10 @@ class VulnerabilityAnalysis(
 
         elif self.scanner == "rapid":
             categories = self.RAPID7_VULN_CATEGORIES
-        # categorized_vulnerabilities.update({
-        #     key: self.vulnerabilities[self.filter_condition(value)]
-        #     for key, value in categories.items()
-        # })
+
         for key, value in categories.items():
             result = self.filter_condition(value)
-            self.print_debug_message(
-                f"Category '{key}' ({value}): {result.sum()} matches")
-            self.print_debug_message(
-                f"Sample matching rows:\n{self.vulnerabilities[result].head()}")
+
             categorized_vulnerabilities[key] = self.vulnerabilities[result]
 
         return categorized_vulnerabilities
@@ -289,7 +283,6 @@ class VulnerabilityAnalysis(
                 cond: acc & ~self.filter_condition(cond),
                 filter_strings,
                 ~self.filter_condition(filter_strings[0]))
-        self.print_debug_message(f"Unfiltered rows: {combined_filter.sum()}")
         return self.vulnerabilities[combined_filter]
 
     def sort_vulnerabilities(self, vulnerabilities, output_file):
