@@ -7,6 +7,7 @@ class MobileAssessment:
         self.package_name = ""
         self.package_path = ""
         self.mobile_cmds = commands  # mobile specific commands
+        #self._helper = helper_instance
 
     @classmethod
     def reset_class_states(cls):

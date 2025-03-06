@@ -1,10 +1,9 @@
-import sys
 import termios
 import time
+import sys
 
 # [Test Domains]
 from domains import InternalAssessment, MobileAssessment, VulnerabilityAnalysis
-
 # [Utils]
 from utils import MobileCommands, ProgressBar, Commands
 from utils.shared import Bcolors
@@ -13,7 +12,8 @@ from handlers import (
     NetworkHandler,
     PackageHandler,
     UserHandler,
-    DisplayHandler
+    DisplayHandler,
+    HelpHandler
 )
 
 
@@ -34,14 +34,18 @@ class PentestFramework(DisplayHandler):
         """
         try:
             network_instance = NetworkHandler()
+            helper_instance = HelpHandler()
+
             return {
                 "package": PackageHandler(),
                 "command":  Commands(),
-                "user": UserHandler(),
                 "network": network_instance,
+                "user": UserHandler(helper_instance),
                 "mobile":  MobileAssessment(MobileCommands()),
                 "vulnerability": VulnerabilityAnalysis(),
-                "internal": InternalAssessment(network_instance)
+                "internal": InternalAssessment(
+                    network_instance,
+                    helper_instance)
             }
         except Exception as error:
             self.print_error_message(
@@ -96,16 +100,18 @@ class PentestFramework(DisplayHandler):
     def handle_internal_assessment(user, network, internal):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
-        network.initialize_network_variables(
-            user.domain_variables, user.domain, ProgressBar)
+        # network.initialize_network_variables(
+        #     user.domain_variables, user.domain, ProgressBar)
 
-        if user.domain_variables["mode"] == "resume":
-            # copies content of the instance
-            network.existing_unresponsive_ips = user.existing_unresponsive_ips
+        # if user.domain_variables["mode"] == "resume":
+        #     # copies content of the instance
+        #     network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
-        internal.initialize_variables(
-            mode=user.domain_variables["mode"], output_file=user.domain_variables["output"])
-        internal.enumerate_hosts()
+        # internal.initialize_variables(
+        #     mode=user.domain_variables["mode"], output_file=user.domain_variables["output"])
+        # internal.enumerate_hosts()
+        # TODO: add internal modules to handle password hashes
+        internal.generate_user_passlist()
 
     @staticmethod
     def handle_vulnerability_assessment(user, vulnerability_analysis):

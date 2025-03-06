@@ -4,13 +4,14 @@ from .package_handler import PackageHandler
 from .user_handler import UserHandler
 from .messages import DisplayHandler
 from .screen import ScreenHandler
-
+from .helper_handler import HelpHandler
 
 __all__ = [
     FileHandler,
+    ScreenHandler,
     UserHandler,
     NetworkHandler,
     PackageHandler,
-    DisplayHandler,
-    ScreenHandler,
+    DisplayHandler, 
+    HelpHandler
 ]

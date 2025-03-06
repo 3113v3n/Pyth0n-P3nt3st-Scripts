@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional
-from handlers import FileHandler, DisplayHandler
+from handlers import FileHandler, DisplayHandler, HelpHandler
 from utils import Config, FilterVulnerabilities
 from functools import reduce
 
@@ -217,7 +217,7 @@ class VulnerabilityAnalysis(
             else:
                 raise ValueError(
                     f"Unsupported file extension: {file_extension}")
-           #self.print_debug_message(f"Original file headers {original_file.columns}")
+           # self.print_debug_message(f"Original file headers {original_file.columns}")
 
             self.get_missing_columns(original_file, filename)
             return original_file
@@ -263,8 +263,10 @@ class VulnerabilityAnalysis(
         # })
         for key, value in categories.items():
             result = self.filter_condition(value)
-            self.print_debug_message(f"Category '{key}' ({value}): {result.sum()} matches")
-            self.print_debug_message(f"Sample matching rows:\n{self.vulnerabilities[result].head()}")
+            self.print_debug_message(
+                f"Category '{key}' ({value}): {result.sum()} matches")
+            self.print_debug_message(
+                f"Sample matching rows:\n{self.vulnerabilities[result].head()}")
             categorized_vulnerabilities[key] = self.vulnerabilities[result]
 
         return categorized_vulnerabilities

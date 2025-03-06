@@ -1,11 +1,19 @@
-from .configurations import VAConfigs, MobileConfigs, ExternalConfigs, InternalConfigs
+from .configurations import (
+    MobileConfigs,
+    ExternalConfigs,
+    VAConfigs,
+    InternalConfigs)
 
 
-class Config(VAConfigs, MobileConfigs, ExternalConfigs, InternalConfigs):
+class Config(
+        InternalConfigs,
+        VAConfigs,
+        MobileConfigs,
+        ExternalConfigs):
     def __init__(self):
         super().__init__()
-        self.domain_select_error = (f"\n{self.FAIL}[!]"
-                                    f"{self.ENDC} Please choose one of: \n")
+        pass
+    domain_select_error = ("\n[!] Please choose one of: \n")
 
     test_domains = [
         {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},

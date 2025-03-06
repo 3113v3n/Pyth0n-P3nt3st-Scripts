@@ -1,4 +1,4 @@
-from handlers import NetworkHandler, DisplayHandler
+from handlers import NetworkHandler, DisplayHandler, HelpHandler
 
 
 # NetExec
@@ -6,11 +6,12 @@ from handlers import NetworkHandler, DisplayHandler
 class InternalAssessment(DisplayHandler):
     """class will be responsible for handling all Internal PT"""
 
-    def __init__(self, network: NetworkHandler) -> None:
+    def __init__(self, network: NetworkHandler,helper_instance:HelpHandler) -> None:
         super().__init__()
         self.output_file = "sample.txt"
         self.mode = "SCAN"
         self.network_manager = network
+        self._helper = helper_instance
 
     @classmethod
     def reset_class_states(cls, network: NetworkHandler):
@@ -33,6 +34,7 @@ class InternalAssessment(DisplayHandler):
         """Lists all possible hosts on a network using ICMP protocol
          to increase your attack surface
         """
+        self._helper.internal_helper("scanner")
         live_ip_count = self.network_manager.get_live_ips(
             output=self.output_file)
         paths = self.network_manager.get_file_paths()
@@ -52,7 +54,9 @@ class InternalAssessment(DisplayHandler):
         elif unresponsive:
             self.print_warning_message(
                 "Scan incomplete, retaining unresponsive file ", file_path=unresponsive)
-       
+
+    def generate_user_passlist(self):
+        self._helper.internal_helper("hashfunction")
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

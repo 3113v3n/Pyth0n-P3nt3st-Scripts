@@ -1,21 +1,22 @@
 # trunk-ignore-all(black)
 import sys
 from utils.shared import Config
-from .file_handler import FileHandler
-from .screen import ScreenHandler
-
+from handlers.screen import ScreenHandler
+from handlers.helper_handler import HelpHandler
+from handlers import FileHandler
 
 class UserHandler(FileHandler, Config, ScreenHandler):
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(self) -> None:
+    def __init__(self,helper_class:HelpHandler) -> None:
         super().__init__()
         self.default_test_domains = []
         self.not_valid_domain = False
         self.domain = ""
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
+        self.helper_ = helper_class
         self.formatted_question = (
             f"\nWhat task would you like to perform?\n" f"{self.OPTIONS}\n=> "
         )
@@ -63,13 +64,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     package_path,
                     self.display_saved_files,
                     display_applications=True
-                    )
+                )
                 if applications:
                     return applications
 
             except (ValueError, FileExistsError) as error:
                 self.print_error_message(error)
-            
 
     def va_ui_interaction(self):
         self.show_loader(
@@ -95,7 +95,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 # File format of the files [CSV or XLSX ]
                 file_format_index = self.create_menu_selection(
                     menu_selection=f" \n {self.WARNING} Select the file "
-                                   f"format of the Scanned File(s):{self.ENDC} \n",
+                    f"format of the Scanned File(s):{self.ENDC} \n",
                     options=self.SCAN_FILE_FORMAT,
                     check_range_string="File Format: ",
                     check_range_function=self.index_out_of_range_display,
@@ -105,7 +105,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
                 file_extension = self.SCAN_FILE_FORMAT[file_format_index]
 
-                self.print_info_message(f"Scanning {file_extension.upper()} file extensions")
+                self.print_info_message(
+                    f"Scanning {file_extension.upper()} file extensions")
                 # file extension ensures we display the correct file extensions
 
                 search_dir = self.get_file_path(
@@ -128,7 +129,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
             except (FileExistsError, ValueError) as error:
                 self.print_error_message(error)
-            
 
     def external_ui_interaction(self):
         self.show_loader(
@@ -138,7 +138,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         )
         try:
             website_domain = (
-                self.get_user_input("Enter domain to enumerate (example.domain.com)")
+                self.get_user_input(
+                    "Enter domain to enumerate (example.domain.com)")
             )
 
             # TODO: strip https://
@@ -149,6 +150,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def internal_ui_interaction(self):
         """Handle internal assessment UI interactions"""
+        self.helper_.internal_helper("scanner")
         self.show_loader(
             "Loading Internal Assessment Module... ",
             "Starting Internal Assessment...\n",
@@ -156,14 +158,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         )
         try:
             while True:
-                
+
                 subnet = ""
                 output_file = ""
 
                 while True:
                     mode = self.get_user_input(self.internal_mode_choice)
                     if not mode:
-                        self.print_warning_message("Please enter a valid choice (scan | resume)")
+                        self.print_warning_message(
+                            "Please enter a valid choice (scan | resume)")
                         continue
                     if mode not in ["scan", "resume"]:
                         mode = self.get_user_input(self.internal_choice_error)
@@ -177,7 +180,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     )
 
                     if resume_ip is None:
-                        self.print_warning_message("No previous scan files found. Defaulting to scan mode.")
+                        self.print_warning_message(
+                            "No previous scan files found. Defaulting to scan mode.")
                         mode = "scan"
                     else:
                         output_file = self.filepath
@@ -187,7 +191,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                                 subnet = f"{resume_ip}/{cidr}"
                                 break
                             else:
-                                self.print_warning_message("Please enter a valid CIDR")
+                                self.print_warning_message(
+                                    "Please enter a valid CIDR")
                                 continue
 
                 # If mode is scan or defaulted to scan
@@ -203,7 +208,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         except Exception as error:
 
-            self.print_error_message(message="An error occurred", exception_error=error)
+            self.print_error_message(
+                message="An error occurred", exception_error=error)
             mode = "scan"
             subnet = self.get_user_subnet()
             output_file = self.get_output_filename()
@@ -212,7 +218,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 "mode": mode,
                 "output": output_file,
             }
-        
 
     @staticmethod
     def exit_program():
@@ -224,7 +229,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         while True:
             try:
-                selected_index = int(self.get_user_input(self.formatted_question)) - 1
+                selected_index = int(self.get_user_input(
+                    self.formatted_question)) - 1
                 if 0 <= selected_index < len(self.default_test_domains):
                     break
                 self.print_error_message(
@@ -232,7 +238,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
             except ValueError:
-                self.print_error_message(message="❌ Invalid choice. Please enter a valid number")
+                self.print_error_message(
+                    message="❌ Invalid choice. Please enter a valid number")
 
         self.domain = self.default_test_domains[selected_index]
         return self.domain
@@ -242,7 +249,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         while True:
             try:
-                subnet = self.get_user_input("\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
+                subnet = self.get_user_input(
+                    "\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
                 if self.validate_ip_and_cidr(subnet):
                     break
                 else:
@@ -269,7 +277,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def set_domain_variables(self, test_domain: str) -> dict:
         """Update the variable object with reference to the test domain provisioned
-        
+
         param
             test-domain: The domain to be tested (internal, external, mobile, va)
 
@@ -301,7 +309,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             self.domain_variables = handler()
 
             if not self.domain_variables:
-                raise ValueError(f"No variables returned for domain: {test_domain}")
+                raise ValueError(
+                    f"No variables returned for domain: {test_domain}")
             return self.domain_variables
 
         except Exception as error:
