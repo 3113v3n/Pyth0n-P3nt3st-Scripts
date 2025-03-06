@@ -5,18 +5,20 @@ from handlers.screen import ScreenHandler
 from handlers.helper_handler import HelpHandler
 from handlers import FileHandler
 
+
 class UserHandler(FileHandler, Config, ScreenHandler):
     """Class will be responsible for handling user interactions with
     The different domains"""
 
-    def __init__(self,helper_class:HelpHandler) -> None:
+    def __init__(self, helper_instance: HelpHandler, command_instance: callable) -> None:
         super().__init__()
         self.default_test_domains = []
         self.not_valid_domain = False
         self.domain = ""
         self.domain_variables = ""
         self.OPTIONS = self.set_test_options()
-        self.helper_ = helper_class
+        self.helper_ = helper_instance
+        self.command_ = command_instance
         self.formatted_question = (
             f"\nWhat task would you like to perform?\n" f"{self.OPTIONS}\n=> "
         )
@@ -47,6 +49,24 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             self.default_test_domains.append(option["alias"])
         # Join the list into a single multi-line string
         return "".join(test_options)
+
+    def start_domain_helper(self,
+                            helper_function: callable,
+                            loader_start_text: str,
+                            loader_end_text: str,
+                            spinner_type="bounce",
+                            **kwargs):
+        if kwargs.get("helper_text"):
+            text = kwargs.get("helper_text")
+            helper_function(text)
+        else:
+            helper_function()
+        self.show_loader(
+            loader_start_text,
+            loader_end_text,
+            spinner_type=spinner_type
+        )
+        self.command_.clear_screen()
 
     def mobile_ui_interaction(self):
         self.show_loader(
@@ -150,11 +170,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def internal_ui_interaction(self):
         """Handle internal assessment UI interactions"""
-        self.helper_.internal_helper("scanner")
-        self.show_loader(
+
+        self.start_domain_helper(
+            self.helper_.internal_helper,
             "Loading Internal Assessment Module... ",
             "Starting Internal Assessment...\n",
-            spinner_type="bounce"
+            helper_text="scanner"
         )
         try:
             while True:

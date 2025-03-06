@@ -67,7 +67,7 @@ class Loader:
                 
             else:
                 # Timed loading
-                for _ in range(20):
+                for _ in range(30):
                     if self._done.is_set():
                         break
                     

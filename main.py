@@ -35,12 +35,12 @@ class PentestFramework(DisplayHandler):
         try:
             network_instance = NetworkHandler()
             helper_instance = HelpHandler()
-
+            command_instance = Commands()
             return {
                 "package": PackageHandler(),
-                "command":  Commands(),
+                "command":  command_instance,
                 "network": network_instance,
-                "user": UserHandler(helper_instance),
+                "user": UserHandler(helper_instance, command_instance),
                 "mobile":  MobileAssessment(MobileCommands()),
                 "vulnerability": VulnerabilityAnalysis(),
                 "internal": InternalAssessment(
