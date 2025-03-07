@@ -1,4 +1,7 @@
+from ..colors import Bcolors
+
 class MobileConfigs:
+    color = Bcolors
     def __init__(self):
         pass
     mobile_packages = [
@@ -69,3 +72,7 @@ class MobileConfigs:
     IP_REGEX = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
     URL_REGEX = r"\w+://[\w\-\.\@\:\/\?\=\%\&\#]+"
     DEEPLINKS_IGNORE_REGEX = r"\.(css|gif|jpeg|jpg|ogg|otf|png|svg|ttf|woff|woff2)"
+    HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
+    MOBILE_HELPER_STRING =f"""{HEADLINE}
+
+{HEADLINE}"""

@@ -55,6 +55,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                             loader_start_text: str,
                             loader_end_text: str,
                             spinner_type="bounce",
+                            timer=30,
                             **kwargs):
         if kwargs.get("helper_text"):
             text = kwargs.get("helper_text")
@@ -64,12 +65,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.show_loader(
             loader_start_text,
             loader_end_text,
-            spinner_type=spinner_type
+            spinner_type=spinner_type,
+            timer=timer
         )
         self.command_.clear_screen()
 
     def mobile_ui_interaction(self):
-        self.show_loader(
+
+        self.start_domain_helper(
+            self.helper_.mobile_helper,
             "Loading Mobile Assessment Module... ",
             "Starting Mobile Assessment...\n"
         )
@@ -92,10 +96,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 self.print_error_message(error)
 
     def va_ui_interaction(self):
-        self.show_loader(
+        self.start_domain_helper(
+            self.helper_.vulnerability_helper,
             "Loading Vulnerability Analysis Module... ",
             "Starting Vulnerability Analysis...\n",
-            spinner_type="pipe"
+            spinner_type="pipe",
+            timer=60
         )
         while True:
 
@@ -151,7 +157,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 self.print_error_message(error)
 
     def external_ui_interaction(self):
-        self.show_loader(
+        self.start_domain_helper(
+            self.helper_.external_helper,
             "Loading External Assessment Module... ",
             "Starting External Assessment...\n",
             spinner_type="arc"

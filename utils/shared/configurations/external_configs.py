@@ -1,4 +1,9 @@
+from ..colors import Bcolors
+
+
 class ExternalConfigs:
+    color = Bcolors
+
     def __init__(self):
         pass
     external_packages = [
@@ -55,3 +60,8 @@ class ExternalConfigs:
             "cmd": "go install -v github.com/haccer/subjack@latest && sudo cp ~/go/bin/subjack /usr/bin",
         },
     ]
+
+    HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
+    EXTERNAL_HELPER_STRING = f"""{HEADLINE}
+
+{HEADLINE}"""

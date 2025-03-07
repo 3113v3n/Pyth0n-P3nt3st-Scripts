@@ -18,7 +18,8 @@ class ScreenHandler(DisplayHandler):
         print(menu_selection)
         for option in options:
             # Ensure both scanner menu and file extension are sorted for
-            display_option = option["name"] if "scanner" in kwargs else option.upper()
+            display_option = option["name"] if "scanner" in kwargs else option.upper(
+            )
             print(f" {start_color}[{options.index(option) + 1}]{end_color}"
                   f" {display_option}"
                   )
@@ -28,9 +29,10 @@ class ScreenHandler(DisplayHandler):
     def show_loader(
         message: str,
         end_message: str,
-        spinner_type: str="dots",
-        continuous: bool=False
-        ):
+        spinner_type: str = "dots",
+        continuous: bool = False,
+        timer=30
+    ):
         """Display Loading functionality to a user
         :param message: message to display
         :param end_message: a message to display after loading complete
@@ -41,13 +43,15 @@ class ScreenHandler(DisplayHandler):
             desc=message,
             end=end_message,
             spinner_type=spinner_type,
-            continuous=continuous
-            )
+            continuous=continuous,
+            timer=timer
+        )
         loader.start()
         if continuous:
-            return loader # return loader only for continuous loading
-                    
+            return loader  # return loader only for continuous loading
+
         return None
+
     def get_file_path(self, prompt: str, check_folder_exists: callable):
         """Get and validate a file path from user"""
         while True:

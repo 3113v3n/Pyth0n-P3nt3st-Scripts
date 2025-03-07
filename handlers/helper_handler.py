@@ -1,3 +1,4 @@
+
 from utils.shared import Config
 
 
@@ -17,3 +18,21 @@ class HelpHandler(Config):
         }
         text_ = module[submodule]
         print(text_)
+    
+    def external_helper(self):
+        """
+        Print helper function for External Penetration Testing
+        """
+        print(self.EXTERNAL_HELPER_STRING)
+
+    def vulnerability_helper(self):
+        """
+        Print helper function for Vulnerability Analysis
+        """
+        print(self.VULNERABILITY_HELPER_STRING)
+
+    def mobile_helper(self):
+        """
+        Print helper function for Mobile Penetration Testing
+        """
+        print(self.MOBILE_HELPER_STRING)
