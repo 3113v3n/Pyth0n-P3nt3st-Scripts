@@ -68,9 +68,24 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             spinner_type=spinner_type,
             timer=timer
         )
-        self.command_.clear_screen()
+        valid_options = {"yes", "y", "no", "n", "quit", "exit"}
+        while True:
+            response = self.get_user_input(
+                f"[-] Would you like to start ? [ {self.OKGREEN}yes{self.ENDC} | {self.FAIL}no{self.ENDC}] ")
 
-    def mobile_ui_interaction(self):
+            if response in valid_options:
+                break  # Exit loop if response is valid
+            else:
+                self.print_warning_message(
+                    f"Invalid choice. Please choose from: {valid_options}")
+
+        if response == "yes" or response == "y":
+            self.command_.clear_screen()
+        else:
+            self.print_warning_message("Exiting Program...")
+            return exit()
+
+    def mobile_ui_handler(self):
 
         self.start_domain_helper(
             self.helper_.mobile_helper,
@@ -95,13 +110,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             except (ValueError, FileExistsError) as error:
                 self.print_error_message(error)
 
-    def va_ui_interaction(self):
+    def va_ui_handler(self):
         self.start_domain_helper(
             self.helper_.vulnerability_helper,
             "Loading Vulnerability Analysis Module... ",
             "Starting Vulnerability Analysis...\n",
             spinner_type="pipe",
-            timer=60
+            timer=20
         )
         while True:
 
@@ -156,7 +171,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             except (FileExistsError, ValueError) as error:
                 self.print_error_message(error)
 
-    def external_ui_interaction(self):
+    def external_ui_handler(self):
         self.start_domain_helper(
             self.helper_.external_helper,
             "Loading External Assessment Module... ",
@@ -175,7 +190,33 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         except Exception as error:
             self.print_error_message(error)
 
-    def internal_ui_interaction(self):
+    def password_ui_handler(self):
+        self.start_domain_helper(
+            self.helper_.internal_helper,
+            "Loading Password Assessment Module... ",
+            "Starting Password Assessment Module...\n",
+            helper_text="hashfunction",
+            spinner_type="bounce"
+        )
+        # Enter File Path to cracked hashes
+        cracked_hashes = self.get_file_path(
+            "\n[-] Enter full path to your cracked hashes \n",
+            self.file_exists
+        )
+        # Enter Path to Dumped hashes
+        dumps = self.get_file_path(
+            "\n[-] Enter full path to your dump [ntds] \n",
+            self.file_exists
+        )
+        # Enter file output path
+        output_filename = self.get_output_filename()
+        return {
+            "cracked_hashes": cracked_hashes,
+            "dumps": dumps,
+            "filename": output_filename
+        }
+
+    def internal_ui_handler(self):
         """Handle internal assessment UI interactions"""
 
         self.start_domain_helper(
@@ -307,7 +348,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         """Update the variable object with reference to the test domain provisioned
 
         param
-            test-domain: The domain to be tested (internal, external, mobile, va)
+            test-domain: The domain to be tested (
+                    internal, external, password, mobile, va)
 
         returns
             dict: Domain-specific variables
@@ -317,10 +359,11 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             DomainError: If domain-specific operation fails
         """
         domain_handlers = {
-            "internal": self.internal_ui_interaction,
-            "external": self.external_ui_interaction,
-            "mobile": self.mobile_ui_interaction,
-            "va": self.va_ui_interaction,
+            "internal": self.internal_ui_handler,
+            "external": self.external_ui_handler,
+            "mobile": self.mobile_ui_handler,
+            "va": self.va_ui_handler,
+            "password": self.password_ui_handler,
             "exit": self.exit_program
         }
 

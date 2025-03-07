@@ -55,8 +55,6 @@ class InternalAssessment(DisplayHandler):
             self.print_warning_message(
                 "Scan incomplete, retaining unresponsive file ", file_path=unresponsive)
 
-    def generate_user_passlist(self):
-        self._helper.internal_helper("hashfunction")
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

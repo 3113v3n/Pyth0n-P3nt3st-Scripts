@@ -1,6 +1,9 @@
+from ..shared.colors import Bcolors
+
 
 class HashUtil:
     # class to help deal with obtained hashes [ cracking and comparison]
+
     @staticmethod
     def format_username(username: str) -> str:
         """ Remove domain if is part of the username 
@@ -36,7 +39,8 @@ class HashUtil:
                     print(
                         f"[-] Skipping malformed line in {hash2compare}:{line.strip()}")
 
-        print(f"[*] Loaded {len(cracked_hashes)} cracked hashes")
+        print(
+            f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
 
         # Process dump file
         matches_found = 0
@@ -54,7 +58,7 @@ class HashUtil:
 
                     if len(_parts) != 7:
                         print(
-                            f"[-] Skipping malformed dump line: {line.strip()}")
+                            f"{Bcolors.FAIL}[-]{Bcolors.ENDC} Skipping malformed dump line: {line.strip()}")
                         continue
 
                     # check is account is enabled
@@ -69,24 +73,9 @@ class HashUtil:
                             pass_file.write(
                                 f"{_formated}:{password}\n")
                             enabled_users += 1
-                            print(f"[+] Match found: {_formated}:{password}")
+                            print(
+                                f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
+                                f"{Bcolors.OKCYAN}{_formated}{Bcolors.ENDC}:"
+                                f"{Bcolors.WARNING}{password}{Bcolors.ENDC}")
 
-        print(
-            f"[*] Found {matches_found} matches, and written {enabled_users} "
-            f"Enabled users to {userpass_list}")
-
-
-if __name__ == "__main__":
-    try:
-        hashchecker = HashUtil()
-        hashchecker._helper()
-        h2c = input("[-] Enter path to your cracked hashes: ").strip()
-        dump = input("[-] Enter Path to your dump file: ").strip()
-        output = input("[-] Enter your output filename ")
-
-        hashchecker.compare_hash_from_dump(h2c, dump, output)
-
-    except FileNotFoundError as e:
-        print(f"Error: One of the input files was not found - {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        return matches_found, enabled_users

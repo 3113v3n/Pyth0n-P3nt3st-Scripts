@@ -3,7 +3,6 @@ import os
 
 
 class Validator:
-   
 
     @staticmethod
     def validate_ip_addr(addr) -> bool:

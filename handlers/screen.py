@@ -61,11 +61,11 @@ class ScreenHandler(DisplayHandler):
 
                 continue
             if not check_folder_exists(file_path):
-                self.print_error_message("No such folder exists")
+                self.print_error_message("No such file/folder exists")
                 continue
             return file_path
 
-    def get_output_filename(self, prompt: str = "[+] Please enter the output filename: "):
+    def get_output_filename(self, prompt: str = "\n[+] Please enter the output filename: "):
         """Get output filename from user"""
 
         while True:

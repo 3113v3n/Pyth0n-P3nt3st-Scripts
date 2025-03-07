@@ -55,6 +55,7 @@ class FileHandler(Validator, DisplayHandler):
             "internal": lambda: self.set_new_dir("Internal"),
             "mobile": lambda: self.set_new_dir("Mobile"),
             "external": lambda: self.set_new_dir("External"),
+            "password": lambda: self.set_new_dir("Password"),
             "va": lambda: self.set_new_dir("Vulnerability-Assessment")
         }
         dir_handler = handlers.get(domain)
@@ -125,7 +126,7 @@ class FileHandler(Validator, DisplayHandler):
         data = pandas.DataFrame(flat_content, columns=None)
 
         if self.file_exists(f"{file_path}"):
-            existing_df = self.read_csv(f"{file_path}",ip_list=True)
+            existing_df = self.read_csv(f"{file_path}", ip_list=True)
             # remove duplicates by converting to set and back to dataFrame
             existing_ips = set(existing_df[0].to_list())
             new_ips = set(flat_content)
@@ -478,7 +479,7 @@ class FileHandler(Validator, DisplayHandler):
             self.print_error_message(exception_error=e)
 
     @staticmethod
-    def generate_unique_name(file, extension) -> str:
+    def generate_unique_name(file, extension="txt") -> str:
         timestamp = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
         removed_extension = Path(file).stem
         return f"{removed_extension}_{timestamp}.{extension}"
