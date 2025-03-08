@@ -4,6 +4,7 @@ from ..shared.colors import Bcolors
 class HashUtil:
     # class to help deal with obtained hashes [ cracking and comparison]
 
+
     @staticmethod
     def format_username(username: str) -> str:
         """ Remove domain if is part of the username 
@@ -16,17 +17,10 @@ class HashUtil:
             return username
         return _parts[1]
 
-    def compare_hash_from_dump(self, hash2compare, dump, userpass_list) -> str | list:
-        """
-        Compares a particular hash from a particular list and returns all
-        possible matches:
-        Appropriate for determining users with similar passwords
-        :Param:
-            hash to compare: The hash you would like to run a search on
-            dump: List containing your dumped hash
-        """
+    @staticmethod
+    def get_hashes(h2c):
         cracked_hashes = {}
-        with open(hash2compare, 'r') as hashes:
+        with open(h2c, 'r') as hashes:
             # select unique hashes
             # Example: 7095e1b89261962493514d82f7b6f276:Shelxp10
             for line in hashes:
@@ -37,8 +31,20 @@ class HashUtil:
                     cracked_hashes[hash_val] = password
                 except ValueError:
                     print(
-                        f"[-] Skipping malformed line in {hash2compare}:{line.strip()}")
+                        f"[-] Skipping malformed line in {h2c}:{line.strip()}")
+        return cracked_hashes
 
+    def compare_hash_from_dump(self, hash2compare, dump, userpass_list) -> str | list:
+        """
+        Compares a particular hash from a particular list and returns all
+        possible matches:
+        Appropriate for determining users with similar passwords
+        :Param:
+            hash to compare: The hash you would like to run a search on
+            dump: List containing your dumped hash
+        """
+
+        cracked_hashes = self.get_hashes(hash2compare)
         print(
             f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
 
@@ -62,9 +68,9 @@ class HashUtil:
                         continue
 
                     # check is account is enabled
-                    username, _, _, lmhash, _, _, status = _parts
-                    if lmhash in cracked_hashes:
-                        password = cracked_hashes[lmhash]
+                    username, _, _, nthash, _, _, status = _parts
+                    if nthash in cracked_hashes:
+                        password = cracked_hashes[nthash]
                         matches_found += 1
                         _check_status = "Enabled"
                         if _check_status in status:
