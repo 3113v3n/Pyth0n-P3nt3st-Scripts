@@ -6,6 +6,7 @@ class HelpHandler(Config):
     def __init__(self):
         super().__init__()
         pass
+
     def internal_helper(self, submodule: str) -> str:
         """Print helper function
         :param submodule: one of scanner | hashfunction
@@ -18,7 +19,7 @@ class HelpHandler(Config):
         }
         text_ = module[submodule]
         print(text_)
-    
+
     def external_helper(self):
         """
         Print helper function for External Penetration Testing
@@ -36,3 +37,9 @@ class HelpHandler(Config):
         Print helper function for Mobile Penetration Testing
         """
         print(self.MOBILE_HELPER_STRING)
+
+    def main_program_helper(self):
+        """
+        Print helper function for the Main Program
+        """
+        print(self.PROGRAM_HELPER_STRING)

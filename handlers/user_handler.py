@@ -20,7 +20,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.helper_ = helper_instance
         self.command_ = command_instance
         self.formatted_question = (
-            f"\nWhat task would you like to perform?\n" f"{self.OPTIONS}\n=> "
+            "\nWhat would you like to do?\n"
+            f"{self.OPTIONS}\n"
+            f"[Type '{self.BOLD}help{self.ENDC}' for info, or a number to choose a test domain]... "
         )
 
     @classmethod
@@ -298,13 +300,18 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
         while True:
             try:
-                selected_index = int(self.get_user_input(
-                    self.formatted_question)) - 1
-                if 0 <= selected_index < len(self.default_test_domains):
-                    break
-                self.print_error_message(
-                    message=f"❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
-                )
+                selected_index = self.get_user_input(
+                    self.formatted_question)
+                if selected_index == "help":
+                    self.domain = selected_index
+                    return selected_index
+                else:
+                    selected_index = int(selected_index) - 1
+                    if 0 <= selected_index < len(self.default_test_domains):
+                        break
+                    self.print_error_message(
+                        message=f"❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
+                    )
 
             except ValueError:
                 self.print_error_message(
@@ -344,6 +351,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 self.print_error_message(exception_error=error)
         return cidr
 
+    def help_me(self):
+        self.helper_.main_program_helper()
+        self.exit_program()
+
     def set_domain_variables(self, test_domain: str) -> dict:
         """Update the variable object with reference to the test domain provisioned
 
@@ -364,7 +375,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             "mobile": self.mobile_ui_handler,
             "va": self.va_ui_handler,
             "password": self.password_ui_handler,
-            "exit": self.exit_program
+            "exit": self.exit_program,
+            "help": self.help_me
         }
 
         try:
@@ -372,7 +384,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 raise ValueError(f"Invalid domain: {test_domain}")
 
             # Update output directory
-            if test_domain != "exit":
+            if test_domain not in {"exit", "help"}:
                 self.update_output_directory(test_domain)
 
             # Get domain handler
