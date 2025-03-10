@@ -30,18 +30,32 @@ class InternalConfigs:
         "\n\n Enter mode: ==> "
     )
     HEADLINE = f"\n{colors.HEADER}[*]INFO[*]{colors.ENDC}\n"
-    HASH_HELPER_STRING = f"""{HEADLINE}
+    PASSWORD_HELPER_STRING = f"""{HEADLINE}
+    [{colors.OKGREEN}Generate Module{colors.ENDC}]
         Compares your cracked hashes to your dumped hashes and creates a password
         file that has all the username and passwords of Enabled users in the AD
         in the following format:
 
+        use: '{colors.BOLD}generate{colors.ENDC}' to select module
+
             [{colors.OKGREEN}username{colors.ENDC}]:[{colors.OKGREEN}password{colors.ENDC}]
 
-        Requirement:
-            cracked hashes format:
-                                 {colors.WARNING}7095e1b8926196214d82f7b6f276{colors.ENDC}:{colors.WARNING}S4mpl3P4ssw0rd!{colors.ENDC}
-            dumped hashes format :
-                                 {colors.OKCYAN}USERNAME{colors.ENDC}: {colors.OKCYAN}ACCOUNTID{colors.ENDC}: {colors.OKCYAN}NTHASH{colors.ENDC}: {colors.OKCYAN}LMHASH{colors.ENDC}::: {colors.OKCYAN}(ACC STATUS){colors.ENDC}
+        {colors.UNDERLINE}Params{colors.ENDC}:
+            cracked hashes format:  {colors.WARNING}7095e1b8926196214d82f7b6f276{colors.ENDC}:{colors.WARNING}S4mpl3P4ssw0rd!{colors.ENDC}
+            dumped hashes format :  {colors.OKCYAN}USERNAME{colors.ENDC}: {colors.OKCYAN}ACCOUNTID{colors.ENDC}: {colors.OKCYAN}LMHASH{colors.ENDC}: {colors.OKCYAN}NTHASH{colors.ENDC}::: {colors.OKCYAN}(ACC STATUS){colors.ENDC}
+
+    [{colors.OKGREEN}Test Module{colors.ENDC}]
+        Tests validity of your credentials against a particular host 
+
+        use '{colors.BOLD}test{colors.ENDC}' to select module
+
+        {colors.UNDERLINE}Params{colors.ENDC}:
+            Target:                 The ip address of the target
+            domain:                 The Domain of the host being tested [{colors.WARNING}testdomain.xy.z{colors.ENDC}]
+            user_password <file>:   The file containing your username and passwords to test in the following
+                                     format
+                                        [ {colors.OKCYAN}username:password{colors.ENDC} ]
+
 {HEADLINE}"""
 
     SCANNER_HELPER_STRING = f"""{HEADLINE}

@@ -50,7 +50,7 @@ class Validator:
 
     @staticmethod
     def file_exists(filename) -> bool:
-        exists = os.path.isfile(filename)
+        exists = os.path.exists(filename)
         return exists
 
     @staticmethod

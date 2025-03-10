@@ -52,15 +52,15 @@ class ScreenHandler(DisplayHandler):
 
         return None
 
-    def get_file_path(self, prompt: str, check_folder_exists: callable):
+    def get_file_path(self, prompt: str, check_exists: callable):
         """Get and validate a file path from user"""
         while True:
             file_path = input(prompt).strip()
+
             if not file_path:
                 self.print_warning_message("Path cannot be empty")
-
                 continue
-            if not check_folder_exists(file_path):
+            if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
                 continue
             return file_path
@@ -69,7 +69,7 @@ class ScreenHandler(DisplayHandler):
         """Get output filename from user"""
 
         while True:
-            filename = input(prompt).strip()
+            filename = self.prompt_format(prompt)
             if not filename:
                 self.print_warning_message("Filename cannot be empty")
                 continue
@@ -80,12 +80,23 @@ class ScreenHandler(DisplayHandler):
         :param prompt: Text to display to user
         : return user input
         """
+
         while True:
-            user_input = input(prompt).strip().lower()
+            user_input = self.prompt_format(prompt)
             if not user_input:
                 self.print_warning_message("Input cannot be empty")
                 continue
             return user_input
+
+    def prompt_format(self, prompt, **kwargs):
+        decorator = "..."*30
+        
+        if kwargs.get('path'):
+            user_input = input(prompt).strip()
+
+        user_input = input(prompt).strip().lower()
+        print(f"{self.OKGREEN}{decorator}{self.ENDC}")
+        return user_input
 
     @staticmethod
     def display_files_onscreen(

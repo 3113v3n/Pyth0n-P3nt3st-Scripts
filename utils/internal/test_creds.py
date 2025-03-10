@@ -1,39 +1,37 @@
 import time
 from datetime import datetime
 # from handlers import DisplayHandler
-import subprocess
+from ..shared import Commands
+from ..shared.colors import Bcolors
 
 
-class CredentialsUtil():
+class CredentialsUtil(Bcolors):
     """Test Found credentials against a particular protocol"""
     MAX_ATTEMPTS = 2
-    SMB_SUCCESS = "(Pwn3d!)"
-    RDP_SUCCESS = "(nla:True)"
     SUCCESS_DECORATOR = "[+]"
     LOGON_FAILURE_DECORATOR = "[-]"
-    LOGON_FAILURE_TEXT = "STATUS_LOGON_FAILURE"
-
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+    LOGON_FAILURE_TEXT = [
+        "STATUS_LOGON_FAILURE",
+        "STATUS_PASSWORD_EXPIRED",
+        "STATUS_LOGON_TYPE_NOT_GRANTED",
+        "STATUS_MORE_PROCESSING_REQUIRED"
+    ]
+    LOGON_SUCCESS_TEXT = ["(Pwn3d!)", "", "(nla:True)"]
 
     def __init__(self):
-        self.creds_file = "usrpass.txt"
-        self.target = "192.168.2.29"
+        super().__init__()
+
+        self.creds_file = ""
+        self.target = ""
         self.domain = ""
         self.log_file = "Cred_test.log"
-        self.protocol = "smb"
+        self._protocol = "smb"
         self.timer_delay = 5
         self.file_delimiter = ":"
         self.attempts = 0
         self.tested_accounts = {}
-        self.output_file = "Successful_Logins.txt"
+        self.output_file = ""
+        self.run_command = Commands()
 
     def split_pass_file(self):
         """Splits userpass file into individual usernames and passwords
@@ -55,28 +53,35 @@ class CredentialsUtil():
             print(f"[+] Credentials file {self.creds_file} not found")
         return user_pass
 
-    def test_credentials(self, target, domain, **kwargs):
+    def test_credentials(
+            self,
+            target: str,
+            domain: str,
+            output_file,
+            passlist,
+            save_dir):
         """Test user credentials against a particular protocol
 
-        :params     target:         IP address of target to test
-                    domain:         Client domain being tested
-                    protocol: 
-                                     [smb]
+        :params     target:            IP address of target to test
+                    domain:            Client domain being tested
+                    output_file:        Defaults to Successful_Logins.txt for successful tests
+                                         and Cred_test.log for full log of scan
+                    passlist:            File containing your passwords to test
         : returns:
                             Log file containing test results
         """
-        if kwargs.get("protocol"):
-            self.protocol = kwargs.get("protocol")
 
         self.target = target
         self.domain = domain
+        self.output_file = output_file
+        self.creds_file = passlist
         user_pass_list = self.split_pass_file()
         date = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
 
         # Initial message
-        start_message = f"\nStarting credential test against {self.target} on Protocol {self.protocol} at {date}\n"
+        start_message = f"\nStarting credential test against {self.target} on Protocol {self._protocol} at {date}\n"
         print(start_message)
-        with open(self.log_file, "a") as file:
+        with open(f"{save_dir}/{self.log_file}", "a") as file:
             file.write(f"{start_message}\n")
 
         if not user_pass_list:
@@ -89,39 +94,39 @@ class CredentialsUtil():
                 # write to log file here
                 continue
 
-            self.run_nxc(username, password, self.domain)
+            self.run_nxc(username, password, self.domain, save_dir)
             self.tested_accounts[username] = True
 
-    def run_nxc(self, user, passwd, domain):
-        command = ["nxc", self.protocol, self.target,
+    def run_nxc(self, user, passwd, domain, save_dir):
+        command = ["nxc", self._protocol, self.target,
                    "-u", user, "-p", passwd]
         if domain:
             # if domain is provided
             command.extend(["-d", domain])
 
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
+        process = self.run_command.run_nxc_command(command)
 
-        with open(self.log_file, 'a') as logfile:
+        with open(f"{save_dir}/{self.log_file}", 'a') as logfile:
 
             for line in process.stdout:
                 line = line.strip()
                 text_to_print = self.format_text_output(line)
                 print(text_to_print)
-                if self.SMB_SUCCESS in line:  # Check if pawned
+                if self.SUCCESS_DECORATOR in line:  # Check if pawned
                     # Write successful Logins to file
                     with open(self.output_file, 'a') as success:
-                        success.write(f'{line}\n')
+                        success.write(f"{line}\n")
 
-                logfile.write(f'{line}\n')
+                logfile.write(f"{line}\n")
 
         process.wait()
         if process.returncode != 0:
             print(f"[!] nxc exited with error code {process.returncode}")
+
+    @staticmethod
+    def get_string_from_list(my_list: list, sentence: str) -> bool:
+        for word in my_list:
+            return word in sentence
 
     def format_text_output(self, text):
         # format string
@@ -129,23 +134,25 @@ class CredentialsUtil():
         cleaned_line = " ".join(text.split())
 
         # check if line contains [-] and STATUS_LOGON_FAILURE
-        if self.LOGON_FAILURE_DECORATOR in cleaned_line and self.LOGON_FAILURE_TEXT in cleaned_line:
+        if self.LOGON_FAILURE_DECORATOR in cleaned_line and self.get_string_from_list(self.LOGON_FAILURE_TEXT, cleaned_line):
             colored_line = self.handle_colored_text(
                 cleaned_line,
                 self.LOGON_FAILURE_DECORATOR,
-                self.LOGON_FAILURE_TEXT,
+                self.failure_texts,
                 self.WARNING,
                 self.ENDC,
-                self.FAIL
+                self.FAIL,
+                self.handle_string_replace
             )
-        elif self.SUCCESS_DECORATOR in cleaned_line and self.SMB_SUCCESS in cleaned_line:
+        elif self.SUCCESS_DECORATOR in cleaned_line and self.get_string_from_list(self.LOGON_SUCCESS_TEXT, cleaned_line):
             colored_line = self.handle_colored_text(
                 cleaned_line,
                 self.SUCCESS_DECORATOR,
-                self.SMB_SUCCESS,
+                self.success_texts,
                 self.OKGREEN,
                 self.ENDC,
-                self.WARNING
+                self.WARNING,
+                self.handle_string_replace
             )
         else:
             colored_line = cleaned_line
@@ -158,22 +165,29 @@ class CredentialsUtil():
             text_to_colour: str,
             dec_color_start: str,
             color_end: str,
-            txt_color_start: str) -> str:
+            txt_color_start: str,
+            handle_string_replace: callable) -> str:
         # split the line into parts
         parts = cleaned_line.split(decorator)
         if len(parts) > 1:
             # Color decorator and text
-            colored_line = (f"{parts[0]}{dec_color_start}{decorator}{color_end} {parts[1].replace(
-                text_to_colour,
-                f'{txt_color_start}{text_to_colour}{color_end}')}\n"
+            colored_line = (f"{parts[0]}{dec_color_start}{decorator}{color_end} {handle_string_replace(
+                parts[1], text_to_colour, txt_color_start, color_end)}"
             )
         else:
             colored_line = cleaned_line  #
 
         return colored_line
 
-
-if __name__ == "__main__":
-    cred_test = CredentialsUtil()
-    cred_test.test_credentials(
-        "192.168.2.29", "testdomain.co.ke", protocol="smb")
+    @staticmethod
+    def handle_string_replace(
+            full_text: str,
+            possible_vars: list,
+            start_color: str,
+            end_color: str) -> str:
+        sentence = full_text
+        for word in possible_vars:
+            if word in sentence:
+                colored_word = f"{start_color}{word}{end_color}"
+                sentence = sentence.replace(word, colored_word)
+        return sentence

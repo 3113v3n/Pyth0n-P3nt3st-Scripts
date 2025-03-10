@@ -1,26 +1,33 @@
 # Pyth0n-P3nt3st-Scripts
 
 Python scripts that aims to automate common activities conducted during penetration testing.
-- Start by installing all the dependencies in the requirements.txt
+- Start by creating a virtual environment and installing all the dependencies in the requirements.txt
 ```shell
+python3 -m venv <virtual_env_name>
+source <virtual_env_name>/bin/activate
+
 pip3 install -r requirements.txt
 
 ```
   
 Some of the Scope covered or in progress include but not limited to:
 
-| Domain                       | Script Target                                     |
-|------------------------------|---------------------------------------------------|
-| External Penetration Testing | 1. Enumerate subdomains     [coming_soon]         |
-|                              |                                                   |
-| Internal Penetration Testing | 1. Enumerate IPs give CIDR [completed]            |
-|                              | 2. Run netexec         des                        |
-|                              | 3. Compare Hashes obtained                        |
-|                              |                                                   |
-| Mobile Penetration Testing   | 1. Static Analysis (iOS/Android)                  |
-|                              |                                                   |
-| Vulnerability Analysis       | 1. Analyze Nessus and Rapid7 VA scans [completed] |
-|                              | 2. Accepts both CSV and XSLX inputs   [completed] |
+| Domain                       | Script Target                                                      |
+|------------------------------|--------------------------------------------------------------------|
+| External Penetration Testing | 1. Enumerate subdomains                           [coming_soon]    |
+|                              |                                                                    |
+| Internal Penetration Testing | 1. Enumerate IPs give CIDR                        [completed]      |
+|                              | 2. Run netexec         des                                         |
+|                              |                                                                    |
+|                              |                                                                    |
+| Mobile Penetration Testing   | 1. Static Analysis (iOS/Android)                                   |
+|                              |                                                                    |
+| Vulnerability Analysis       | 1. Analyze Nessus and Rapid7 VA scans             [completed]      |
+|                              | 2. Accepts both CSV and XSLX inputs               [completed]      |
+|                              |                                                                    |
+| Password Operation           | 1. Generate password list from cracked hashes     [completed]      |
+|                              | 2. Test credentials                               [completed]      |
+|                              |                                                                    |
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
@@ -80,7 +87,28 @@ The user is however required to provide the subnet that was being scanned initia
 ### Check for hardcoded values
 ![Hardcoded strings](images/mobile-hardcoded.png)
 
-## 4. External Penetration Testing
+## 4. Password Operation Module
+
+```text
+Compares your cracked hashes to your dumped hashes and creates a password
+file that has all the username and passwords of Enabled users in the AD
+in the following format:
+
+        [username]:[password]
+
+        :params:
+            cracked hashes format:
+                                 7095e1b8926196214d82f7b6f276:S4mpl3P4ssw0rd!
+            dumped hashes format :
+                                 USERNAME: ACCOUNTID: LMHASH: NTHASH ::: (ACC STATUS)
+```
+
+### Select module
+![module](images/password1.png)
+### Required arguments
+![arguments](images/password-02.png)
+
+## 5. External Penetration Testing
 
 [Coming Soon]
 

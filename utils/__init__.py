@@ -1,4 +1,4 @@
-from .internal import HashUtil, NetExec
+from .internal import HashUtil, NetExec, CredentialsUtil
 from .mobile import MobileCommands
 from .vulnerability import FilterVulnerabilities
 from .shared import (
@@ -20,5 +20,6 @@ __all__ = [
     ProgressBar,
     Validator,
     FilterVulnerabilities,
-    Loader
+    Loader,
+    CredentialsUtil
 ]

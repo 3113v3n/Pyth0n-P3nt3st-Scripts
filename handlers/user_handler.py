@@ -22,7 +22,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.formatted_question = (
             "\nWhat would you like to do?\n"
             f"{self.OPTIONS}\n"
-            f"[Type '{self.BOLD}help{self.ENDC}' for info, or a number to choose a test domain]... "
+            f"[Type '{self.BOLD}help{self.ENDC}' for info, or a number to choose a test domain]...\n "
         )
 
     @classmethod
@@ -73,7 +73,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         valid_options = {"yes", "y", "no", "n", "quit", "exit"}
         while True:
             response = self.get_user_input(
-                f"[-] Would you like to start ? [ {self.OKGREEN}yes{self.ENDC} | {self.FAIL}no{self.ENDC}] ")
+                f"[-] Would you like to start ? [ {self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
 
             if response in valid_options:
                 break  # Exit loop if response is valid
@@ -192,6 +192,54 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         except Exception as error:
             self.print_error_message(error)
 
+    @staticmethod
+    def match_password(
+            get_filepath_func: callable,
+            is_file: callable,
+            get_filename: callable,
+            module: str):
+        # Enter File Path to cracked hashes
+        cracked_hashes = get_filepath_func(
+            "\n[-] Enter full path to your cracked hashes \n",
+            is_file
+        )
+        # Enter Path to Dumped hashes
+        dumps = get_filepath_func(
+            "\n[-] Enter full path to your dump [ntds] \n",
+            is_file
+        )
+        # Enter file output path
+        output_filename = get_filename()
+        return {
+            "cracked_hashes": cracked_hashes,
+            "dumps": dumps,
+            "filename": output_filename,
+            "module": module
+        }
+
+    @staticmethod
+    def test_user_password(
+            get_user_input: callable,
+            get_filepath_func: callable,
+            is_file: callable,
+            display_text: str,
+            domain_text: str,
+            module: str):
+        target = get_user_input(display_text)
+        domain = get_user_input(domain_text)
+        pass_list = get_filepath_func(
+            "\n[-] Enter full path to your Password List file \n",
+            is_file
+        )
+
+        return {
+            "target": target,
+            "domain": domain,
+            "pass_list": pass_list,
+            "filename": "Successful_Logins.txt",
+            "module": module
+        }
+
     def password_ui_handler(self):
         self.start_domain_helper(
             self.helper_.internal_helper,
@@ -200,23 +248,28 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             helper_text="hashfunction",
             spinner_type="bounce"
         )
-        # Enter File Path to cracked hashes
-        cracked_hashes = self.get_file_path(
-            "\n[-] Enter full path to your cracked hashes \n",
-            self.file_exists
-        )
-        # Enter Path to Dumped hashes
-        dumps = self.get_file_path(
-            "\n[-] Enter full path to your dump [ntds] \n",
-            self.file_exists
-        )
-        # Enter file output path
-        output_filename = self.get_output_filename()
-        return {
-            "cracked_hashes": cracked_hashes,
-            "dumps": dumps,
-            "filename": output_filename
+        target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
+        domain_text = "[*] Enter the domain of your target [ testdomain.xy.z ] \n"
+
+        operation = self.get_user_input(
+            f"Type ({self.OKGREEN}generate{self.ENDC}) to Generate password list\n"
+            f"Type ({self.OKGREEN}test{self.ENDC}) to test out your passwords \n")
+        
+        pass_handler = {
+            "generate": lambda:self.match_password(self.get_file_path,
+                                            self.file_exists,
+                                            self.get_output_filename,
+                                            operation),
+            "test": lambda:self.test_user_password(self.get_user_input,
+                                            self.get_file_path,
+                                            self.file_exists,
+                                            target_text,
+                                            domain_text,
+                                            operation)
         }
+        start_handler = pass_handler.get(operation)
+        if start_handler:
+            return start_handler()
 
     def internal_ui_handler(self):
         """Handle internal assessment UI interactions"""
@@ -228,54 +281,48 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             helper_text="scanner"
         )
         try:
+            subnet = ""
+            output_file = ""
+            mode = self.get_user_input(self.internal_mode_choice)
             while True:
-
-                subnet = ""
-                output_file = ""
-
-                while True:
-                    mode = self.get_user_input(self.internal_mode_choice)
-                    if not mode:
-                        self.print_warning_message(
-                            "Please enter a valid choice (scan | resume)")
-                        continue
-                    if mode not in ["scan", "resume"]:
-                        mode = self.get_user_input(self.internal_choice_error)
-                        continue
+                if mode not in ["scan", "resume"]:
+                    self.print_warning_message("Invalid mode entered.")
+                    mode = self.get_user_input(self.internal_choice_error)
+                else:
                     break
 
-                if mode == "resume":
-                    resume_ip = self.display_saved_files(
-                        self.output_directory,
-                        resume_scan=True
-                    )
+            if mode == "resume":
+                resume_ip = self.display_saved_files(
+                    self.output_directory,
+                    resume_scan=True
+                )
 
-                    if resume_ip is None:
-                        self.print_warning_message(
-                            "No previous scan files found. Defaulting to scan mode.")
-                        mode = "scan"
-                    else:
-                        output_file = self.filepath
-                        while True:
-                            cidr = self.get_cidr()
-                            if cidr:
-                                subnet = f"{resume_ip}/{cidr}"
-                                break
-                            else:
-                                self.print_warning_message(
-                                    "Please enter a valid CIDR")
-                                continue
+                if resume_ip is None:
+                    self.print_warning_message(
+                        "No previous scan files found. Defaulting to scan mode.")
+                    mode = "scan"
+                else:
+                    output_file = self.filepath
+                    while True:
+                        cidr = self.get_cidr()
+                        if cidr:
+                            subnet = f"{resume_ip}/{cidr}"
+                            break
+                        else:
+                            self.print_warning_message(
+                                "Please enter a valid CIDR")
+                            continue
 
-                # If mode is scan or defaulted to scan
-                if mode == "scan":
-                    subnet = self.get_user_subnet()
-                    output_file = self.get_output_filename()
+            # If mode is scan or defaulted to scan
+            if mode == "scan":
+                subnet = self.get_user_subnet()
+                output_file = self.get_output_filename()
 
-                return {
-                    "subnet": subnet,
-                    "mode": mode,
-                    "output": output_file,
-                }
+            return {
+                "subnet": subnet,
+                "mode": mode,
+                "output": output_file,
+            }
 
         except Exception as error:
 
@@ -408,5 +455,3 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 class DomainError(Exception):
     """Custom exception for domain-related errors"""
     pass
-
-# TODO: fix wrong selection in mode

@@ -30,7 +30,7 @@ class Loader:
                  desc: str = "Loading...",
                  end: str = "Done!",
                  timeout: float = 0.1,
-                 timer: int = 30,
+                 timer: int = 10,
                  spinner_type: str = "dots",
                  continuous: bool = False
 

@@ -42,6 +42,20 @@ class Commands:
         return result
 
     @staticmethod
+    def run_nxc_command(command):
+        try:
+            result = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(
+                f"Command failed with exit code: {e.returncode}\nError: {e.stderr}")
+        return result
+
+    @staticmethod
     def run_git_cmd(git_command):
         try:
             print(f"running command:\n{git_command}\n\n")
@@ -123,7 +137,7 @@ class Commands:
 
     def start_async_ping(self, ip) -> bool:
         try:
-            loop = asyncio.new_event_loop() # create a new loop for this thread
+            loop = asyncio.new_event_loop()  # create a new loop for this thread
             asyncio.set_event_loop(loop)
             is_alive = loop.run_until_complete(self.async_host_ping(ip))
             loop.close()
@@ -131,4 +145,3 @@ class Commands:
         except Exception as e:
             print(f"Async ping failed for IP: {ip}: {str(e)}")
             return False
-        

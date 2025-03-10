@@ -114,18 +114,33 @@ class PentestFramework(DisplayHandler):
             network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
         internal.initialize_variables(
-            mode=user.domain_variables["mode"], output_file=user.domain_variables["output"])
+            mode=user.domain_variables["mode"],
+            output_file=user.domain_variables["output"])
         internal.enumerate_hosts()
 
     @staticmethod
     def handle_password_operations(user, password):
         """Handle Password related operations"""
         # Initialize Password class variables
-        password.set_domain_variables(
-            user.domain_variables, user.output_directory, user.generate_unique_name)
-
-        # Extract user_pass list from cracked hashes and domain dump
-        password.generate_passlist_from_hashes()
+        output_dir = user.output_directory
+        generator_func = user.generate_unique_name
+        variables = user.domain_variables
+        selected_module = variables["module"]
+       
+        module_handler = {
+            "generate": lambda:password.generate_passlist_from_hashes(
+                variables,
+                output_dir,
+                generator_func),
+            "test": lambda: password.test_valid_passwords(
+                variables,
+                generator_func,
+                output_dir)
+        }
+        run_selected_module = module_handler.get(selected_module)
+        # Run selected module
+        if run_selected_module:
+            run_selected_module()
 
     @staticmethod
     def handle_vulnerability_assessment(user, vulnerability_analysis):
@@ -292,7 +307,7 @@ class PentestFramework(DisplayHandler):
                 self.exit_menu = True
             except Exception as e:
                 self.print_error_message(
-                    message="An error occurred", exception_error=e)
+                    message="An error in Main Program occurred", exception_error=e)
 
 
 def main():

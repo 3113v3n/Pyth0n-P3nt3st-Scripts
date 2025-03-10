@@ -3,6 +3,7 @@ from utils.shared.colors import Bcolors
 
 class DisplayHandler(Bcolors):
     def __init__(self):
+        super().__init__()
         pass
 
     @staticmethod

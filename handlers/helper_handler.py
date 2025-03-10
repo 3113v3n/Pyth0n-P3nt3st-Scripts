@@ -15,7 +15,7 @@ class HelpHandler(Config):
         """
         module = {
             "scanner": self.SCANNER_HELPER_STRING,
-            "hashfunction": self.HASH_HELPER_STRING
+            "hashfunction": self.PASSWORD_HELPER_STRING
         }
         text_ = module[submodule]
         print(text_)
