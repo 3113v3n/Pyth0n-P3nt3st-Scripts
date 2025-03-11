@@ -70,16 +70,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             spinner_type=spinner_type,
             timer=timer
         )
+        input_text = ("[-] Would you like to start ? [ "
+                      f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
         valid_options = {"yes", "y", "no", "n", "quit", "exit"}
-        while True:
-            response = self.get_user_input(
-                f"[-] Would you like to start ? [ {self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
 
-            if response in valid_options:
-                break  # Exit loop if response is valid
-            else:
-                self.print_warning_message(
-                    f"Invalid choice. Please choose from: {valid_options}")
+        response = self.validate_user_choice(
+            valid_options, self.get_user_input, input_text)
 
         if response == "yes" or response == "y":
             self.command_.clear_screen()
@@ -220,12 +216,21 @@ class UserHandler(FileHandler, Config, ScreenHandler):
     @staticmethod
     def test_user_password(
             get_user_input: callable,
+            ip_validator: callable,
+            validate: callable,
             get_filepath_func: callable,
             is_file: callable,
             display_text: str,
             domain_text: str,
             module: str):
-        target = get_user_input(display_text)
+        ip_error = "Invalid ip provided. Please enter a valid one"
+        target = ip_validator(
+            get_user_input,
+            display_text,
+            validate,
+            ip_error
+        )
+
         domain = get_user_input(domain_text)
         pass_list = get_filepath_func(
             "\n[-] Enter full path to your Password List file \n",
@@ -250,22 +255,27 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         )
         target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
         domain_text = "[*] Enter the domain of your target [ testdomain.xy.z ] \n"
-
-        operation = self.get_user_input(
+        valid_operations = {"generate", "test"}
+        operation_text = (
             f"Type ({self.OKGREEN}generate{self.ENDC}) to Generate password list\n"
             f"Type ({self.OKGREEN}test{self.ENDC}) to test out your passwords \n")
-        
+
+        operation = self.validate_user_choice(valid_operations,
+                                              self.get_user_input,
+                                              operation_text)
         pass_handler = {
-            "generate": lambda:self.match_password(self.get_file_path,
-                                            self.file_exists,
-                                            self.get_output_filename,
-                                            operation),
-            "test": lambda:self.test_user_password(self.get_user_input,
-                                            self.get_file_path,
-                                            self.file_exists,
-                                            target_text,
-                                            domain_text,
-                                            operation)
+            "generate": lambda: self.match_password(self.get_file_path,
+                                                    self.file_exists,
+                                                    self.get_output_filename,
+                                                    operation),
+            "test": lambda: self.test_user_password(self.get_user_input,
+                                                    self.get_valid_ip_addr,
+                                                    self.validate_ip_addr,
+                                                    self.get_file_path,
+                                                    self.file_exists,
+                                                    target_text,
+                                                    domain_text,
+                                                    operation)
         }
         start_handler = pass_handler.get(operation)
         if start_handler:
@@ -283,13 +293,11 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         try:
             subnet = ""
             output_file = ""
-            mode = self.get_user_input(self.internal_mode_choice)
-            while True:
-                if mode not in ["scan", "resume"]:
-                    self.print_warning_message("Invalid mode entered.")
-                    mode = self.get_user_input(self.internal_choice_error)
-                else:
-                    break
+            valid_modes = {"scan", "resume"}
+            mode = self.validate_user_choice(
+                valid_modes,
+                self.get_user_input,
+                self.internal_mode_choice)
 
             if mode == "resume":
                 resume_ip = self.display_saved_files(
@@ -369,34 +377,40 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def get_user_subnet(self):
         # Validate subnet provided
-
-        while True:
-            try:
-                subnet = self.get_user_input(
-                    "\n[+] Please provide a valid subnet [10.0.0.0/24]\n")
-                if self.validate_ip_and_cidr(subnet):
-                    break
-                else:
-                    raise ValueError(" Invalid IP address format provided")
-            except ValueError as error:
-                self.print_error_message(exception_error=error)
-
-        return subnet
+        text = "\n[+] Please provide a valid subnet [10.0.0.0/24]\n"
+        error_text = " Invalid IP address format provided"
+        return self.get_valid_ip_addr(
+            self.get_user_input,
+            text,
+            self.validate_ip_and_cidr,
+            error_text)
 
     def get_cidr(self):
         # Validate CIDR
+        cidr = "\n[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
+        error_txt = " Invalid CIDR provided"
+        return self.get_valid_ip_addr(
+            self.get_user_input,
+            cidr,
+            self.validate_cidr,
+            error_txt
+        )
+
+    def get_valid_ip_addr(self,
+                          get_user_input: callable,
+                          input_text: str,
+                          validator_func: callable,
+                          error_text: str):
         while True:
             try:
-                cidr = self.get_user_input(
-                    "\n[+] Please provide a valid CIDR address that you were scanning previously [0-32]\n"
-                )
-                if self.validate_cidr(cidr):
+                user_iput = get_user_input(input_text)
+                if validator_func(user_iput):
                     break
                 else:
-                    raise ValueError(" Invalid CIDR provided")
+                    raise ValueError(error_text)
             except ValueError as error:
                 self.print_error_message(exception_error=error)
-        return cidr
+        return user_iput
 
     def help_me(self):
         self.helper_.main_program_helper()

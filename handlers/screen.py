@@ -90,13 +90,31 @@ class ScreenHandler(DisplayHandler):
 
     def prompt_format(self, prompt, **kwargs):
         decorator = "..."*30
-        
+
         if kwargs.get('path'):
             user_input = input(prompt).strip()
 
         user_input = input(prompt).strip().lower()
         print(f"{self.OKGREEN}{decorator}{self.ENDC}")
         return user_input
+
+    def validate_user_choice(
+        self,
+        options: dict,
+        get_user_input: callable,
+        text: str
+    ):
+        valid_options = options
+        while True:
+            response = get_user_input(text)
+
+            if response in valid_options:
+                break  # Exit loop if response is valid
+            else:
+                self.print_warning_message(
+                    f"Invalid choice: {response}.\n Please "
+                    f"choose from: {self.BOLD}{valid_options}{self.ENDC}")
+        return response
 
     @staticmethod
     def display_files_onscreen(
