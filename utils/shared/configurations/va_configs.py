@@ -136,6 +136,9 @@ class VAConfigs:
     WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS"
     UNIVERSAL_IGNORE_FILTER = "Upgrade|Update|upgrade|update|patch"
     WEB_IGNORE_FILTER = "TLS|SSL"
+    RISK_RATING_STRINGS = "High|Medium|Critical"
+    COMPLIANCE_STRINGS="FAILED|WARNING|Fail"
+    RCE_STRING="remote code execution"
 
     # Scanner-specific column mappings
     COLUMNS = {

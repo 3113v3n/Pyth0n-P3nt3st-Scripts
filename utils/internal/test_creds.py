@@ -12,9 +12,9 @@ class CredentialsUtil(Bcolors):
     LOGON_FAILURE_DECORATOR = "[-]"
     LOGON_FAILURE_TEXT = [
         "STATUS_LOGON_FAILURE",
-        "STATUS_PASSWORD_EXPIRED",
         "STATUS_LOGON_TYPE_NOT_GRANTED",
-        "STATUS_MORE_PROCESSING_REQUIRED"
+        "STATUS_MORE_PROCESSING_REQUIRED",
+        "STATUS_PASSWORD_EXPIRED"
     ]
     LOGON_SUCCESS_TEXT = ["(Pwn3d!)", "", "(nla:True)"]
 
@@ -138,7 +138,7 @@ class CredentialsUtil(Bcolors):
             colored_line = self.handle_colored_text(
                 cleaned_line,
                 self.LOGON_FAILURE_DECORATOR,
-                self.failure_texts,
+                self.LOGON_FAILURE_TEXT,
                 self.WARNING,
                 self.ENDC,
                 self.FAIL,
@@ -148,7 +148,7 @@ class CredentialsUtil(Bcolors):
             colored_line = self.handle_colored_text(
                 cleaned_line,
                 self.SUCCESS_DECORATOR,
-                self.success_texts,
+                self.LOGON_SUCCESS_TEXT,
                 self.OKGREEN,
                 self.ENDC,
                 self.WARNING,

@@ -54,6 +54,7 @@ class ScreenHandler(DisplayHandler):
 
     def get_file_path(self, prompt: str, check_exists: callable):
         """Get and validate a file path from user"""
+        
         while True:
             file_path = input(prompt).strip()
 
@@ -63,6 +64,7 @@ class ScreenHandler(DisplayHandler):
             if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
                 continue
+            self.print_info_message(f"Validator status: {check_exists(file_path)}")
             return file_path
 
     def get_output_filename(self, prompt: str = "\n[+] Please enter the output filename: "):

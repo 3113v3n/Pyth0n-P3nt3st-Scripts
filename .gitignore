@@ -4,6 +4,9 @@
 **/.trunk
 **/.idea
 **/.cursor
+**/.ipyn*
+**/jp-venv
+jupyter_notebook
 output_directory
 test-data
 **/.idea
