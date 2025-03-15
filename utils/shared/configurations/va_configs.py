@@ -127,7 +127,8 @@ class VAConfigs:
     }
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
     SSL_FILTER_STRINGS = "SSL|TLS|POODLE|Diffie-Hellman"
-    PATCH_FILTER_STRINGS = "patches|updates|security update|Microsoft has released|Update|update"
+    PATCH_FILTER_STRINGS = (
+        "patches|updates|security update|Microsoft has released|Update|update|Security Patch|security patch")
     UPGRADE_FILTER_STRINGS = (
         "no longer supported|unsupported|Unsupported Version|Obsolete Version|end-of-life|Upgrade|upgrade|discontinued"
     )
@@ -137,8 +138,8 @@ class VAConfigs:
     UNIVERSAL_IGNORE_FILTER = "Upgrade|Update|upgrade|update|patch"
     WEB_IGNORE_FILTER = "TLS|SSL"
     RISK_RATING_STRINGS = "High|Medium|Critical"
-    COMPLIANCE_STRINGS="FAILED|WARNING|Fail"
-    RCE_STRING="remote code execution"
+    COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
+    RCE_STRING = "remote code execution"
 
     # Scanner-specific column mappings
     COLUMNS = {
