@@ -63,28 +63,7 @@ class VAConfigs:
         f"{Bcolors.FAIL}{Bcolors.BOLD}[!]Column mismatch between files. "
         f" Ensure all files have the same number of columns {Bcolors.ENDC}"
     )
-    # TODO: combine strings and categories
-    NESSUS_STRINGS_TO_FILTER = [
-        "ssl_condition",
-        "missing_patch_condition",
-        "unsupported_software_condition",
-        "kaspersky_condition",
-        "insecure_condition",
-        "winverify_condition",
-        "unquoted_condition",
-        "smb_condition",
-        "speculative_condition",
-        "AD_condition",
-        "defender_condition",
-        "rdp_condition",
-        "ssh_condition",
-        "telnet_condition",
-        "information_condition",
-        "web_condition",
-        "rce_condition",
-        "reboot_condition",
-        "compliance_condition",
-    ]
+
     NESSUS_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
         "Missing Patches": "missing_patch_condition",
@@ -106,16 +85,6 @@ class VAConfigs:
         "Windows Update Reboot": "reboot_condition",
         "Compliance": "compliance_condition",
     }
-    # strings and categories need to be same number
-    RAPID7_STRINGS_TO_FILTER = [
-        "ssl_condition",
-        "missing_patch_condition",
-        "unsupported_software_condition",
-        "web_condition",
-        "ssh_condition",
-        "database_condition",
-        "compliance_condition",
-    ]
     RAPID7_VULN_CATEGORIES = {
         "SSL Misconfigurations": "ssl_condition",
         "Missing Patches": "missing_patch_condition",
@@ -128,18 +97,22 @@ class VAConfigs:
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
     SSL_FILTER_STRINGS = "SSL|TLS|POODLE|Diffie-Hellman"
     PATCH_FILTER_STRINGS = (
-        "patches|updates|security update|Microsoft has released|Update|update|Security Patch|security patch")
-    UPGRADE_FILTER_STRINGS = (
-        "no longer supported|unsupported|Unsupported Version|Obsolete Version|end-of-life|Upgrade|upgrade|discontinued"
+        "[Pp]atch(?:es)|[Uu]pdat(?:e|es|ing)|[Ss]ecurity|Microsoft has released|"
+        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|version \\d+|[Uu]pdate \\d+"
     )
-    REBOOT_FILTER_STRINGS = "reboot|Reboot"
+    UPGRADE_FILTER_STRINGS = (
+        "no longer supported|[Uu]nsupported|Obsolete Version|"
+        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later"
+    )
+    REBOOT_FILTER_STRINGS = "[rR]eboot"
     RDP_FILTER_STRINGS = "Terminal Services|Remote Desktop Protocol"
-    WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS"
-    UNIVERSAL_IGNORE_FILTER = "Upgrade|Update|upgrade|update|patch"
+    WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS|ASP.NET"
+    UNIVERSAL_IGNORE_FILTER = "[Uu]pgrade|[Uu]pdate|[Pp]atch"
     WEB_IGNORE_FILTER = "TLS|SSL"
-    RISK_RATING_STRINGS = "High|Medium|Critical"
+    RISK_RATING_STRINGS = "Critical|High|Medium"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = "remote code execution"
+    PATCH_OR_UPGRADE = "Update|Upgrade"
 
     # Scanner-specific column mappings
     COLUMNS = {
@@ -169,11 +142,12 @@ class VAConfigs:
 
             {color.OKGREEN}scan_folder{color.ENDC}      File Path to your scan results
             {color.OKGREEN}scanner{color.ENDC}          The scanner used [ {color.WARNING}Nessus | Rapid7{color.ENDC} ]
-            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both{color.ENDC} ]
+            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both
+            {color.ENDC} ]
             {color.OKGREEN}filename{color.ENDC}         The name of your output file
 
-    {color.OKCYAN}{color.UNDERLINE}return{color.ENDC}:
+    {color.OKCYAN}{color.UNDERLINE}return {color.ENDC}:
             {color.OKGREEN}filtered_list{color.ENDC}    Output file with the filtered vulnerabilities
             {color.OKGREEN}unfiltered_list{color.ENDC}  File containing list of all vulnerabilities that
-                              were not analzed, for manual input
+                              were not analyzed, for manual input
 {HEADLINE}"""

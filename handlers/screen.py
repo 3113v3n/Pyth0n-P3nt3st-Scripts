@@ -56,8 +56,7 @@ class ScreenHandler(DisplayHandler):
         """Get and validate a file path from user"""
         
         while True:
-            file_path = input(prompt).strip()
-
+            file_path = self.prompt_format(prompt, path=True)
             if not file_path:
                 self.print_warning_message("Path cannot be empty")
                 continue
@@ -71,7 +70,7 @@ class ScreenHandler(DisplayHandler):
         """Get output filename from user"""
 
         while True:
-            filename = self.prompt_format(prompt)
+            filename = self.prompt_format(prompt, filename=True)
             if not filename:
                 self.print_warning_message("Filename cannot be empty")
                 continue
@@ -92,12 +91,21 @@ class ScreenHandler(DisplayHandler):
 
     def prompt_format(self, prompt, **kwargs):
         decorator = "..."*30
+        dotted_lines = f"{self.OKGREEN}{decorator}{self.ENDC}"
+        
+        def not_lower():
+            user_input = input(prompt).strip()
+            print(dotted_lines)
+            return user_input
 
         if kwargs.get('path'):
-            user_input = input(prompt).strip()
+            return not_lower()
+        
+        if kwargs.get('filename'):
+            return not_lower()
 
         user_input = input(prompt).strip().lower()
-        print(f"{self.OKGREEN}{decorator}{self.ENDC}")
+        print(dotted_lines)
         return user_input
 
     def validate_user_choice(
