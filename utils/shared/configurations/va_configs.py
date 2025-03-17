@@ -98,7 +98,7 @@ class VAConfigs:
     SSL_FILTER_STRINGS = "SSL|TLS|POODLE|Diffie-Hellman"
     PATCH_FILTER_STRINGS = (
         "[Pp]atch(?:es)|[Uu]pdat(?:e|es|ing)|[Ss]ecurity|Microsoft has released|"
-        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|version \\d+|[Uu]pdate \\d+"
+        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+"
     )
     UPGRADE_FILTER_STRINGS = (
         "no longer supported|[Uu]nsupported|Obsolete Version|"
