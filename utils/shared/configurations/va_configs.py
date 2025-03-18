@@ -98,7 +98,7 @@ class VAConfigs:
     SSL_FILTER_STRINGS = "SSL|TLS|POODLE|Diffie-Hellman"
     PATCH_FILTER_STRINGS = (
         "[Pp]atch(?:es)|[Uu]pdat(?:e|es|ing)|[Ss]ecurity|Microsoft has released|"
-        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|is prior to \\d+"
+        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|is prior to \\d+|Apply"
     )
     UPGRADE_FILTER_STRINGS = (
         "no longer supported|[Uu]nsupported|Obsolete Version|"
@@ -113,7 +113,7 @@ class VAConfigs:
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = "[Rr]emote [Cc]ode [Ee]xecution"
     PATCH_OR_UPGRADE = "Update|Upgrade"
-    SSH_STRINGS= "SSH|SSH server"
+    SSH_STRINGS = "SSH|SSH server"
     # Scanner-specific column mappings
     COLUMNS = {
         'nessus': {
