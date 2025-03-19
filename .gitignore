@@ -6,6 +6,7 @@
 **/.cursor
 **/.ipyn*
 **/jp-venv
+**/.DS_Store
 jupyter_notebook
 output_directory
 test-data
