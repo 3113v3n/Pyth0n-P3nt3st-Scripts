@@ -97,38 +97,39 @@ class VAConfigs:
     SCAN_FILE_FORMAT = ("csv", "xlsx", "both")
     SSL_FILTER_STRINGS = "SSL|TLS|POODLE|Diffie-Hellman"
     PATCH_FILTER_STRINGS = (
-        "[Pp]atch(?:es)|[Uu]pdat(?:e|es|ing)|[Ss]ecurity|Microsoft has released|"
-        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|is prior to \\d+|Apply"
+        "[Pp]atch(?:es)|[Pp]atch|[Uu]pdat(?:e|es|ing)|[Ss]ecurity (?:[Uu]pdat(?:e|es)|[Pp]atch)|Microsoft has released|"
+        "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|Apply|[Ii]nstall patch"
     )
     UPGRADE_FILTER_STRINGS = (
-        "no longer supported|[Uu]nsupported|Obsolete Version|"
-        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later"
+        "no longer supported|[Uu]nsupported|Obsolete Version|end of life"
+        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later|is prior to \\d+|remove any affected versions"
     )
     REBOOT_FILTER_STRINGS = "[rR]eboot"
     RDP_FILTER_STRINGS = "Terminal Services|[Rr]emote [Dd]esktop [Pp]rotocol|NLA"
-    WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS|ASP.NET"
+    WEB_FILTER_STRINGS = "Web|web server|HTTP|HSTS|HTTPS|IIS|ASP.NET|[Hh]eader"
     UNIVERSAL_IGNORE_FILTER = "[Uu]pgrade|[Uu]pdate|[Pp]atch"
     WEB_IGNORE_FILTER = "TLS|SSL"
     RISK_RATING_STRINGS = "Critical|High|Medium"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = "[Rr]emote [Cc]ode [Ee]xecution"
-    PATCH_OR_UPGRADE = "Update|Upgrade"
+    PATCH_OR_UPGRADE = "[Uu]pdate|[Uu]pgrade"
     SSH_STRINGS = "SSH|SSH server"
+    INFO_DISCLOSURE_STRINGS = "[Ii]nformation [Dd]isclosure"
     # Scanner-specific column mappings
     COLUMNS = {
-        'nessus': {
-            'title': 'Name',
-            'solution': 'Solution',
-            'description': 'Description',
-            'synopsis': 'Synopsis',
-            'risk': 'Risk'
+        "nessus": {
+            "title": "Name",
+            "solution": "Solution",
+            "description": "Description",
+            "synopsis": "Synopsis",
+            "risk": "Risk",
         },
-        'rapid': {
-            'title': 'Vulnerability Title',
-            'solution': 'Vulnerability Solution',
-            'service': 'Service Name',
-            'pci_status': 'Vulnerability PCI Compliance Status'
-        }
+        "rapid": {
+            "title": "Vulnerability Title",
+            "solution": "Vulnerability Solution",
+            "service": "Service Name",
+            "pci_status": "Vulnerability PCI Compliance Status",
+        },
     }
     HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
     VULNERABILITY_HELPER_STRING = f"""{HEADLINE}
