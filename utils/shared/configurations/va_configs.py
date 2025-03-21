@@ -100,9 +100,15 @@ class VAConfigs:
         "[Pp]atch(?:es)|[Pp]atch|[Uu]pdat(?:e|es|ing)|[Ss]ecurity (?:[Uu]pdat(?:e|es)|[Pp]atch)|Microsoft has released|"
         "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|Apply|[Ii]nstall patch"
     )
+    PATCH_IGNORE_STRINGS = (
+        "[Pp]atch(?:es)|[Pp]atch|[Uu]pdat(?:es|ing)|[Ss]ecurity (?:[Uu]pdat(?:e|es)|[Pp]atch)|Microsoft has released|"
+        "Apply|[Ii]nstall patch"
+    )
     UPGRADE_FILTER_STRINGS = (
-        "no longer supported|[Uu]nsupported|Obsolete Version|end of life"
-        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later|is prior to \\d+|remove any affected versions"
+        "no longer supported|[Uu]nsupported|Obsolete Version|end of life|"
+        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later|is prior to \\d+|remove any affected versions|"
+        "[Uu]pgrade to"
+
     )
     REBOOT_FILTER_STRINGS = "[rR]eboot"
     RDP_FILTER_STRINGS = "Terminal Services|[Rr]emote [Dd]esktop [Pp]rotocol|NLA"
@@ -113,7 +119,7 @@ class VAConfigs:
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = "[Rr]emote [Cc]ode [Ee]xecution"
     PATCH_OR_UPGRADE = "[Uu]pdate|[Uu]pgrade"
-    SSH_STRINGS = "SSH|SSH server"
+    SSH_STRINGS = "SSH|SSH [Ss]erver"
     INFO_DISCLOSURE_STRINGS = "[Ii]nformation [Dd]isclosure"
     # Scanner-specific column mappings
     COLUMNS = {

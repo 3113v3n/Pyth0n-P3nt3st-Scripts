@@ -10,6 +10,10 @@ import ipaddress
 
 class FileHandler(Validator, DisplayHandler):
     """Handle File operations"""
+    FONT_NAME = "Calibri Light"
+    FONT_SIZE = 12
+    FONT_COLOR = "white"
+    BG_COLOR = "black"
 
     def __init__(self) -> None:
         super().__init__()
@@ -76,12 +80,44 @@ class FileHandler(Validator, DisplayHandler):
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename, extension='xlsx')}"
-        with pandas.ExcelWriter(self.filepath) as writer:
+
+        # Define formats
+        header_formats = {
+            "font_name": self.FONT_NAME,
+            "font_size": self.FONT_SIZE,
+            "font_color": self.FONT_COLOR,
+            "bg_color": self.BG_COLOR,
+            "bold": True
+        }
+
+        cell_formats = {
+            "font_name": self.FONT_NAME,
+            "font_size": self.FONT_SIZE,
+        }
+
+        with pandas.ExcelWriter(self.filepath, engine="xlsxwriter") as writer:
             for dataframe in dataframe_objects:
                 if not dataframe["dataframe"].empty:
-                    dataframe["dataframe"].to_excel(
-                        writer, sheet_name=dataframe["sheetname"], index=False
-                    )
+                    sheetname = dataframe["sheetname"]
+                    df = dataframe["dataframe"]
+
+                    df.to_excel(writer, sheet_name=sheetname, index=False)
+
+                    workbook = writer.book
+                    worksheet = writer.sheets[sheetname]
+
+                    # format workbook headers
+                    formatted_headers = workbook.add_format(header_formats)
+                    # format cell
+                    formatted_cell = workbook.add_format(cell_formats)
+
+                    # Apply header format to the first row (A1:G1)
+                    for col_num, value in enumerate(df.columns.values):
+                        worksheet.write(0, col_num, value, formatted_headers)
+
+                    # Apply cell format to data rows
+                    worksheet.set_column('A:ZZ',15, formatted_cell)
+
         self.print_success_message(
             message="Filtered vulnerabilities have been written to :",
             extras=self.filepath
