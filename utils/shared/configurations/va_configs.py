@@ -1,11 +1,27 @@
 from ..colors import Bcolors
+import re
 
 
 class VAConfigs:
     color = Bcolors
 
     def __init__(self):
-        pass
+        self._compiled_patterns = {
+            "ssl": re.compile(self.SSL_FILTER_STRINGS),
+            "software": re.compile(self.UPGRADE_FILTER_STRINGS),
+            "reboot": re.compile(self.REBOOT_FILTER_STRINGS),
+            "patch": re.compile(self.PATCH_FILTER_STRINGS),
+            "rdp": re.compile(self.RDP_FILTER_STRINGS),
+            "web": re.compile(self.WEB_FILTER_STRINGS),
+            "ignore_": {"common": re.compile(self.UNIVERSAL_IGNORE_FILTER),
+                        "web": re.compile(self.WEB_IGNORE_FILTER)},
+            "compliance": re.compile(self.COMPLIANCE_STRINGS),
+            "rating": re.compile(self.RISK_RATING_STRINGS),
+            "rce": re.compile(self.RCE_STRING),
+            "patch_or_upgrade": re.compile(self.PATCH_OR_UPGRADE),
+            "ssh": re.compile(self.SSH_STRINGS),
+            "info": re.compile(self.INFO_DISCLOSURE_STRINGS)
+        }
 
     NESSUS_HEADERS = [
         "CVE",

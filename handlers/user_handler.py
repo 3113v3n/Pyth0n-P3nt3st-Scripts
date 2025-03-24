@@ -113,8 +113,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             self.helper_.vulnerability_helper,
             "Loading Vulnerability Analysis Module... ",
             "Starting Vulnerability Analysis...\n",
-            spinner_type="pipe",
-            timer=20
+            spinner_type="pipe"
         )
         while True:
 
