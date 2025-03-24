@@ -99,9 +99,19 @@ class FileHandler(Validator, DisplayHandler):
             for dataframe in dataframe_objects:
                 if not dataframe["dataframe"].empty:
                     sheetname = dataframe["sheetname"]
-                    df = dataframe["dataframe"]
+                    df = dataframe["dataframe"].copy()
 
+                    url_column_name = "See Also"
+
+                    if url_column_name in df.columns:
+                        # Convert URLs to strings and add leading space
+                        # to prevent hyperlink detection
+                        df[url_column_name] = df[url_column_name].astype(str).apply(
+                            lambda x: ' ' + x if pandas.notnull(x) else x)
+                        
                     df.to_excel(writer, sheet_name=sheetname, index=False)
+
+                    # TODO: handle URLs in See Also to prevent errors
 
                     workbook = writer.book
                     worksheet = writer.sheets[sheetname]
@@ -116,15 +126,13 @@ class FileHandler(Validator, DisplayHandler):
                         worksheet.write(0, col_num, value, formatted_headers)
 
                     # Apply cell format to data rows
-                    worksheet.set_column('A:ZZ',15, formatted_cell)
+                    worksheet.set_column('A:ZZ', 15, formatted_cell)
 
         self.print_success_message(
-            message="Filtered vulnerabilities have been written to :",
+            message="Analyzed Vulnerabilities have been written to :",
             extras=self.filepath
-        ) if "unfiltered" not in kwargs else self.print_info_message(
-            message="Unfiltered vulnerabilities have been written to ",
-            file_path=self.filepath
-        )
+        ) 
+        
 
     def save_to_csv(self, filename, content, *args):
         """ 
@@ -243,7 +251,7 @@ class FileHandler(Validator, DisplayHandler):
 
     def _get_file_collections(self) -> dict:
         """ Get different collections of files b type
-        :return: Dictionary of file collections
+        :Returns: Dictionary of file collections
         """
 
         def get_files_by_type(ext):
@@ -251,7 +259,7 @@ class FileHandler(Validator, DisplayHandler):
 
             :param
                 ext: File extension
-            :return
+            :Returns
                 list: Files matching the extension
             """
             return list(filter(
@@ -389,8 +397,9 @@ class FileHandler(Validator, DisplayHandler):
     @staticmethod
     def read_csv(dataframe, **kwargs):
         """Handles reading of CSV files
-        :param dataframe : The file to be read
-        :param kwargs: Keyword arguments
+        Args:
+            dataframe : The file to be read
+        **kwargs: 
                header
                ip_list : handles file that have ips
         """
@@ -466,9 +475,9 @@ class FileHandler(Validator, DisplayHandler):
         return existing_ips
 
     @staticmethod
-    def concat_dataframes(existing, newdata):
-        """Concatenate two data Frames"""
-        return pandas.concat([existing, newdata], ignore_index=True, axis=0)
+    def concat_dataframes(df:list):
+        """Concatenate data Frames"""
+        return pandas.concat(df, ignore_index=True, axis=0)
 
     @staticmethod
     def get_file_basename(full_file_path):
