@@ -100,14 +100,10 @@ class VAConfigs:
         "[Pp]atch(?:es)|[Pp]atch|[Uu]pdat(?:e|es|ing)|[Ss]ecurity (?:[Uu]pdat(?:e|es)|[Pp]atch)|Microsoft has released|"
         "JDK [Uu]pdate|JRE [Uu]pdate|Java [Uu]pdate|[Uu]pdate \\d+|Apply|[Ii]nstall patch"
     )
-    PATCH_IGNORE_STRINGS = (
-        "[Pp]atch(?:es)|[Pp]atch|[Uu]pdat(?:es|ing)|[Ss]ecurity (?:[Uu]pdat(?:e|es)|[Pp]atch)|Microsoft has released|"
-        "Apply|[Ii]nstall patch"
-    )
     UPGRADE_FILTER_STRINGS = (
         "no longer supported|[Uu]nsupported|Obsolete Version|end of life|"
-        "end-of-life|[Uu]pgrad(?:e|ing)|discontinued|later|is prior to \\d+|remove any affected versions|"
-        "[Uu]pgrade to"
+        "end-of-life|[Uu]pgrad(?:e|ing)|discontinu(?:e|ed)|is prior to \\d+|remove any affected versions|"
+        "[Uu]pgrade to|[Uu]ninstall"
 
     )
     REBOOT_FILTER_STRINGS = "[rR]eboot"
