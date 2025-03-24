@@ -126,9 +126,9 @@ class PentestFramework(DisplayHandler):
         generator_func = user.generate_unique_name
         variables = user.domain_variables
         selected_module = variables["module"]
-       
+
         module_handler = {
-            "generate": lambda:password.generate_passlist_from_hashes(
+            "generate": lambda: password.generate_passlist_from_hashes(
                 variables,
                 output_dir,
                 generator_func),
@@ -142,22 +142,37 @@ class PentestFramework(DisplayHandler):
         if run_selected_module:
             run_selected_module()
 
-    @staticmethod
-    def handle_vulnerability_assessment(user, vulnerability_analysis):
+    def handle_vulnerability_assessment(self, user, vulnerability_analysis):
         """Handle Vulnerability analysis"""
-        # Set scanner
-        vulnerability_analysis.set_scanner(
-            user.domain_variables["scanner"])
-        input_file = user.domain_variables["input_file"]
-        formatted_issues = vulnerability_analysis.analyze_scan_files(
-            user.domain,
-            input_file
-        )
+        try:
+            # Set scanner
+            scanner_type = user.domain_variables.get("scanner")
+            vulnerability_analysis.set_scanner(scanner_type)
 
-        # pprint(formatted_issues)
-        vulnerability_analysis.sort_vulnerabilities(
-            formatted_issues, f"{user.domain_variables['output']}"
-        )
+            input_file = user.domain_variables.get("input_file")
+            #self.print_debug_message("Starting vulnerability analysis...")
+            formatted_issues = vulnerability_analysis.analyze_scan_files(
+                user.domain,
+                input_file
+            )
+            if formatted_issues is None:
+                raise ValueError("No vulnerabilities found to process")
+
+            # pprint(formatted_issues)
+            output_filename = user.domain_variables.get('output')
+            success = vulnerability_analysis.sort_vulnerabilities(
+                formatted_issues,
+                output_filename
+            )
+            if not success:
+                raise ValueError("Failed to sort and save vulnerabilities")
+            self.print_success_message(
+                "Vulnerability analysis completed successfully")
+            return True
+        except Exception as e:
+            self.print_error_message(
+                message="Error in vulnerability assessment", exception_error=e)
+            return False
 
     @staticmethod
     def handle_mobile_assessment(user, mobile):

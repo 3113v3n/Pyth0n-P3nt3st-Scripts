@@ -161,8 +161,7 @@ class VAConfigs:
 
             {color.OKGREEN}scan_folder{color.ENDC}      File Path to your scan results
             {color.OKGREEN}scanner{color.ENDC}          The scanner used [ {color.WARNING}Nessus | Rapid7{color.ENDC} ]
-            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both
-            {color.ENDC} ]
+            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both{color.ENDC} ]
             {color.OKGREEN}filename{color.ENDC}         The name of your output file
 
     {color.OKCYAN}{color.UNDERLINE}return {color.ENDC}:
