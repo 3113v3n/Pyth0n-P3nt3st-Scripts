@@ -7,21 +7,24 @@ class VAConfigs:
 
     def __init__(self):
         self._compiled_patterns = {
-            "ssl": re.compile(self.SSL_FILTER_STRINGS),
-            "software": re.compile(self.UPGRADE_FILTER_STRINGS),
-            "reboot": re.compile(self.REBOOT_FILTER_STRINGS),
-            "patch": re.compile(self.PATCH_FILTER_STRINGS),
-            "rdp": re.compile(self.RDP_FILTER_STRINGS),
-            "web": re.compile(self.WEB_FILTER_STRINGS),
-            "ignore_": {"common": re.compile(self.UNIVERSAL_IGNORE_FILTER),
-                        "web": re.compile(self.WEB_IGNORE_FILTER)},
-            "compliance": re.compile(self.COMPLIANCE_STRINGS),
-            "rating": re.compile(self.RISK_RATING_STRINGS),
-            "rce": re.compile(self.RCE_STRING),
-            "patch_or_upgrade": re.compile(self.PATCH_OR_UPGRADE),
-            "ssh": re.compile(self.SSH_STRINGS),
-            "info": re.compile(self.INFO_DISCLOSURE_STRINGS)
+            "ssl": self._compile_regex(self.SSL_FILTER_STRINGS),
+            "software": self._compile_regex(self.UPGRADE_FILTER_STRINGS),
+            "reboot": self._compile_regex(self.REBOOT_FILTER_STRINGS),
+            "patch": self._compile_regex(self.PATCH_FILTER_STRINGS),
+            "rdp": self._compile_regex(self.RDP_FILTER_STRINGS),
+            "web": self._compile_regex(self.WEB_FILTER_STRINGS),
+            "ignore_": {"common": self._compile_regex(self.UNIVERSAL_IGNORE_FILTER),
+                        "web": self._compile_regex(self.WEB_IGNORE_FILTER)},
+            "compliance": self._compile_regex(self.COMPLIANCE_STRINGS),
+            "rating": self._compile_regex(self.RISK_RATING_STRINGS),
+            "rce": self._compile_regex(self.RCE_STRING),
+            "patch_or_upgrade": self._compile_regex(self.PATCH_OR_UPGRADE),
+            "ssh": self._compile_regex(self.SSH_STRINGS),
+            "info": self._compile_regex(self.INFO_DISCLOSURE_STRINGS)
         }
+
+    def _compile_regex(self, string_pattern):
+        return re.compile(string_pattern)
 
     NESSUS_HEADERS = [
         "CVE",
@@ -161,8 +164,7 @@ class VAConfigs:
 
             {color.OKGREEN}scan_folder{color.ENDC}      File Path to your scan results
             {color.OKGREEN}scanner{color.ENDC}          The scanner used [ {color.WARNING}Nessus | Rapid7{color.ENDC} ]
-            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both
-            {color.ENDC} ]
+            {color.OKGREEN}file_type{color.ENDC}        The output filetype [ {color.WARNING}CSV | XLSX | Both{color.ENDC} ]
             {color.OKGREEN}filename{color.ENDC}         The name of your output file
 
     {color.OKCYAN}{color.UNDERLINE}return {color.ENDC}:

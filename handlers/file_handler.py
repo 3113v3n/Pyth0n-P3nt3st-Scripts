@@ -128,11 +128,13 @@ class FileHandler(Validator, DisplayHandler):
                     # Apply cell format to data rows
                     worksheet.set_column('A:ZZ', 15, formatted_cell)
 
-        self.print_success_message(
+        # self.print_success_message(
+        #     message="Analyzed Vulnerabilities have been written to :",
+        #     extras=self.filepath
+        # ) 
+        self.print_info_message( 
             message="Analyzed Vulnerabilities have been written to :",
-            extras=self.filepath
-        ) 
-        
+            file_path=self.filepath)
 
     def save_to_csv(self, filename, content, *args):
         """ 

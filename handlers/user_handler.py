@@ -113,7 +113,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             self.helper_.vulnerability_helper,
             "Loading Vulnerability Analysis Module... ",
             "Starting Vulnerability Analysis...\n",
-            spinner_type="pipe"
+            spinner_type="pipe",
+            timer=5
         )
         while True:
 
@@ -166,7 +167,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 }
 
             except (FileExistsError, ValueError) as error:
-                self.print_error_message(error)
+                self.print_error_message(
+                    message="Error in VA UI handler", exception_error=error)
+                return None
 
     def external_ui_handler(self):
         self.start_domain_helper(
