@@ -5,7 +5,7 @@ from .progress_bar import ProgressBar
 from .validators import Validator
 from .loader import Loader
 from .configurations.va_configs import VAConfigs
-
+from .decorators import CustomDecorators
 
 __all__ = [
     Bcolors,
@@ -14,5 +14,6 @@ __all__ = [
     ProgressBar,
     Validator,
     Loader,
-    VAConfigs
+    VAConfigs,
+    CustomDecorators
 ]
