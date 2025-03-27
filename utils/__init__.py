@@ -7,7 +7,8 @@ from .shared import (
     Config,
     ProgressBar,
     Validator,
-    Loader
+    Loader, 
+    CustomDecorators
 )
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     Validator,
     FilterVulnerabilities,
     Loader,
-    CredentialsUtil
+    CredentialsUtil,
+    CustomDecorators
 ]
