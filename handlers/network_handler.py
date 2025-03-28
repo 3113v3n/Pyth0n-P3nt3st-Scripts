@@ -284,4 +284,4 @@ class NetworkHandler(FileHandler, Commands):
             self.print_error_message(exception_error=e)
 
 # TODO: include interface check before scanning
-# TODO: duplication in loop
+

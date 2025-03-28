@@ -1,6 +1,7 @@
 import termios
 import time
 import sys
+import threading
 
 # [Test Domains]
 from domains import (
@@ -9,24 +10,65 @@ from domains import (
     VulnerabilityAnalysis,
     PasswordModule)
 # [Utils]
-from utils import MobileCommands, ProgressBar, Commands
+from utils import (
+    MobileCommands,
+    ProgressBar,
+    Commands,
+    Loader)
 from utils.shared import Bcolors
 # [Handlers]
 from handlers import (
     NetworkHandler,
     PackageHandler,
     UserHandler,
-    DisplayHandler,
-    HelpHandler
+    HelpHandler,
+    ScreenHandler
 )
 
 
-class PentestFramework(DisplayHandler):
+class PentestFramework(ScreenHandler):
     def __init__(self):
         super().__init__()
         self.classes = self.initialize_classes()
         self.exit_menu = False
+        self._loader = None
+        self._spinner_thread = None
+        self._spinner_running = False
+        self._lock = threading.Lock()
 
+    # Custom Spinner
+    class Spinner:
+        """Simple animated spinner that runs in a thread"""
+        def __init__(self, desc="\nSorting vulnerabilities ..."):
+            self.desc = desc
+            self.spinner_chars = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
+            self.running = False
+
+        def spin(self,lock):
+            """Run the spinner animation"""
+            idx = 0
+            while self.running:
+                with lock:  # Prevent other prints from breaking the line
+                    sys.stdout.write(f"\r{self.desc} {self.spinner_chars[idx % len(self.spinner_chars)]} ")
+                    sys.stdout.flush()
+                time.sleep(0.1)  # Animation speed
+                idx += 1
+            # Clear line on exit
+            with lock:
+                sys.stdout.write("\r" + " " * (len(self.desc) + 2) + "\r")
+                sys.stdout.flush()
+
+        def start(self,lock):
+            """Start the spinner in a thread"""
+            if not self.running:
+                self.running = True
+                thread = threading.Thread(target=self.spin, args=(lock,), daemon=True)
+                thread.start()
+                return thread
+
+        def stop(self):
+            """Stop the spinner"""
+            self.running = False
     # [Utils]
     # Initializers
 
@@ -40,6 +82,7 @@ class PentestFramework(DisplayHandler):
             network_instance = NetworkHandler()
             helper_instance = HelpHandler()
             command_instance = Commands()
+
             return {
                 "package": PackageHandler(),
                 "command":  command_instance,
@@ -51,7 +94,8 @@ class PentestFramework(DisplayHandler):
                 "internal": InternalAssessment(
                     network_instance,
                     helper_instance
-                )
+                ),
+
             }
         except Exception as error:
             self.print_error_message(
@@ -145,12 +189,19 @@ class PentestFramework(DisplayHandler):
     def handle_vulnerability_assessment(self, user, vulnerability_analysis):
         """Handle Vulnerability analysis"""
         try:
+            # Start animated spinner
+            spinner = self.Spinner(desc="Sorting vulnerabilities ...")
+            self._spinner_thread = spinner.start(self._lock)
+            self._spinner_running = True
+            time.sleep(0.1)
+
+            self.print_debug_message("Starting VA process")
+            print("\nSorting vulnerabilities ... ⢿", end="", flush=True)
             # Set scanner
             scanner_type = user.domain_variables.get("scanner")
             vulnerability_analysis.set_scanner(scanner_type)
 
             input_file = user.domain_variables.get("input_file")
-            #self.print_debug_message("Starting vulnerability analysis...")
             formatted_issues = vulnerability_analysis.analyze_scan_files(
                 user.domain,
                 input_file
@@ -160,20 +211,29 @@ class PentestFramework(DisplayHandler):
 
             # pprint(formatted_issues)
             output_filename = user.domain_variables.get('output')
+
             success = vulnerability_analysis.sort_vulnerabilities(
                 formatted_issues,
                 output_filename
             )
             if not success:
                 raise ValueError("Failed to sort and save vulnerabilities")
-            self.print_success_message(
-                "Vulnerability analysis completed successfully")
+
+            with self._lock:  # Sync success message
+                self.print_success_message("Vulnerability analysis completed successfully")
             return True
         except Exception as e:
             self.print_error_message(
                 message="Error in vulnerability assessment", exception_error=e)
             return False
-
+        finally:
+            # Stop spinner and print end message
+            if self._spinner_running and self._spinner_thread:
+                spinner.stop()
+                self._spinner_thread.join()  # Wait for thread to finish
+                self._spinner_running = False
+                with self._lock:
+                    print("\rVulnerabilities sorted successfully", flush=True)
     @staticmethod
     def handle_mobile_assessment(user, mobile):
         """Handle mobile application assessment"""
@@ -206,7 +266,7 @@ class PentestFramework(DisplayHandler):
             ),
             "va": lambda: self.handle_vulnerability_assessment(
                 self.classes["user"],
-                self.classes["vulnerability"]
+                self.classes["vulnerability"],
             ),
             "mobile": lambda: self.handle_mobile_assessment(
                 self.classes["user"],

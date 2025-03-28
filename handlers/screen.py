@@ -31,7 +31,7 @@ class ScreenHandler(DisplayHandler):
         end_message: str,
         spinner_type: str = "dots",
         continuous: bool = False,
-        timer=30
+        timer=10
     ):
         """Display Loading functionality to a user
         :param message: message to display
