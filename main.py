@@ -1,7 +1,6 @@
 import termios
 import time
 import sys
-import threading
 
 # [Test Domains]
 from domains import (
@@ -14,7 +13,7 @@ from utils import (
     MobileCommands,
     ProgressBar,
     Commands,
-    Loader)
+    CustomDecorators)
 from utils.shared import Bcolors
 # [Handlers]
 from handlers import (
@@ -31,44 +30,7 @@ class PentestFramework(ScreenHandler):
         super().__init__()
         self.classes = self.initialize_classes()
         self.exit_menu = False
-        self._loader = None
-        self._spinner_thread = None
-        self._spinner_running = False
-        self._lock = threading.Lock()
 
-    # Custom Spinner
-    class Spinner:
-        """Simple animated spinner that runs in a thread"""
-        def __init__(self, desc="\nSorting vulnerabilities ..."):
-            self.desc = desc
-            self.spinner_chars = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
-            self.running = False
-
-        def spin(self,lock):
-            """Run the spinner animation"""
-            idx = 0
-            while self.running:
-                with lock:  # Prevent other prints from breaking the line
-                    sys.stdout.write(f"\r{self.desc} {self.spinner_chars[idx % len(self.spinner_chars)]} ")
-                    sys.stdout.flush()
-                time.sleep(0.1)  # Animation speed
-                idx += 1
-            # Clear line on exit
-            with lock:
-                sys.stdout.write("\r" + " " * (len(self.desc) + 2) + "\r")
-                sys.stdout.flush()
-
-        def start(self,lock):
-            """Start the spinner in a thread"""
-            if not self.running:
-                self.running = True
-                thread = threading.Thread(target=self.spin, args=(lock,), daemon=True)
-                thread.start()
-                return thread
-
-        def stop(self):
-            """Stop the spinner"""
-            self.running = False
     # [Utils]
     # Initializers
 
@@ -185,18 +147,11 @@ class PentestFramework(ScreenHandler):
         # Run selected module
         if run_selected_module:
             run_selected_module()
-
+    
     def handle_vulnerability_assessment(self, user, vulnerability_analysis):
         """Handle Vulnerability analysis"""
         try:
-            # Start animated spinner
-            spinner = self.Spinner(desc="Sorting vulnerabilities ...")
-            self._spinner_thread = spinner.start(self._lock)
-            self._spinner_running = True
-            time.sleep(0.1)
 
-            self.print_debug_message("Starting VA process")
-            print("\nSorting vulnerabilities ... ⢿", end="", flush=True)
             # Set scanner
             scanner_type = user.domain_variables.get("scanner")
             vulnerability_analysis.set_scanner(scanner_type)
@@ -219,21 +174,15 @@ class PentestFramework(ScreenHandler):
             if not success:
                 raise ValueError("Failed to sort and save vulnerabilities")
 
-            with self._lock:  # Sync success message
-                self.print_success_message("Vulnerability analysis completed successfully")
+              # Sync success message
+            self.print_success_message(
+                "Vulnerability analysis completed successfully")
             return True
         except Exception as e:
             self.print_error_message(
                 message="Error in vulnerability assessment", exception_error=e)
             return False
-        finally:
-            # Stop spinner and print end message
-            if self._spinner_running and self._spinner_thread:
-                spinner.stop()
-                self._spinner_thread.join()  # Wait for thread to finish
-                self._spinner_running = False
-                with self._lock:
-                    print("\rVulnerabilities sorted successfully", flush=True)
+
     @staticmethod
     def handle_mobile_assessment(user, mobile):
         """Handle mobile application assessment"""
