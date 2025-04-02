@@ -64,12 +64,12 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             helper_function(text)
         else:
             helper_function()
-        self.show_loader(
-            loader_start_text,
-            loader_end_text,
-            spinner_type=spinner_type,
-            timer=timer
-        )
+        # self.show_loader(
+        #     loader_start_text,
+        #     loader_end_text,
+        #     spinner_type=spinner_type,
+        #     timer=timer
+        # )
         input_text = ("[-] Would you like to start ? [ "
                       f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
         valid_options = {"yes", "y", "no", "n", "quit", "exit"}

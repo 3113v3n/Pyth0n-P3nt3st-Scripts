@@ -30,7 +30,6 @@ class ScreenHandler(DisplayHandler):
         message: str,
         end_message: str,
         spinner_type: str = "dots",
-        continuous: bool = False,
         timer=10
     ):
         """Display Loading functionality to a user
@@ -43,12 +42,11 @@ class ScreenHandler(DisplayHandler):
             desc=message,
             end=end_message,
             spinner_type=spinner_type,
-            continuous=continuous,
             timer=timer
         )
         loader.start()
-        if continuous:
-            return loader  # return loader only for continuous loading
+        # if continuous:
+        #     return loader  # return loader only for continuous loading
 
         return None
 
