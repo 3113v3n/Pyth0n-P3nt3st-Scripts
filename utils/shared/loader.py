@@ -65,7 +65,7 @@ class Loader:
             if self.continuous:
                 while not self._done.is_set():
                     frame = next(spinner_cycle)
-                    output = f"\r{self.desc} {frame} "
+                    output = f"\033[F\033[G{self.desc} {frame} "
                     print(output, flush=True, end="")
                     sleep(self.timeout)
 
@@ -76,7 +76,7 @@ class Loader:
                         break
 
                     frame = next(spinner_cycle)
-                    print(f"\r{self.desc} {frame} ", flush=True, end="")
+                    print(f"\033[F\033[G{self.desc} {frame} ", flush=True, end="")
                     sleep(self.timeout)
                 self._done.set()
 
