@@ -54,14 +54,32 @@ class Loader:
             self._thread.start()
 
     def _animate(self) -> None:
-        spinner_cycle = cycle(self.spinner)
-        while not self._done.is_set():
-            frame = next(spinner_cycle)
-            # Use \r to return to start of the line
-            output = f"\r{self.desc} {frame} "
-            print(output, flush=True, end="")
-            sleep(self.timeout)
-        print(f"\r{self.end}", flush=True)
+        try:
+            spinner_cycle = cycle(self.spinner)
+            # Continuous loading until explicitly stopped
+            if self.continuous:
+                while not self._done.is_set():
+                    frame = next(spinner_cycle)
+                    output = f"\033[F\033[G{self.desc} {frame} "
+                    print(output, flush=True, end="")
+                    sleep(self.timeout)
+
+            else:
+                # Timed loading
+                for _ in range(self.timer):
+                    if self._done.is_set():
+                        break
+
+                    frame = next(spinner_cycle)
+                    print(f"\033[F\033[G{self.desc} {frame} ", flush=True, end="")
+                    sleep(self.timeout)
+                self._done.set()
+
+        finally:
+            # Clear the line and print end message
+            print("\r" + " " * self._cols, end="", flush=True)
+            if self.end:
+                print(f"\r{self.end}", flush=True)
 
     def stop(self):
         """Stop Animation"""
