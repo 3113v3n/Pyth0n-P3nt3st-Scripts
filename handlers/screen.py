@@ -61,7 +61,7 @@ class ScreenHandler(DisplayHandler):
             if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
                 continue
-            self.print_info_message(f"Validator status: {check_exists(file_path)}")
+            #self.print_info_message(f"Validator status: {check_exists(file_path)}")
             return file_path
 
     def get_output_filename(self, prompt: str = "\n[+] Please enter the output filename: "):

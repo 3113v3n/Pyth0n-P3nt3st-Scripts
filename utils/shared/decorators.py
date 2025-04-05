@@ -1,8 +1,7 @@
 import time
 from functools import wraps
 from .loader import Loader
-#from loader import Loader
-
+# from loader import Loader
 
 
 class CustomDecorators:
@@ -75,29 +74,3 @@ class CustomDecorators:
         """Reset the total time to 0"""
         # global total_time
         cls.total_time = 0
-
-@CustomDecorators.with_loader(desc="Filtering Issues", end="Completed")
-def filter_issues(data):
-    # Your filtering logic here
-    # Simulate processing time
-    time.sleep(2)  # Simulate a delay for demonstration
-    return "Filtered Data"
-
-@CustomDecorators.with_loader(desc="Categorizing Issues", end="Completed")
-def categorize_issues(data):
-    # Your categorizing logic here
-    time.sleep(2)  # Simulate a delay for demonstration
-    return "Categorized Data"
-
-@CustomDecorators.with_loader(desc="Creating Summary Page", end="Completed")
-def create_summary(data):
-    # Your summary creation logic here
-    time.sleep(2)  # Simulate a delay for demonstration
-    return "Summary Created"
-
-# Example of calling the functions in a loop
-if __name__ == "__main__":
-    for _ in range(3):
-        filter_issues("data")
-        categorize_issues("data")
-        create_summary("data")

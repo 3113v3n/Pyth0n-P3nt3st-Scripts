@@ -10,10 +10,8 @@ from domains import (
     PasswordModule)
 # [Utils]
 from utils import (
-    MobileCommands,
     ProgressBar,
-    Commands,
-    CustomDecorators)
+    Commands)
 from utils.shared import Bcolors
 # [Handlers]
 from handlers import (
@@ -50,7 +48,7 @@ class PentestFramework(ScreenHandler):
                 "command":  command_instance,
                 "network": network_instance,
                 "user": UserHandler(helper_instance, command_instance),
-                "mobile":  MobileAssessment(MobileCommands()),
+                "mobile":  MobileAssessment(),
                 "vulnerability": VulnerabilityAnalysis(),
                 "password": PasswordModule(),
                 "internal": InternalAssessment(
@@ -175,8 +173,6 @@ class PentestFramework(ScreenHandler):
                 raise ValueError("Failed to sort and save vulnerabilities")
 
               # Sync success message
-            self.print_success_message(
-                "Vulnerability analysis completed successfully")
             return True
         except Exception as e:
             self.print_error_message(
@@ -187,9 +183,10 @@ class PentestFramework(ScreenHandler):
     def handle_mobile_assessment(user, mobile):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
+        
         mobile_object = user.domain_variables
         mobile.initialize_variables(mobile_object)
-        mobile.inspect_application_files(user.domain)
+        mobile._inspect_files(user.domain)
 
     @staticmethod
     def handle_external_assessment(user):
@@ -255,7 +252,7 @@ class PentestFramework(ScreenHandler):
                 time.sleep(0.1)
 
                 choice = input(
-                    f"\n[*] Would you like to {Bcolors.OKGREEN}EXIT the program{Bcolors.ENDC} "
+                    f"\n[*] Would you like to {Bcolors.WARNING}EXIT the program{Bcolors.ENDC} "
                     f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
                 ).strip().lower()
                 if choice in {'y', 'yes', 'n', 'no'}:

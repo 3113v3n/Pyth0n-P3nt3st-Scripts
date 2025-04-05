@@ -25,7 +25,7 @@ class DisplayHandler(Bcolors):
                 - extras: any extra data to print
                 - flush: flush the message
         """
-        msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}\n"
+        msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
 
         if kwargs.get("mobile_success"):
             msg = (
@@ -34,7 +34,7 @@ class DisplayHandler(Bcolors):
             )
         elif kwargs.get("extras"):
             extra_data = kwargs["extras"]
-            msg = f"{msg}{extra_data}"
+            msg = f"{msg}{extra_data}\n\n"
         elif kwargs.get("flush"):
             # Default to empty string if absent
             extra_data = kwargs.get("extras", "")

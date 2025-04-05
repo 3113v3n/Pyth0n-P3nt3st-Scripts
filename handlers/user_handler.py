@@ -54,22 +54,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def start_domain_helper(self,
                             helper_function: callable,
-                            loader_start_text: str,
-                            loader_end_text: str,
-                            spinner_type="bounce",
-                            timer=30,
                             **kwargs):
         if kwargs.get("helper_text"):
             text = kwargs.get("helper_text")
             helper_function(text)
         else:
             helper_function()
-        # self.show_loader(
-        #     loader_start_text,
-        #     loader_end_text,
-        #     spinner_type=spinner_type,
-        #     timer=timer
-        # )
+
         input_text = ("[-] Would you like to start ? [ "
                       f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
         valid_options = {"yes", "y", "no", "n", "quit", "exit"}
@@ -85,11 +76,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def mobile_ui_handler(self):
 
-        self.start_domain_helper(
-            self.helper_.mobile_helper,
-            "Loading Mobile Assessment Module... ",
-            "Starting Mobile Assessment...\n"
-        )
+        self.start_domain_helper(self.helper_.mobile_helper)
         while True:
             try:
                 package_path = self.get_file_path(
@@ -109,13 +96,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 self.print_error_message(error)
 
     def va_ui_handler(self):
-        self.start_domain_helper(
-            self.helper_.vulnerability_helper,
-            "Loading Vulnerability Analysis Module... ",
-            "Starting Vulnerability Analysis...\n",
-            spinner_type="pipe",
-            timer=5
-        )
+        self.start_domain_helper(self.helper_.vulnerability_helper)
         while True:
 
             try:
@@ -172,12 +153,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 return None
 
     def external_ui_handler(self):
-        self.start_domain_helper(
-            self.helper_.external_helper,
-            "Loading External Assessment Module... ",
-            "Starting External Assessment...\n",
-            spinner_type="arc"
-        )
+        self.start_domain_helper(self.helper_.external_helper)
         try:
             website_domain = (
                 self.get_user_input(
@@ -248,13 +224,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         }
 
     def password_ui_handler(self):
-        self.start_domain_helper(
-            self.helper_.internal_helper,
-            "Loading Password Assessment Module... ",
-            "Starting Password Assessment Module...\n",
-            helper_text="hashfunction",
-            spinner_type="bounce"
-        )
+        self.start_domain_helper(self.helper_.internal_helper)
         target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
         domain_text = "[*] Enter the domain of your target [ testdomain.xy.z ] \n"
         valid_operations = {"generate", "test"}
@@ -286,12 +256,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
     def internal_ui_handler(self):
         """Handle internal assessment UI interactions"""
 
-        self.start_domain_helper(
-            self.helper_.internal_helper,
-            "Loading Internal Assessment Module... ",
-            "Starting Internal Assessment...\n",
-            helper_text="scanner"
-        )
+        self.start_domain_helper(self.helper_.internal_helper)
         try:
             subnet = ""
             output_file = ""
