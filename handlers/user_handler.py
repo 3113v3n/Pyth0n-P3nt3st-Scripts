@@ -224,7 +224,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         }
 
     def password_ui_handler(self):
-        self.start_domain_helper(self.helper_.internal_helper)
+        self.start_domain_helper(
+            self.helper_.internal_helper, helper_text="hashfunction")
         target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
         domain_text = "[*] Enter the domain of your target [ testdomain.xy.z ] \n"
         valid_operations = {"generate", "test"}
@@ -256,7 +257,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
     def internal_ui_handler(self):
         """Handle internal assessment UI interactions"""
 
-        self.start_domain_helper(self.helper_.internal_helper)
+        self.start_domain_helper(
+            self.helper_.internal_helper, helper_text="scanner")
         try:
             subnet = ""
             output_file = ""
