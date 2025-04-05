@@ -1,13 +1,12 @@
 from utils.mobile import MobileCommands
 
 
-class MobileAssessment:
+class MobileAssessment(MobileCommands):
     # class will be responsible for all mobile operations
-    def __init__(self, commands: MobileCommands) -> None:
+    def __init__(self) -> None:
+        super().__init__()  # commands: MobileCommands
         self.package_name = ""
         self.package_path = ""
-        self.mobile_cmds = commands  # mobile specific commands
-        #self._helper = helper_instance
 
     @classmethod
     def reset_class_states(cls):
@@ -20,11 +19,16 @@ class MobileAssessment:
         self.package_name = data["filename"]  # application filename
         self.package_path = data["full_path"]  # fullpath to the application
 
-    def inspect_application_files(self, test_domain):
-        return self.mobile_cmds.inspect_application_files(
-            application=self.package_path,
-            test_domain=test_domain
-        )
+    def _inspect_files(self, test_domain):
+        try:
+
+            self.inspect_application_files(
+                application=self.package_path, test_domain=test_domain
+            )
+            self.print_total_time(f"Total analysis time for {self.package_name}")
+        finally:
+            pass
+            self.reset_total_time()
 
     # Install web proxies cert
     # 1. Take filepath to .der
