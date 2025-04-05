@@ -54,6 +54,12 @@ class Validator:
         exists = os.path.exists(filename)
         return exists
 
+    def isfile_and_exists(self, filename) -> bool:
+        """
+        Check if the file exists and is a file.
+        """
+        return os.path.isfile(filename) and self.file_exists(filename)
+
     @staticmethod
     def check_filetype(filename: str, filetype: str) -> bool:
         pattern = re.compile(rf"\.{re.escape(filetype)}$", re.IGNORECASE)
@@ -75,3 +81,11 @@ class Validator:
     @staticmethod
     def remove_spaces(text):
         return text.replace(" ", "_")
+
+    @staticmethod
+    def validate_domain(domain):
+        # Regular expression for validating a domain name
+        pattern = re.compile(
+            r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$"
+        )
+        return bool(pattern.match(domain))

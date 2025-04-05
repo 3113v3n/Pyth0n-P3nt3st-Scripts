@@ -196,31 +196,34 @@ class PentestFramework(ScreenHandler):
         # print(external.bbot_enum(out_put))
         pass
 
-    def process_domain(self, user_test_domain: str) -> None:
+    def process_domain(self, user_test_domain: str, **kwargs) -> None:
         """Process the selected testing domain
 
         Args:
             user_test_domain: Selected testing domain
+            kwargs: Handle command line arguments passed by user
+        
         """
-
+        print("Kwargs are:", kwargs)
         # Match user_test_domain with the appropriate handler
         handlers = {
             "internal": lambda: self.handle_internal_assessment(
-                self.classes["user"],
+                self.classes["user"] if not kwargs else kwargs.get(
+                    "user_data"),
                 self.classes["network"],
                 self.classes["internal"]
             ),
             "va": lambda: self.handle_vulnerability_assessment(
-                self.classes["user"],
+                self.classes["user"]if not kwargs else kwargs.get("user_data"),
                 self.classes["vulnerability"],
             ),
             "mobile": lambda: self.handle_mobile_assessment(
-                self.classes["user"],
+                self.classes["user"]if not kwargs else kwargs.get("user_data"),
                 self.classes["mobile"]
             ),
             "external": lambda: print("External assessment not implemented yet"),
             "password": lambda: self.handle_password_operations(
-                self.classes["user"],
+                self.classes["user"]if not kwargs else kwargs.get("user_data"),
                 self.classes["password"],
             )
 
@@ -330,6 +333,31 @@ class PentestFramework(ScreenHandler):
                 self.print_error_message(
                     message="An error in Main Program occurred", exception_error=e)
 
+    def run_program_interactively(self, user_data: dict) -> None:
+        """Run Interactive version of the program
+        Args:
+            user_data: Dictionary containing user data
+        """        
+        try:
+            # Reset state at the start of each iteration
+            self.reset_class_states()
+            test_domain = user_data.get("module")
+
+            # Check packages before getting user input
+            if not self.check_packages(test_domain):
+                self.print_info_message(
+                    "Required packages are missing. Installing them...")
+                
+            #print(f"User command line arguments are:\n {user_data}")
+            self.process_domain(test_domain, user_data=user_data)
+
+        except KeyboardInterrupt:
+            self.print_error_message("Program interrupted by user")
+            self.exit_menu = True
+        except Exception as e:
+            self.print_error_message(
+                message="An error in Main Program occurred", exception_error=e)
+
 
 def main():
     """Entry point of the program"""
@@ -337,12 +365,13 @@ def main():
     _interaction = InteractionHandler()
     try:
         _interaction.main()
-        cmdline_args = _interaction.argument_mode
-        if not cmdline_args:
+        # Check if command line arguments are used
+        use_cmdline_args = _interaction.argument_mode
+        if not use_cmdline_args:
             framework.run_program()
         else:
             # Handle command line args here
-            print("Command line arguments provided")
+            framework.run_program_interactively(_interaction.arguments)
     except Exception as e:
         framework.print_error_message(
             message="Critical error", exception_error=e)

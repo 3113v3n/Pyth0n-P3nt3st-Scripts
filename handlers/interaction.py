@@ -1,4 +1,5 @@
 import argparse
+from utils.shared import Validator
 
 
 class InteractionHandler:
@@ -11,6 +12,8 @@ class InteractionHandler:
         pass
         self.HEADLINE = "Usage: main.py [ --(interactive | arguments | help) ]"
         self.argument_mode = False
+        self.arguments = {}
+        self.validator = Validator()
 
     def main(self):
         """Main Program"""
@@ -61,7 +64,7 @@ class InteractionHandler:
             "va": self.handle_va_arguments,
             "external": self.handle_external_arguments
         }
-        return handler[module](args, module)
+        self.arguments = handler[module](args, module)
 
     @staticmethod
     def _add_external_arguments(subparsers):
@@ -71,6 +74,7 @@ class InteractionHandler:
         parser.add_argument(
             "-d", "--domain",
             required=True,
+            type=str,
             help="Domain to test",
         )
 
@@ -81,6 +85,7 @@ class InteractionHandler:
             "mobile", help="Mobile Assessment Arguments")
         parser.add_argument(
             "-P", "--path",
+            type=str,
             required=True,
             help="Path to the mobile application file",
         )
@@ -94,6 +99,7 @@ class InteractionHandler:
             "-s",
             "--scanner",
             required=True,
+            type=str,
             choices=["nessus", "rapid"],
             help="Scanner used for analysis e.g( nessus | rapid )"
         )
@@ -102,12 +108,14 @@ class InteractionHandler:
             "-o",
             "--output",
             required=True,
+            type=str,
             help="Output file for your Vulnerability analysis report"
         )
         parser.add_argument(
             "-P",
             "--path",
             required=True,
+            type=str,
             help="Path to your scanned files"
         )
 
@@ -179,54 +187,58 @@ class InteractionHandler:
         mode_group.add_argument(
             "-m", "--mask",
             type=int,
-            choices=range(0, 33),
+            choices=range(1, 33),
             help="Subnet mask used for previous scan (0-32) - required for resume",
         )
 
     # Handlers for each module
 
-    @staticmethod
-    def handle_mobile_arguments(args, module):
+    def handle_mobile_arguments(self, args, module):
         """Handle Mobile arguments"""
         path = args.path
-        print(f"\nRunning Mobile Assessment on application {path}")
-        # TODO: Validate file exists and is one of [ipa or apk]
+        if not self.validator.isfile_and_exists(path):
+            raise ValueError(f"File {path} does not exist")
+            # Check if the file is an APK or IPA
+        if not (self.validator.check_filetype(path, "apk") or self.validator.check_filetype(path, "ipa")):
+            # Valid mobile application file
+            raise ValueError(
+                f"File {path} is not a valid APK or IPA file")
+        print(f"\n[-] Running Mobile Assessment on {path} application")
         return {
             "module": module,
             "apk_path": path
         }
 
-    @staticmethod
-    def handle_external_arguments(args, module):
+    def handle_external_arguments(self, args, module):
         """Handle External arguments"""
 
-        print(f"Handling External arguments: {args} on module {module}")
+        if not self.validator.validate_domain(args.domain):
+            raise ValueError(
+                f"Domain {args.domain} is not valid. Ensure it is a valid domain name")
+        print(f"\n[-] Running External Assessment on {args.domain} domain")
         return {
             "module": module,
             "domain": args.domain
         }
 
-    @staticmethod
-    def handle_va_arguments(args, module):
+    def handle_va_arguments(self, args, module):
         """Handle Vulnerability Assessment arguments"""
         scanner = args.scanner
         path = args.path
         file = args.output
-        print(f"\nRunning {scanner.title()} Vulnerability Analysis ")
-        # TODO: Validate input is a folder
+        print(f"\n[-] Running {scanner.title()} Vulnerability Analysis ")
+
+        if not self.validator.check_folder_exists(path):
+            raise ValueError(
+                f"Path {path} is not a valid directory. Ensure it exists and is a directory")
         return {
             "module": module,
             "output_file": file,
             "scan_folder": path
         }
 
-    @staticmethod
-    def handle_password_arguments(args, module):
+    def handle_password_arguments(self, args, module):
         """Handle Password arguments"""
-        # TODO :1 Validate ip address
-        # TODO :2 Validate pass_file exists
-        # TODO :3 Validate hash file
-        # TODO :4 Validate Dump file exists
         if args.test:
             # Testing password module
             ip = args.ip
@@ -235,8 +247,12 @@ class InteractionHandler:
             if not (ip and domain and pass_file):
                 raise ValueError(
                     "For Test mode, --ip, --domain, and --pass_file are required")
-            print(
-                f"\nPassword test with IP: {ip}, \ndomain: {domain}, \npass_file: {pass_file}")
+            if not self.validator.isfile_and_exists(pass_file):
+                raise ValueError(f"File {pass_file} does not exist")
+            if not self.validator.validate_ip_addr(ip):
+                raise ValueError(
+                    f"IP {ip} is not valid. Ensure it is a valid IP address")
+            print(f"\n[-] Running Password Test on {ip} with {domain} domain")
             return {
                 "module": module,
                 "action": "test",
@@ -251,8 +267,9 @@ class InteractionHandler:
             if not (hashes and output and dump):
                 raise ValueError(
                     "For Generate mode, --crack, --output and --dump are required")
-            print(
-                f"\nGenerate Password list using \nCracked hashes: {hashes} \nand Dump file: {dump}")
+            if not (self.validator.isfile_and_exists(hashes) or self.validator.isfile_and_exists(dump)):
+                raise ValueError(f"File {hashes} or {dump} does not exist")
+            print(f"\n[-] Generating Password List from {hashes} and {dump} files")
             return {
                 "module": module,
                 "hashes": hashes,
@@ -260,12 +277,9 @@ class InteractionHandler:
                 "dump": dump
             }
 
-    @staticmethod
-    def handle_internal_arguments(args, module):
+    def handle_internal_arguments(self, args, module):
         """Handle Internal PT arguments"""
-        # TODO :1 validate ip_cidr is of a particular pattern [IP/mask]
-        # TODO :2 Validate resume_file exists
-        mode = args.scan
+        mode = args.mode
         if mode == "scan":
             # scan network
             ip_cidr = args.ip
@@ -273,7 +287,10 @@ class InteractionHandler:
             if not (ip_cidr and output):
                 raise ValueError(
                     "For Scan mode, --ip and --output are required")
-            print(f"\nScanning {ip_cidr} network")
+            if not self.validator.validate_ip_and_cidr(ip_cidr):
+                raise ValueError(
+                    f"IP {ip_cidr} is not valid. Ensure it is a valid IP address with CIDR notation")
+            print(f"\n[-] Running Internal PT Scan on {ip_cidr} network")
             return {
                 "module": module,
                 "mode": mode,
@@ -287,7 +304,9 @@ class InteractionHandler:
             if not (resume_file and mask):
                 raise ValueError(
                     "For resume mode, --resume and --mask are required")
-            print(f"\nResuming scan on /{mask} network")
+            if not self.validator.isfile_and_exists(resume_file):
+                raise ValueError(f"File {resume_file} does not exist")
+            print(f"\n[-] Resuming previous scan from File: {resume_file} on /{mask} network")
             return {
                 "module": module,
                 "mode": mode,
