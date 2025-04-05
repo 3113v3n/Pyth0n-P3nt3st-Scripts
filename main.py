@@ -19,7 +19,8 @@ from handlers import (
     PackageHandler,
     UserHandler,
     HelpHandler,
-    ScreenHandler
+    ScreenHandler,
+    InteractionHandler
 )
 
 
@@ -54,8 +55,7 @@ class PentestFramework(ScreenHandler):
                 "internal": InternalAssessment(
                     network_instance,
                     helper_instance
-                ),
-
+                )
             }
         except Exception as error:
             self.print_error_message(
@@ -145,7 +145,7 @@ class PentestFramework(ScreenHandler):
         # Run selected module
         if run_selected_module:
             run_selected_module()
-    
+
     def handle_vulnerability_assessment(self, user, vulnerability_analysis):
         """Handle Vulnerability analysis"""
         try:
@@ -183,7 +183,7 @@ class PentestFramework(ScreenHandler):
     def handle_mobile_assessment(user, mobile):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
-        
+
         mobile_object = user.domain_variables
         mobile.initialize_variables(mobile_object)
         mobile._inspect_files(user.domain)
@@ -334,8 +334,15 @@ class PentestFramework(ScreenHandler):
 def main():
     """Entry point of the program"""
     framework = PentestFramework()
+    _interaction = InteractionHandler()
     try:
-        framework.run_program()
+        _interaction.main()
+        cmdline_args = _interaction.argument_mode
+        if not cmdline_args:
+            framework.run_program()
+        else:
+            # Handle command line args here
+            print("Command line arguments provided")
     except Exception as e:
         framework.print_error_message(
             message="Critical error", exception_error=e)

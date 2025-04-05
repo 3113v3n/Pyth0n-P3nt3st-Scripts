@@ -5,10 +5,11 @@ class InteractionHandler:
     """Class responsible for handling interactions with the user.
     Switches between different modes [interactive and arguments]
     """
+    # {os.path.basename(__file__)}
 
     def __init__(self):
         pass
-        self.HEADLINE = "Usage: script_name.py [ --(interactive | arguments | help) ]"
+        self.HEADLINE = "Usage: main.py [ --(interactive | arguments | help) ]"
         self.argument_mode = False
 
     def main(self):
@@ -19,15 +20,13 @@ class InteractionHandler:
         parser.add_argument("--script-mode",
                             metavar="script_mode",
                             choices=["interactive", "arguments"],
-                            type=str,
-                            default="interactive",
                             required=True,
+                            default="interactive",
                             help="Choose the mode to run the script. (interactive | arguments)")
 
         # Add subparsers for different modules
         subparsers = parser.add_subparsers(
             dest="module", help="Module to run (mobile | internal | password | va | external)")
-        subparsers.required = True  # Ensure a module-specific command is provided
 
         self._add_mobile_arguments(subparsers)
         self._add_internal_arguments(subparsers)
@@ -38,16 +37,23 @@ class InteractionHandler:
         args = parser.parse_args()
         _mode = args.script_mode
         _module = args.module
-        print(f"Selected script mode: {_mode}")
+
         if _mode == "interactive":
-            pass
+            # Run Script with user interaction
+            self.argument_mode = False
+            return
         elif _mode == "arguments":
+            # Module is required in arguments mode
+            if not args.module:
+                parser.error(
+                    "the following arguments are required in arguments mode: module")
             self.argument_mode = True
+
             return self._run_modules(args, _module)
 
     def _run_modules(self, args, module):
         """Run the selected module with the provided arguments."""
-        print(args, module)
+
         handler = {
             "mobile": self.handle_mobile_arguments,
             "internal": self.handle_internal_arguments,
@@ -55,12 +61,18 @@ class InteractionHandler:
             "va": self.handle_va_arguments,
             "external": self.handle_external_arguments
         }
-        return handler[module](args)
+        return handler[module](args, module)
 
     @staticmethod
     def _add_external_arguments(subparsers):
         """Handle External PT Arguments"""
-        pass
+        parser = subparsers.add_parser(
+            "external", help="External Assessment Arguments")
+        parser.add_argument(
+            "-d", "--domain",
+            required=True,
+            help="Domain to test",
+        )
 
     @staticmethod
     def _add_mobile_arguments(subparsers):
@@ -174,29 +186,114 @@ class InteractionHandler:
     # Handlers for each module
 
     @staticmethod
-    def handle_mobile_arguments(args):
+    def handle_mobile_arguments(args, module):
         """Handle Mobile arguments"""
-        print(f"Handling Mobile arguments: {args}")
+        path = args.path
+        print(f"\nRunning Mobile Assessment on application {path}")
+        # TODO: Validate file exists and is one of [ipa or apk]
+        return {
+            "module": module,
+            "apk_path": path
+        }
 
     @staticmethod
-    def handle_external_arguments(args):
+    def handle_external_arguments(args, module):
         """Handle External arguments"""
-        print(f"Handling External arguments: {args}")
+
+        print(f"Handling External arguments: {args} on module {module}")
+        return {
+            "module": module,
+            "domain": args.domain
+        }
 
     @staticmethod
-    def handle_va_arguments(args):
+    def handle_va_arguments(args, module):
         """Handle Vulnerability Assessment arguments"""
-        print(f"Handling Vulnerability Assessment arguments: {args}")
+        scanner = args.scanner
+        path = args.path
+        file = args.output
+        print(f"\nRunning {scanner.title()} Vulnerability Analysis ")
+        # TODO: Validate input is a folder
+        return {
+            "module": module,
+            "output_file": file,
+            "scan_folder": path
+        }
 
     @staticmethod
-    def handle_password_arguments(args):
+    def handle_password_arguments(args, module):
         """Handle Password arguments"""
-        print(f"Handling Password arguments: {args}")
+        # TODO :1 Validate ip address
+        # TODO :2 Validate pass_file exists
+        # TODO :3 Validate hash file
+        # TODO :4 Validate Dump file exists
+        if args.test:
+            # Testing password module
+            ip = args.ip
+            domain = args.domain
+            pass_file = args.pass_file
+            if not (ip and domain and pass_file):
+                raise ValueError(
+                    "For Test mode, --ip, --domain, and --pass_file are required")
+            print(
+                f"\nPassword test with IP: {ip}, \ndomain: {domain}, \npass_file: {pass_file}")
+            return {
+                "module": module,
+                "action": "test",
+                "target_ip": ip,
+                "domain": domain,
+                "pass_file": pass_file}
+        elif args.generate:
+            # Generate password list
+            hashes = args.crack
+            output = args.output
+            dump = args.dump
+            if not (hashes and output and dump):
+                raise ValueError(
+                    "For Generate mode, --crack, --output and --dump are required")
+            print(
+                f"\nGenerate Password list using \nCracked hashes: {hashes} \nand Dump file: {dump}")
+            return {
+                "module": module,
+                "hashes": hashes,
+                "out_file": output,
+                "dump": dump
+            }
 
     @staticmethod
-    def handle_internal_arguments(args):
+    def handle_internal_arguments(args, module):
         """Handle Internal PT arguments"""
-        print(f"Handling Internal PT arguments: {args}")
+        # TODO :1 validate ip_cidr is of a particular pattern [IP/mask]
+        # TODO :2 Validate resume_file exists
+        mode = args.scan
+        if mode == "scan":
+            # scan network
+            ip_cidr = args.ip
+            output = args.output
+            if not (ip_cidr and output):
+                raise ValueError(
+                    "For Scan mode, --ip and --output are required")
+            print(f"\nScanning {ip_cidr} network")
+            return {
+                "module": module,
+                "mode": mode,
+                "ip": ip_cidr,
+                "output": output
+            }
+        elif mode == "resume":
+            # Resume scan
+            resume_file = args.resume
+            mask = args.mask
+            if not (resume_file and mask):
+                raise ValueError(
+                    "For resume mode, --resume and --mask are required")
+            print(f"\nResuming scan on /{mask} network")
+            return {
+                "module": module,
+                "mode": mode,
+                "resume_file": resume_file,
+                "mask": mask
+            }
 
 
 if __name__ == "__main__":
