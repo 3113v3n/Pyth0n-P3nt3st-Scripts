@@ -60,7 +60,7 @@ class NetworkHandler(FileHandler, Commands):
         self.subnet = variables["subnet"]
         network_info = self.get_network_info(self.subnet)
         self.hosts = network_info["hosts"]
-        self.mode = variables["mode"]
+        self.mode = variables["action"]
         self.user_ip_addr = network_info["ip_address"]
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]

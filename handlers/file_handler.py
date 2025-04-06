@@ -216,6 +216,7 @@ class FileHandler(Validator, DisplayHandler):
                 file_object = {"filename": file,
                                "full_path": os.path.join(root, file)}
                 self.files.append(file_object)
+        return self.files
 
     def display_saved_files(self, dir_to_search, **kwargs):
         """Display to the user a list of files available"""

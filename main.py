@@ -1,7 +1,7 @@
 import termios
 import time
 import sys
-import os
+
 
 # [Test Domains]
 from domains import (
@@ -109,19 +109,44 @@ class PentestFramework(ScreenHandler):
             return False
 
     @staticmethod
-    def handle_internal_assessment(user, network, internal):
+    def handle_internal_assessment(user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
-        network.initialize_network_variables(
-            user.domain_variables, user.domain, ProgressBar)
+        _vars = {}
+        test_domain = ""
+        _action = ""
+        _output_file = ""
 
-        if user.domain_variables["mode"] == "resume":
-            # copies content of the instance
-            network.existing_unresponsive_ips = user.existing_unresponsive_ips
+        if not kwargs.get("user_data"):
+            # Runs during interactive mode
+            _vars = user.domain_variables
+            test_domain = user.domain
+            _action = _vars["action"]
+            _output_file = _vars["output"]
 
-        internal.initialize_variables(
-            mode=user.domain_variables["mode"],
-            output_file=user.domain_variables["output"])
+            if _action == "resume":
+                # copies content of the instance [user.existing_unresponsive_ips]
+                network.existing_unresponsive_ips = user.existing_unresponsive_ips
+
+        else:
+            _vars = kwargs.get("user_data")
+            test_domain = _vars["module"]
+            _action = _vars["action"]
+            _output_file = _vars["output"]
+
+            if _action == "resume":
+                resume_file = _vars["resume_file"]
+                subnet_mask = _vars["mask"]
+                last_ip = user.get_last_unresponsive_ip(resume_file)
+                ip_notation = f"{last_ip}/{subnet_mask}"
+                _vars["subnet"] = ip_notation
+                _output_file = resume_file
+
+                network.existing_unresponsive_ips = user.existing_unresponsive_ips
+
+        network.initialize_network_variables(_vars, test_domain, ProgressBar)
+
+        internal.initialize_variables(mode=_action, output_file=_output_file)
         internal.enumerate_hosts()
 
     @staticmethod
@@ -152,37 +177,57 @@ class PentestFramework(ScreenHandler):
                 output_dir)
         }
         run_action = module_handler.get(selected_action)
-       ## Run selected action
+       # Run selected action
         if run_action:
             run_action()
 
-    def handle_vulnerability_assessment(self, user, vulnerability_analysis):
+    def handle_vulnerability_assessment(self, user: callable, vulnerability_analysis: callable, **kwargs):
         """Handle Vulnerability analysis"""
         try:
+            scanner_type = "nessus"
+            input_files = ""
+            test_domain = ""
+            output_file = ""
+            if kwargs.get("user_data"):
+                # Run with command line arguments
+                _vars = kwargs.get("user_data")
+                test_domain: str = _vars["module"]
+                output_file: str = _vars["output_file"]
+                scan_folder = _vars["scan_folder"]
+
+                all_files = user.find_files(scan_folder)
+                if not all_files:
+                    raise ValueError(
+                        "No files found in the specified scan folder")
+                start_index = 0
+                # returns list of files and start index
+                input_files: tuple = all_files, start_index
+
+            else:
+                # Run with user interaction
+                scanner_type: str = user.domain_variables.get("scanner")
+                input_files: tuple = user.domain_variables.get("input_file")
+                test_domain: str = user.domain
+                output_file: str = user.domain_variables.get('output')
 
             # Set scanner
-            scanner_type = user.domain_variables.get("scanner")
             vulnerability_analysis.set_scanner(scanner_type)
 
-            input_file = user.domain_variables.get("input_file")
             formatted_issues = vulnerability_analysis.analyze_scan_files(
-                user.domain,
-                input_file
-            )
+                test_domain, input_files)
             if formatted_issues is None:
                 raise ValueError("No vulnerabilities found to process")
 
             # pprint(formatted_issues)
-            output_filename = user.domain_variables.get('output')
 
             success = vulnerability_analysis.sort_vulnerabilities(
                 formatted_issues,
-                output_filename
+                output_file
             )
             if not success:
                 raise ValueError("Failed to sort and save vulnerabilities")
 
-              # Sync success message
+            # Sync success message
             return True
         except Exception as e:
             self.print_error_message(
@@ -190,13 +235,13 @@ class PentestFramework(ScreenHandler):
             return False
 
     @staticmethod
-    def handle_mobile_assessment(user, mobile):
+    def handle_mobile_assessment(user, mobile, **kwargs):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
         _vars = None
         test_domain = ""
-        if isinstance(user, dict) and user.get("user_data"):
-            _vars = user["user_data"]
+        if kwargs.get("user_data"):
+            _vars = kwargs["user_data"]
             test_domain = _vars.get("module")
         else:
             _vars = user.domain_variables
@@ -226,22 +271,25 @@ class PentestFramework(ScreenHandler):
 
         if self.debug:
             self.print_debug_message(
-                f"Commandline Arguments {self.classes["user"] if not kwargs.get("user_data") else kwargs}")
+                f"Commandline Arguments {kwargs.get("user_data")}")
         # Match user_test_domain with the appropriate handler
         handlers = {
-            # "internal": lambda: self.handle_internal_assessment(
-            #     self.classes["user"] if not kwargs.get("user_data") else kwargs,
-            #     self.classes["network"],
-            #     self.classes["internal"]
-            # ),
-            # "va": lambda: self.handle_vulnerability_assessment(
-            #     self.classes["user"]if not kwargs.get("user_data") else kwargs,
-            #     self.classes["vulnerability"],
-            # ),
+            "internal": lambda: self.handle_internal_assessment(
+                self.classes["user"],
+                self.classes["network"],
+                self.classes["internal"],
+                user_data=kwargs.get("user_data")
+            ),
+            "va": lambda: self.handle_vulnerability_assessment(
+                self.classes["user"],
+                self.classes["vulnerability"],
+                user_data=kwargs.get("user_data")
+            ),
             "mobile": lambda: self.handle_mobile_assessment(
-                self.classes["user"] if not kwargs.get(
-                    "user_data") else kwargs,
-                self.classes["mobile"]
+                self.classes["user"],
+                self.classes["mobile"],
+                user_data=kwargs.get("user_data")
+
             ),
             "external": lambda: print("External assessment not implemented yet"),
             "password": lambda: self.handle_password_operations(

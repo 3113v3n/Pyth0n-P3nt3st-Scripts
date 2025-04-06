@@ -174,7 +174,7 @@ class InteractionHandler:
         parser = subparsers.add_parser(
             "internal", help="Internal PT arguments")
         parser.add_argument(
-            "-M", "--mode",
+            "-a", "--action",
             choices=["scan", "resume"],
             required=True,
             help="Mode of the internal PT (scan | resume)",
@@ -295,8 +295,8 @@ class InteractionHandler:
 
     def handle_internal_arguments(self, args, module):
         """Handle Internal PT arguments"""
-        mode = args.mode
-        if mode == "scan":
+        action = args.action
+        if action == "scan":
             # scan network
             ip_cidr = args.ip
             output = args.output
@@ -309,11 +309,11 @@ class InteractionHandler:
             print(f"\n[-] Running Internal PT Scan on {ip_cidr} network")
             return {
                 "module": module,
-                "mode": mode,
-                "ip": ip_cidr,
+                "action": action,
+                "subnet": ip_cidr,
                 "output": output
             }
-        elif mode == "resume":
+        elif action == "resume":
             # Resume scan
             resume_file = args.resume
             mask = args.mask
@@ -323,12 +323,12 @@ class InteractionHandler:
             if not self.validator.isfile_and_exists(resume_file):
                 raise ValueError(f"File {resume_file} does not exist")
             print(
-                f"\n[-] Resuming previous scan from File: {resume_file} on /{mask} network")
+                f"\n[-] Resuming previous scan from File: {get_basename(resume_file)} on /{mask} network")
             return {
                 "module": module,
-                "mode": mode,
+                "action": action,
                 "resume_file": resume_file,
-                "mask": mask
+                "mask":mask
             }
 
 

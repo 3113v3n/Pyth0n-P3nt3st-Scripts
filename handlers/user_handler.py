@@ -262,13 +262,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         try:
             subnet = ""
             output_file = ""
-            valid_modes = {"scan", "resume"}
-            mode = self.validate_user_choice(
-                valid_modes,
+            valid_actions = {"scan", "resume"}
+            action = self.validate_user_choice(
+                valid_actions,
                 self.get_user_input,
                 self.internal_mode_choice)
 
-            if mode == "resume":
+            if action == "resume":
                 resume_ip = self.display_saved_files(
                     self.output_directory,
                     resume_scan=True
@@ -277,7 +277,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 if resume_ip is None:
                     self.print_warning_message(
                         "No previous scan files found. Defaulting to scan mode.")
-                    mode = "scan"
+                    action = "scan"
                 else:
                     output_file = self.filepath
                     while True:
@@ -291,13 +291,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                             continue
 
             # If mode is scan or defaulted to scan
-            if mode == "scan":
+            if action == "scan":
                 subnet = self.get_user_subnet()
                 output_file = self.get_output_filename()
 
             return {
                 "subnet": subnet,
-                "mode": mode,
+                "action": action,
                 "output": output_file,
             }
 
