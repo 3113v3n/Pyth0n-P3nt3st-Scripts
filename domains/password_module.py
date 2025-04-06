@@ -20,9 +20,9 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
             save_dir: str,
             generate_filename: callable):
         """Generate user:pass list from cracked hashes and ntds dump"""
-        if domain_variables["cracked_hashes"]:
+        if domain_variables["hashes"]:
             print("Getting cracked hashes")
-            self.cracked_hashes = domain_variables["cracked_hashes"]
+            self.cracked_hashes = domain_variables["hashes"]
             self.dumped_hashes = domain_variables["dumps"]
         filename = generate_filename(domain_variables['filename'])
         self.output_file = f"{save_dir}/{filename}"
@@ -46,7 +46,7 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         """
 
         filename = generate_filename(domain_variables['filename'])
-        self.pass_list = domain_variables["pass_list"]
+        self.pass_list = domain_variables["pass_file"]
         self.output_file = f"{save_dir}/{filename}"
         domain = domain_variables["domain"]
         target = domain_variables["target"]

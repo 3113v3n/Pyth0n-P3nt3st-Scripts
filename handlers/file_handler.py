@@ -312,7 +312,7 @@ class FileHandler(Validator, DisplayHandler):
 
         :return: List of files filtered by extension
         """
-        if extension not in ["csv", "xlsx", "both"]:
+        if extension not in ["csv", "xlsx","xlx", "both"]:
             self.print_error_message(f"Invalid extension: {extension}")
             return None
         filtered_files = collections[extension]
@@ -320,7 +320,6 @@ class FileHandler(Validator, DisplayHandler):
         if not filtered_files:
             self.print_error_message("No files found")
             return None
-
         return filtered_files
 
     def _display_file_options(self):

@@ -1,6 +1,7 @@
 import termios
 import time
 import sys
+import os
 
 # [Test Domains]
 from domains import (
@@ -29,6 +30,7 @@ class PentestFramework(ScreenHandler):
         super().__init__()
         self.classes = self.initialize_classes()
         self.exit_menu = False
+        self.debug = False
 
     # [Utils]
     # Initializers
@@ -123,13 +125,21 @@ class PentestFramework(ScreenHandler):
         internal.enumerate_hosts()
 
     @staticmethod
-    def handle_password_operations(user, password):
+    def handle_password_operations(user, password, **kwargs):
         """Handle Password related operations"""
         # Initialize Password class variables
         output_dir = user.output_directory
         generator_func = user.generate_unique_name
-        variables = user.domain_variables
-        selected_module = variables["module"]
+        variables = {}
+        selected_action = ""
+
+        if kwargs.get("user_data"):
+            # Handles command line arguments
+            variables = kwargs.get("user_data")
+            selected_action = variables.get("action")
+        else:
+            variables = user.domain_variables
+            selected_action = variables["action"]
 
         module_handler = {
             "generate": lambda: password.generate_passlist_from_hashes(
@@ -141,10 +151,10 @@ class PentestFramework(ScreenHandler):
                 generator_func,
                 output_dir)
         }
-        run_selected_module = module_handler.get(selected_module)
-        # Run selected module
-        if run_selected_module:
-            run_selected_module()
+        run_action = module_handler.get(selected_action)
+       ## Run selected action
+        if run_action:
+            run_action()
 
     def handle_vulnerability_assessment(self, user, vulnerability_analysis):
         """Handle Vulnerability analysis"""
@@ -183,10 +193,19 @@ class PentestFramework(ScreenHandler):
     def handle_mobile_assessment(user, mobile):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
+        _vars = None
+        test_domain = ""
+        if isinstance(user, dict) and user.get("user_data"):
+            _vars = user["user_data"]
+            test_domain = _vars.get("module")
+        else:
+            _vars = user.domain_variables
+            test_domain = user.domain
 
-        mobile_object = user.domain_variables
-        mobile.initialize_variables(mobile_object)
-        mobile._inspect_files(user.domain)
+        mobile_testing_vars = _vars
+
+        mobile.initialize_variables(mobile_testing_vars)
+        mobile._inspect_files(test_domain)
 
     @staticmethod
     def handle_external_assessment(user):
@@ -202,29 +221,33 @@ class PentestFramework(ScreenHandler):
         Args:
             user_test_domain: Selected testing domain
             kwargs: Handle command line arguments passed by user
-        
+
         """
-        print("Kwargs are:", kwargs)
+
+        if self.debug:
+            self.print_debug_message(
+                f"Commandline Arguments {self.classes["user"] if not kwargs.get("user_data") else kwargs}")
         # Match user_test_domain with the appropriate handler
         handlers = {
-            "internal": lambda: self.handle_internal_assessment(
-                self.classes["user"] if not kwargs else kwargs.get(
-                    "user_data"),
-                self.classes["network"],
-                self.classes["internal"]
-            ),
-            "va": lambda: self.handle_vulnerability_assessment(
-                self.classes["user"]if not kwargs else kwargs.get("user_data"),
-                self.classes["vulnerability"],
-            ),
+            # "internal": lambda: self.handle_internal_assessment(
+            #     self.classes["user"] if not kwargs.get("user_data") else kwargs,
+            #     self.classes["network"],
+            #     self.classes["internal"]
+            # ),
+            # "va": lambda: self.handle_vulnerability_assessment(
+            #     self.classes["user"]if not kwargs.get("user_data") else kwargs,
+            #     self.classes["vulnerability"],
+            # ),
             "mobile": lambda: self.handle_mobile_assessment(
-                self.classes["user"]if not kwargs else kwargs.get("user_data"),
+                self.classes["user"] if not kwargs.get(
+                    "user_data") else kwargs,
                 self.classes["mobile"]
             ),
             "external": lambda: print("External assessment not implemented yet"),
             "password": lambda: self.handle_password_operations(
-                self.classes["user"]if not kwargs else kwargs.get("user_data"),
+                self.classes["user"],
                 self.classes["password"],
+                user_data=kwargs.get("user_data")
             )
 
         }
@@ -337,18 +360,22 @@ class PentestFramework(ScreenHandler):
         """Run Interactive version of the program
         Args:
             user_data: Dictionary containing user data
-        """        
+        """
         try:
             # Reset state at the start of each iteration
             self.reset_class_states()
+            user = self.classes["user"]
             test_domain = user_data.get("module")
+
+            # Update test domain if need be
+            user.update_output_directory(test_domain)
 
             # Check packages before getting user input
             if not self.check_packages(test_domain):
                 self.print_info_message(
                     "Required packages are missing. Installing them...")
-                
-            #print(f"User command line arguments are:\n {user_data}")
+
+            # print(f"User command line arguments are:\n {user_data}")
             self.process_domain(test_domain, user_data=user_data)
 
         except KeyboardInterrupt:
@@ -371,6 +398,7 @@ def main():
             framework.run_program()
         else:
             # Handle command line args here
+            _interaction.arguments["use_args"] = use_cmdline_args
             framework.run_program_interactively(_interaction.arguments)
     except Exception as e:
         framework.print_error_message(

@@ -1,5 +1,10 @@
-import argparse
+from argparse import ArgumentParser
 from utils.shared import Validator
+import os
+
+
+def get_basename(fullpath):
+    return os.path.basename(fullpath)
 
 
 class InteractionHandler:
@@ -10,22 +15,23 @@ class InteractionHandler:
 
     def __init__(self):
         pass
-        self.HEADLINE = "Usage: main.py [ --(interactive | arguments | help) ]"
+        self.HEADLINE = ("main.py [-h] [--script-mode [ interactive|cli_args ] ] "
+                         "[ MODULE [ internal|mobile|password|va|external ] ] [ other OPTIONS ]")
         self.argument_mode = False
         self.arguments = {}
         self.validator = Validator()
 
     def main(self):
         """Main Program"""
-        parser = argparse.ArgumentParser(
+        parser = ArgumentParser(
             description="Handle different modes of the script.",
-            usage=self.HEADLINE)
+        )  # usage=self.HEADLINE
         parser.add_argument("--script-mode",
                             metavar="script_mode",
-                            choices=["interactive", "arguments"],
+                            choices=["interactive", "cli_args"],
                             required=True,
                             default="interactive",
-                            help="Choose the mode to run the script. (interactive | arguments)")
+                            help="Choose the mode to run the script. (interactive | cli_args)")
 
         # Add subparsers for different modules
         subparsers = parser.add_subparsers(
@@ -45,7 +51,7 @@ class InteractionHandler:
             # Run Script with user interaction
             self.argument_mode = False
             return
-        elif _mode == "arguments":
+        elif _mode == "cli_args":
             # Module is required in arguments mode
             if not args.module:
                 parser.error(
@@ -124,6 +130,7 @@ class InteractionHandler:
         """Handle Password Arguments"""
 
         parser = subparsers.add_parser("password", help="Password Arguments")
+        # run one action at a particular moment
         action_group = parser.add_mutually_exclusive_group(required=True)
         action_group.add_argument(
             "-t", "--test",
@@ -141,6 +148,7 @@ class InteractionHandler:
         )
         parser.add_argument(
             "-d", "--domain",
+            default=".",
             help="Target Domain - required for test",
         )
         parser.add_argument(
@@ -206,7 +214,8 @@ class InteractionHandler:
         print(f"\n[-] Running Mobile Assessment on {path} application")
         return {
             "module": module,
-            "apk_path": path
+            "full_path": path,
+            "filename": get_basename(path)
         }
 
     def handle_external_arguments(self, args, module):
@@ -252,12 +261,17 @@ class InteractionHandler:
             if not self.validator.validate_ip_addr(ip):
                 raise ValueError(
                     f"IP {ip} is not valid. Ensure it is a valid IP address")
-            print(f"\n[-] Running Password Test on {ip} with {domain} domain")
+
+            # Add verbosity
+            print(
+                f"\n[-] Testing passwords from {get_basename(pass_file)} on Target IP: {ip} with {domain} domain")
+
             return {
                 "module": module,
                 "action": "test",
-                "target_ip": ip,
+                "target": ip,
                 "domain": domain,
+                'filename': 'Successful_Logins.txt',
                 "pass_file": pass_file}
         elif args.generate:
             # Generate password list
@@ -267,14 +281,16 @@ class InteractionHandler:
             if not (hashes and output and dump):
                 raise ValueError(
                     "For Generate mode, --crack, --output and --dump are required")
-            if not (self.validator.isfile_and_exists(hashes) or self.validator.isfile_and_exists(dump)):
+            if not (self.validator.isfile_and_exists(hashes) and self.validator.isfile_and_exists(dump)):
                 raise ValueError(f"File {hashes} or {dump} does not exist")
-            print(f"\n[-] Generating Password List from {hashes} and {dump} files")
+            print(
+                f"\n[-] Generating Password List from {hashes} and {dump} files")
             return {
                 "module": module,
                 "hashes": hashes,
-                "out_file": output,
-                "dump": dump
+                "filename": output,
+                "dumps": dump,
+                "action": "generate"
             }
 
     def handle_internal_arguments(self, args, module):
@@ -306,7 +322,8 @@ class InteractionHandler:
                     "For resume mode, --resume and --mask are required")
             if not self.validator.isfile_and_exists(resume_file):
                 raise ValueError(f"File {resume_file} does not exist")
-            print(f"\n[-] Resuming previous scan from File: {resume_file} on /{mask} network")
+            print(
+                f"\n[-] Resuming previous scan from File: {resume_file} on /{mask} network")
             return {
                 "module": module,
                 "mode": mode,

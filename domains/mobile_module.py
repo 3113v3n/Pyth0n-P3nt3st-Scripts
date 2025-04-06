@@ -15,6 +15,7 @@ class MobileAssessment(MobileCommands):
         cls.package_path = ""
 
     def initialize_variables(self, data):
+        
         # Sets user provided values
         self.package_name = data["filename"]  # application filename
         self.package_path = data["full_path"]  # fullpath to the application

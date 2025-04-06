@@ -171,7 +171,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             get_filepath_func: callable,
             is_file: callable,
             get_filename: callable,
-            module: str):
+            action: str):
         # Enter File Path to cracked hashes
         cracked_hashes = get_filepath_func(
             "\n[-] Enter full path to your cracked hashes \n",
@@ -185,10 +185,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         # Enter file output path
         output_filename = get_filename()
         return {
-            "cracked_hashes": cracked_hashes,
+            "hashes": cracked_hashes,
             "dumps": dumps,
             "filename": output_filename,
-            "module": module
+            "action": action
         }
 
     @staticmethod
@@ -200,7 +200,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             is_file: callable,
             display_text: str,
             domain_text: str,
-            module: str):
+            action: str):
         ip_error = "Invalid ip provided. Please enter a valid one"
         target = ip_validator(
             get_user_input,
@@ -218,9 +218,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         return {
             "target": target,
             "domain": domain,
-            "pass_list": pass_list,
+            "pass_file": pass_list,
             "filename": "Successful_Logins.txt",
-            "module": module
+            "action": action
         }
 
     def password_ui_handler(self):
