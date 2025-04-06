@@ -31,6 +31,7 @@ class PentestFramework(ScreenHandler):
         self.classes = self.initialize_classes()
         self.exit_menu = False
         self.debug = False
+        self.cmd_args = False
 
     # [Utils]
     # Initializers
@@ -108,8 +109,8 @@ class PentestFramework(ScreenHandler):
 
             return False
 
-    @staticmethod
-    def handle_internal_assessment(user, network, internal, **kwargs):
+    
+    def handle_internal_assessment(self,user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
         _vars = {}
@@ -132,7 +133,6 @@ class PentestFramework(ScreenHandler):
             _vars = kwargs.get("user_data")
             test_domain = _vars["module"]
             _action = _vars["action"]
-            _output_file = _vars["output"]
 
             if _action == "resume":
                 resume_file = _vars["resume_file"]
@@ -141,16 +141,19 @@ class PentestFramework(ScreenHandler):
                 ip_notation = f"{last_ip}/{subnet_mask}"
                 _vars["subnet"] = ip_notation
                 _output_file = resume_file
-
+            elif _action == "scan":
+                _output_file = _vars["output"]
                 network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
         network.initialize_network_variables(_vars, test_domain, ProgressBar)
 
-        internal.initialize_variables(mode=_action, output_file=_output_file)
+        internal.initialize_variables(is_cmdl= self.cmd_args,
+                                      mode=_action, 
+                                      output_file=_output_file)
         internal.enumerate_hosts()
 
-    @staticmethod
-    def handle_password_operations(user, password, **kwargs):
+    
+    def handle_password_operations(self,user, password, **kwargs):
         """Handle Password related operations"""
         # Initialize Password class variables
         output_dir = user.output_directory
@@ -234,8 +237,8 @@ class PentestFramework(ScreenHandler):
                 message="Error in vulnerability assessment", exception_error=e)
             return False
 
-    @staticmethod
-    def handle_mobile_assessment(user, mobile, **kwargs):
+    
+    def handle_mobile_assessment(self,user, mobile, **kwargs):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
         _vars = None
@@ -252,8 +255,8 @@ class PentestFramework(ScreenHandler):
         mobile.initialize_variables(mobile_testing_vars)
         mobile._inspect_files(test_domain)
 
-    @staticmethod
-    def handle_external_assessment(user):
+    
+    def handle_external_assessment(self,user):
         """Handle external assessment"""
         # initialize variables that will be used to test different External PT modules
         # external.initialize_variables(variables=domain_vars)
@@ -414,6 +417,9 @@ class PentestFramework(ScreenHandler):
             self.reset_class_states()
             user = self.classes["user"]
             test_domain = user_data.get("module")
+
+            # Update class instance
+            self.cmd_args = user_data.get("use_args")
 
             # Update test domain if need be
             user.update_output_directory(test_domain)
