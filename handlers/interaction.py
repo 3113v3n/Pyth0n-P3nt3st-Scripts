@@ -1,41 +1,167 @@
-from argparse import ArgumentParser
-from utils.shared import Validator
 import os
+import sys
+from argparse import ArgumentParser, Action
+
+from utils.shared import Validator, Bcolors
 
 
 def get_basename(fullpath):
     return os.path.basename(fullpath)
 
 
+class CustomHelp(Action):
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+        self.color = Bcolors
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        simple_help_text =(f"""{self.color.HEADER}=== Custom Help Menu ==={self.color.ENDC}
+This is a custom CLI tool for Penetration Testing.
+              
+{self.color.BOLD}Usage:{self.color.ENDC}
+               {self.color.ITALICS}main.py -M <interactive|cli_args> [MODULE] [OPTIONS]{self.color.ENDC}
+{self.color.BOLD}Options:{self.color.ENDC}
+    -M MODE   Select mode: 'interactive' or 'cli_args'
+              {self.color.OKGREEN}interactive:{self.color.ENDC} Run with user interaction
+              {self.color.OKGREEN}cli_args:{self.color.ENDC} Run with command-line arguments
+        
+{self.color.BOLD}MODULE:{self.color.ENDC}       Choose module:                          mobile, internal, password, va, external
+                   internal:                          Handle Internal Penetration Testing
+                   mobile  :                          Handle Mobile Penetration Testing
+                   password:                          Handle Password-related operations
+                   va      :                          Handle Vulnerability Analysis
+                   external:                          Handle External Penetration Testing
+{self.color.BOLD}OPTIONS:{self.color.ENDC}      Module-specific options
+
+""")
+        more_text =(f"""
+    {self.color.OKCYAN}[internal]{self.color.ENDC} 
+        -a, --action            <action>            : Choose action to perform : scan, resume
+
+        <scan>
+            -o, --output        <output_file>       : Output file for scan results
+            --ip                <ip/subnet>         : Ip address to scan
+        <resume>
+            -r, --resume        <unresponsive_file> : File with unresponsive hosts
+            -m, --mask          <mask>              : Subnet mask used for previous scan
+
+    {self.color.OKCYAN}[mobile]{self.color.ENDC}
+        -P, --path              <apk_ipa_file>      : Path to the mobile application file
+                                                     <apk | ipa>
+
+    {self.color.OKCYAN}[password]{self.color.ENDC}
+        -t, --test                                  : Test the password against a protocol
+            [{self.color.ITALICS}ip | domain | pass_file{self.color.ENDC}]
+
+            -d, --domain        <domain>            : Domain to test
+            -p, --pass_file     <pass_file>         : Password file to test
+            --ip                <target_ip>         : Target IP address
+
+        -g, --generate                              : Generate a password list from cracked hashes
+            [{self.color.ITALICS}crack | output | dump{self.color.ENDC}]
+
+            -c, --crack         <cracked_hashes>    : File with Cracked hashes
+            -o, --output        <output_file>       : Output file
+            --dump              <dump_file>         : NTDS Dump file
+
+    {self.color.OKCYAN}[vulnerability analysis]{self.color.ENDC}
+        -s, --scanner           <scanner>           : Scanner used for analysis e.g( nessus | rapid )
+        -o, --output            <output_file>       : Output file for your Vulnerability analysis report
+        -P, --path              <path_to_files>     : Path to your scanned files
+
+    {self.color.OKCYAN}[external]{self.color.ENDC}
+        -d, --domain            <domain>            : Domain to test
+
+{self.color.BOLD}EXAMPLES:{self.color.ENDC}==> 
+        [Run script interactively]
+        main.py -M interactive 
+
+        1.{self.color.WARNING}Mobile:{self.color.ENDC}
+                main.py -M cli_args mobile -P /path/to/app.apk
+        
+        2.{self.color.WARNING}Internal:{self.color.ENDC}
+            Scan:
+                main.py -M cli_args internal -a scan --ip 10.10.10.2/24 -o scan_results.txt
+            Resume:
+                main.py -M cli_args internal -a resume -r unresponsive_hosts.txt -m 24
+        
+        3.{self.color.WARNING}Password:{self.color.ENDC}
+            test:
+                main.py -M cli_args password -t -d domain.example.com -p /path/to/pass-file --ip 192.168.1.1
+            generate:
+                main.py -M cli_args password -g -c /path/to/crack-file -o output.txt --dump /path/to/dump-file
+        
+        4.{self.color.WARNING}Vulnerability Analysis:{self.color.ENDC}
+                main.py -M cli_args va -s nessus -o report.txt -P /path/to/scanned-files
+        
+ -h, --help  Show this custom help""")
+        # Check if verbose flag is set in namespace
+        #print(namespace)
+
+        full_help_text = simple_help_text + more_text
+        print(full_help_text)
+        sys.exit(0)
+
+
 class InteractionHandler:
     """Class responsible for handling interactions with the user.
     Switches between different modes [interactive and arguments]
     """
+
     # {os.path.basename(__file__)}
 
     def __init__(self):
         pass
-        self.HEADLINE = ("main.py [-h] [--script-mode [ interactive|cli_args ] ] "
-                         "[ MODULE [ internal|mobile|password|va|external ] ] [ other OPTIONS ]")
+        self.HEADLINE = (
+            "main.py [-h] -M {interactive,cli_args} "
+            "[MODULE {internal,mobile,password,va,external}] [OPTIONS...]"
+        )
         self.argument_mode = False
         self.arguments = {}
         self.validator = Validator()
 
+
     def main(self):
         """Main Program"""
         parser = ArgumentParser(
-            description="Handle different modes of the script.",
-        )  # usage=self.HEADLINE
-        parser.add_argument("--script-mode",
-                            metavar="script_mode",
-                            choices=["interactive", "cli_args"],
-                            required=True,
-                            default="interactive",
-                            help="Choose the mode to run the script. (interactive | cli_args)")
+            description="Main Program for Penetration Testing",
+            add_help=False,
+            usage=self.HEADLINE
+        )  #
+        # Verbosity flag
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            action="store_true",
+            help="Show full help text when used with --help",
+        )
+       
+        
+        parser.add_argument(
+            "-M",
+            dest="script_mode",
+            choices=["interactive", "cli_args"],
+            required=True,
+            default="interactive",
+            help=(
+                "Select the mode to run the script with:\n"
+                "  interactive: run with user interaction\n"
+                "  cli_args: run with command-line arguments"
+            ),
+        )
+         # Custom help function
+        parser.add_argument(
+            "-h",
+            "--help",
+            action=CustomHelp,
+            help="Show this help message and exit",
+        )
 
         # Add subparsers for different modules
         subparsers = parser.add_subparsers(
-            dest="module", help="Module to run (mobile | internal | password | va | external)")
+            dest="module",
+            help="Module to run (mobile | internal | password | va | external)",
+        )
 
         self._add_mobile_arguments(subparsers)
         self._add_internal_arguments(subparsers)
@@ -50,12 +176,14 @@ class InteractionHandler:
         if _mode == "interactive":
             # Run Script with user interaction
             self.argument_mode = False
+            print("Running in interactive mode...")
             return
         elif _mode == "cli_args":
             # Module is required in arguments mode
             if not args.module:
                 parser.error(
-                    "the following arguments are required in arguments mode: module")
+                    "the following arguments are required in arguments mode: MODULE"
+                )
             self.argument_mode = True
 
             return self._run_modules(args, _module)
@@ -68,7 +196,7 @@ class InteractionHandler:
             "internal": self.handle_internal_arguments,
             "password": self.handle_password_arguments,
             "va": self.handle_va_arguments,
-            "external": self.handle_external_arguments
+            "external": self.handle_external_arguments,
         }
         self.arguments = handler[module](args, module)
 
@@ -78,7 +206,8 @@ class InteractionHandler:
         parser = subparsers.add_parser(
             "external", help="External Assessment Arguments")
         parser.add_argument(
-            "-d", "--domain",
+            "-d",
+            "--domain",
             required=True,
             type=str,
             help="Domain to test",
@@ -86,11 +215,12 @@ class InteractionHandler:
 
     @staticmethod
     def _add_mobile_arguments(subparsers):
-        """Handle Arguments for mobile assessments """
+        """Handle Arguments for mobile assessments"""
         parser = subparsers.add_parser(
             "mobile", help="Mobile Assessment Arguments")
         parser.add_argument(
-            "-P", "--path",
+            "-P",
+            "--path",
             type=str,
             required=True,
             help="Path to the mobile application file",
@@ -107,7 +237,7 @@ class InteractionHandler:
             required=True,
             type=str,
             choices=["nessus", "rapid"],
-            help="Scanner used for analysis e.g( nessus | rapid )"
+            help="Scanner used for analysis e.g( nessus | rapid )",
         )
 
         parser.add_argument(
@@ -115,14 +245,10 @@ class InteractionHandler:
             "--output",
             required=True,
             type=str,
-            help="Output file for your Vulnerability analysis report"
+            help="Output file for your Vulnerability analysis report",
         )
         parser.add_argument(
-            "-P",
-            "--path",
-            required=True,
-            type=str,
-            help="Path to your scanned files"
+            "-P", "--path", required=True, type=str, help="Path to your scanned files"
         )
 
     @staticmethod
@@ -133,12 +259,14 @@ class InteractionHandler:
         # run one action at a particular moment
         action_group = parser.add_mutually_exclusive_group(required=True)
         action_group.add_argument(
-            "-t", "--test",
+            "-t",
+            "--test",
             action="store_true",
             help="Test the password against a protocol",
         )
         action_group.add_argument(
-            "-g", "--generate",
+            "-g",
+            "--generate",
             action="store_true",
             help="Generate a password list from cracked hashes",
         )
@@ -147,20 +275,24 @@ class InteractionHandler:
             help="Target IP address - required for test",
         )
         parser.add_argument(
-            "-d", "--domain",
+            "-d",
+            "--domain",
             default=".",
             help="Target Domain - required for test",
         )
         parser.add_argument(
-            "-p", "--pass_file",
+            "-p",
+            "--pass_file",
             help="Password File - required for test",
         )
         parser.add_argument(
-            "-c", "--crack",
+            "-c",
+            "--crack",
             help="File with Cracked hashes - required for generate",
         )
         parser.add_argument(
-            "-o", "--output",
+            "-o",
+            "--output",
             help="Output file - required for generate",
         )
         parser.add_argument(
@@ -174,7 +306,8 @@ class InteractionHandler:
         parser = subparsers.add_parser(
             "internal", help="Internal PT arguments")
         parser.add_argument(
-            "-a", "--action",
+            "-a",
+            "--action",
             choices=["scan", "resume"],
             required=True,
             help="Mode of the internal PT (scan | resume)",
@@ -185,15 +318,18 @@ class InteractionHandler:
             help="Target IP address with subnet (e.g., 10.1.1.1/24) - required for scan",
         )
         mode_group.add_argument(
-            "-o", "--output",
+            "-o",
+            "--output",
             help="Output file for the scan results - required for scan",
         )
         mode_group.add_argument(
-            "-r", "--resume",
+            "-r",
+            "--resume",
             help="File with unresponsive hosts - required for resume",
         )
         mode_group.add_argument(
-            "-m", "--mask",
+            "-m",
+            "--mask",
             type=int,
             choices=range(1, 33),
             help="Subnet mask used for previous scan (0-32) - required for resume",
@@ -207,28 +343,24 @@ class InteractionHandler:
         if not self.validator.isfile_and_exists(path):
             raise ValueError(f"File {path} does not exist")
             # Check if the file is an APK or IPA
-        if not (self.validator.check_filetype(path, "apk") or self.validator.check_filetype(path, "ipa")):
+        if not (
+            self.validator.check_filetype(path, "apk")
+            or self.validator.check_filetype(path, "ipa")
+        ):
             # Valid mobile application file
-            raise ValueError(
-                f"File {path} is not a valid APK or IPA file")
+            raise ValueError(f"File {path} is not a valid APK or IPA file")
         print(f"\n[-] Running Mobile Assessment on {path} application")
-        return {
-            "module": module,
-            "full_path": path,
-            "filename": get_basename(path)
-        }
+        return {"module": module, "full_path": path, "filename": get_basename(path)}
 
     def handle_external_arguments(self, args, module):
         """Handle External arguments"""
 
         if not self.validator.validate_domain(args.domain):
             raise ValueError(
-                f"Domain {args.domain} is not valid. Ensure it is a valid domain name")
+                f"Domain {args.domain} is not valid. Ensure it is a valid domain name"
+            )
         print(f"\n[-] Running External Assessment on {args.domain} domain")
-        return {
-            "module": module,
-            "domain": args.domain
-        }
+        return {"module": module, "domain": args.domain}
 
     def handle_va_arguments(self, args, module):
         """Handle Vulnerability Assessment arguments"""
@@ -239,12 +371,9 @@ class InteractionHandler:
 
         if not self.validator.check_folder_exists(path):
             raise ValueError(
-                f"Path {path} is not a valid directory. Ensure it exists and is a directory")
-        return {
-            "module": module,
-            "output_file": file,
-            "scan_folder": path
-        }
+                f"Path {path} is not a valid directory. Ensure it exists and is a directory"
+            )
+        return {"module": module, "output_file": file, "scan_folder": path}
 
     def handle_password_arguments(self, args, module):
         """Handle Password arguments"""
@@ -255,24 +384,28 @@ class InteractionHandler:
             pass_file = args.pass_file
             if not (ip and domain and pass_file):
                 raise ValueError(
-                    "For Test mode, --ip, --domain, and --pass_file are required")
+                    "For Test mode, --ip, --domain, and --pass_file are required"
+                )
             if not self.validator.isfile_and_exists(pass_file):
                 raise ValueError(f"File {pass_file} does not exist")
             if not self.validator.validate_ip_addr(ip):
                 raise ValueError(
-                    f"IP {ip} is not valid. Ensure it is a valid IP address")
+                    f"IP {ip} is not valid. Ensure it is a valid IP address"
+                )
 
             # Add verbosity
             print(
-                f"\n[-] Testing passwords from {get_basename(pass_file)} on Target IP: {ip} with {domain} domain")
+                f"\n[-] Testing passwords from {get_basename(pass_file)} on Target IP: {ip} with {domain} domain"
+            )
 
             return {
                 "module": module,
                 "action": "test",
                 "target": ip,
                 "domain": domain,
-                'filename': 'Successful_Logins.txt',
-                "pass_file": pass_file}
+                "filename": "Successful_Logins.txt",
+                "pass_file": pass_file,
+            }
         elif args.generate:
             # Generate password list
             hashes = args.crack
@@ -280,8 +413,12 @@ class InteractionHandler:
             dump = args.dump
             if not (hashes and output and dump):
                 raise ValueError(
-                    "For Generate mode, --crack, --output and --dump are required")
-            if not (self.validator.isfile_and_exists(hashes) and self.validator.isfile_and_exists(dump)):
+                    "For Generate mode, --crack, --output and --dump are required"
+                )
+            if not (
+                self.validator.isfile_and_exists(hashes)
+                and self.validator.isfile_and_exists(dump)
+            ):
                 raise ValueError(f"File {hashes} or {dump} does not exist")
             print(
                 f"\n[-] Generating Password List from {hashes} and {dump} files")
@@ -290,7 +427,7 @@ class InteractionHandler:
                 "hashes": hashes,
                 "filename": output,
                 "dumps": dump,
-                "action": "generate"
+                "action": "generate",
             }
 
     def handle_internal_arguments(self, args, module):
@@ -305,13 +442,14 @@ class InteractionHandler:
                     "For Scan mode, --ip and --output are required")
             if not self.validator.validate_ip_and_cidr(ip_cidr):
                 raise ValueError(
-                    f"IP {ip_cidr} is not valid. Ensure it is a valid IP address with CIDR notation")
+                    f"IP {ip_cidr} is not valid. Ensure it is a valid IP address with CIDR notation"
+                )
             print(f"\n[-] Running Internal PT Scan on {ip_cidr} network")
             return {
                 "module": module,
                 "action": action,
                 "subnet": ip_cidr,
-                "output": output
+                "output": output,
             }
         elif action == "resume":
             # Resume scan
@@ -323,12 +461,13 @@ class InteractionHandler:
             if not self.validator.isfile_and_exists(resume_file):
                 raise ValueError(f"File {resume_file} does not exist")
             print(
-                f"\n[-] Resuming previous scan from File: {get_basename(resume_file)} on /{mask} network")
+                f"\n[-] Resuming previous scan from File: {get_basename(resume_file)} on /{mask} network"
+            )
             return {
                 "module": module,
                 "action": action,
                 "resume_file": resume_file,
-                "mask":mask
+                "mask": mask,
             }
 
 

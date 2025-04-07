@@ -43,9 +43,3 @@ class HelpHandler(Config):
         Print helper function for the Main Program
         """
         print(self.PROGRAM_HELPER_STRING)
-
-    def interactive_helper(self):
-        """
-        Print helper function for Interactive Mode
-        """
-        print(self.INTERACTIVE_HELPER_STRING)
