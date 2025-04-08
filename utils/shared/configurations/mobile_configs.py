@@ -76,18 +76,18 @@ class MobileConfigs:
     DEEPLINKS_IGNORE_REGEX = r"\.(css|gif|jpeg|jpg|ogg|otf|png|svg|ttf|woff|woff2)"
     HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
     MOBILE_HELPER_STRING = f"""{HEADLINE}
-    This module helps do static analysis on a mobile application using
-     various techniques.
-     The script decompiles the provided application and scans individual
-     files for potential valuable information
+This module helps do static analysis on a mobile application using
+various techniques.
+The script decompiles the provided application and scans individual
+files for potential valuable information
 
-     {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
+    {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
 
-            {color.OKGREEN}filepath{color.ENDC}  The path to the folder containing your ({color.WARNING}iOS | Android{color.ENDC}) applications  :
+        {color.OKGREEN}filepath{color.ENDC}  The path to the folder containing your ({color.WARNING}iOS | Android{color.ENDC}) applications  :
 
-     {color.OKCYAN}{color.UNDERLINE}:returns{color.ENDC}: 
+    {color.OKCYAN}{color.UNDERLINE}:returns{color.ENDC}: 
 
-            {color.OKGREEN}files{color.ENDC}     Files containing: [{color.WARNING} IP_address|URLs|Hardcoded_Strings|
-                                          Base64_decoded_strings|nuclei results{color.ENDC} ]
+        {color.OKGREEN}files{color.ENDC}     Files containing: [{color.WARNING} IP_address|URLs|Hardcoded_Strings|
+                                        Base64_decoded_strings|nuclei results{color.ENDC} ]
             
 {HEADLINE}"""

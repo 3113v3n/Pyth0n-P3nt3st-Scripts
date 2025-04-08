@@ -4,6 +4,7 @@ from utils.shared import Config
 from handlers.screen import ScreenHandler
 from handlers.helper_handler import HelpHandler
 from handlers import FileHandler
+from handlers.network_handler import get_network_interfaces,NetworkHandler
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):
@@ -19,6 +20,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.OPTIONS = self.set_test_options()
         self.helper_ = helper_instance
         self.command_ = command_instance
+        self.debug = False
         self.formatted_question = (
             "\nWhat would you like to do?\n"
             f"{self.OPTIONS}\n"
@@ -263,10 +265,22 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             subnet = ""
             output_file = ""
             valid_actions = {"scan", "resume"}
+            valid_interfaces = [iface 
+                                for iface in get_network_interfaces()
+                                if NetworkHandler()._is_interface_active(iface)
+                                and not iface.startswith(("br-", "docker", "veth", "lo"))]
+            if self.debug:
+                print(f"DEBUG: Available active interfaces={valid_interfaces}")
+                
             action = self.validate_user_choice(
                 valid_actions,
                 self.get_user_input,
                 self.internal_mode_choice)
+            interface = self.validate_user_choice(
+                valid_interfaces,
+                self.get_user_input,
+                f"Enter a network interface to run your scan \n{valid_interfaces} "
+            )
 
             if action == "resume":
                 resume_ip = self.display_saved_files(
@@ -299,6 +313,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 "subnet": subnet,
                 "action": action,
                 "output": output_file,
+                "interface": interface
             }
 
         except Exception as error:

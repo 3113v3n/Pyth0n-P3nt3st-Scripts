@@ -1,106 +1,14 @@
 import os
-import sys
-from argparse import ArgumentParser, Action
+from argparse import RawTextHelpFormatter
 
-from utils.shared import Validator, Bcolors
+from utils.shared import Validator
+from handlers.network_handler import (NetworkHandler,
+                                      get_network_interfaces)
+from handlers.custom_parser import CustomArgumentParser, CustomHelp
 
 
 def get_basename(fullpath):
     return os.path.basename(fullpath)
-
-
-class CustomHelp(Action):
-    def __init__(self, option_strings, dest, **kwargs):
-        super().__init__(option_strings, dest, nargs=0, **kwargs)
-        self.color = Bcolors
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        simple_help_text =(f"""{self.color.HEADER}=== Custom Help Menu ==={self.color.ENDC}
-This is a custom CLI tool for Penetration Testing.
-              
-{self.color.BOLD}Usage:{self.color.ENDC}
-               {self.color.ITALICS}main.py -M <interactive|cli_args> [MODULE] [OPTIONS]{self.color.ENDC}
-{self.color.BOLD}Options:{self.color.ENDC}
-    -M MODE   Select mode: 'interactive' or 'cli_args'
-              {self.color.OKGREEN}interactive:{self.color.ENDC} Run with user interaction
-              {self.color.OKGREEN}cli_args:{self.color.ENDC} Run with command-line arguments
-        
-{self.color.BOLD}MODULE:{self.color.ENDC}       Choose module:                          mobile, internal, password, va, external
-                   internal:                          Handle Internal Penetration Testing
-                   mobile  :                          Handle Mobile Penetration Testing
-                   password:                          Handle Password-related operations
-                   va      :                          Handle Vulnerability Analysis
-                   external:                          Handle External Penetration Testing
-{self.color.BOLD}OPTIONS:{self.color.ENDC}      Module-specific options
-
-""")
-        more_text =(f"""
-    {self.color.OKCYAN}[internal]{self.color.ENDC} 
-        -a, --action            <action>            : Choose action to perform : scan, resume
-
-        <scan>
-            -o, --output        <output_file>       : Output file for scan results
-            --ip                <ip/subnet>         : Ip address to scan
-        <resume>
-            -r, --resume        <unresponsive_file> : File with unresponsive hosts
-            -m, --mask          <mask>              : Subnet mask used for previous scan
-
-    {self.color.OKCYAN}[mobile]{self.color.ENDC}
-        -P, --path              <apk_ipa_file>      : Path to the mobile application file
-                                                     <apk | ipa>
-
-    {self.color.OKCYAN}[password]{self.color.ENDC}
-        -t, --test                                  : Test the password against a protocol
-            [{self.color.ITALICS}ip | domain | pass_file{self.color.ENDC}]
-
-            -d, --domain        <domain>            : Domain to test
-            -p, --pass_file     <pass_file>         : Password file to test
-            --ip                <target_ip>         : Target IP address
-
-        -g, --generate                              : Generate a password list from cracked hashes
-            [{self.color.ITALICS}crack | output | dump{self.color.ENDC}]
-
-            -c, --crack         <cracked_hashes>    : File with Cracked hashes
-            -o, --output        <output_file>       : Output file
-            --dump              <dump_file>         : NTDS Dump file
-
-    {self.color.OKCYAN}[vulnerability analysis]{self.color.ENDC}
-        -s, --scanner           <scanner>           : Scanner used for analysis e.g( nessus | rapid )
-        -o, --output            <output_file>       : Output file for your Vulnerability analysis report
-        -P, --path              <path_to_files>     : Path to your scanned files
-
-    {self.color.OKCYAN}[external]{self.color.ENDC}
-        -d, --domain            <domain>            : Domain to test
-
-{self.color.BOLD}EXAMPLES:{self.color.ENDC}==> 
-        [Run script interactively]
-        main.py -M interactive 
-
-        1.{self.color.WARNING}Mobile:{self.color.ENDC}
-                main.py -M cli_args mobile -P /path/to/app.apk
-        
-        2.{self.color.WARNING}Internal:{self.color.ENDC}
-            Scan:
-                main.py -M cli_args internal -a scan --ip 10.10.10.2/24 -o scan_results.txt
-            Resume:
-                main.py -M cli_args internal -a resume -r unresponsive_hosts.txt -m 24
-        
-        3.{self.color.WARNING}Password:{self.color.ENDC}
-            test:
-                main.py -M cli_args password -t -d domain.example.com -p /path/to/pass-file --ip 192.168.1.1
-            generate:
-                main.py -M cli_args password -g -c /path/to/crack-file -o output.txt --dump /path/to/dump-file
-        
-        4.{self.color.WARNING}Vulnerability Analysis:{self.color.ENDC}
-                main.py -M cli_args va -s nessus -o report.txt -P /path/to/scanned-files
-        
- -h, --help  Show this custom help""")
-        # Check if verbose flag is set in namespace
-        #print(namespace)
-
-        full_help_text = simple_help_text + more_text
-        print(full_help_text)
-        sys.exit(0)
 
 
 class InteractionHandler:
@@ -108,25 +16,17 @@ class InteractionHandler:
     Switches between different modes [interactive and arguments]
     """
 
-    # {os.path.basename(__file__)}
-
     def __init__(self):
-        pass
-        self.HEADLINE = (
-            "main.py [-h] -M {interactive,cli_args} "
-            "[MODULE {internal,mobile,password,va,external}] [OPTIONS...]"
-        )
         self.argument_mode = False
         self.arguments = {}
         self.validator = Validator()
 
-
     def main(self):
         """Main Program"""
-        parser = ArgumentParser(
-            description="Main Program for Penetration Testing",
+        parser = CustomArgumentParser(
+            description="Penetest Framework: A modular penetration testing tool",
             add_help=False,
-            usage=self.HEADLINE
+            formatter_class=RawTextHelpFormatter
         )  #
         # Verbosity flag
         parser.add_argument(
@@ -135,8 +35,7 @@ class InteractionHandler:
             action="store_true",
             help="Show full help text when used with --help",
         )
-       
-        
+
         parser.add_argument(
             "-M",
             dest="script_mode",
@@ -149,7 +48,7 @@ class InteractionHandler:
                 "  cli_args: run with command-line arguments"
             ),
         )
-         # Custom help function
+        # Custom help function
         parser.add_argument(
             "-h",
             "--help",
@@ -270,6 +169,7 @@ class InteractionHandler:
             action="store_true",
             help="Generate a password list from cracked hashes",
         )
+
         parser.add_argument(
             "--ip",
             help="Target IP address - required for test",
@@ -312,6 +212,15 @@ class InteractionHandler:
             required=True,
             help="Mode of the internal PT (scan | resume)",
         )
+        parser.add_argument(
+            "-I", "--interface",
+            required=True,
+            choices=[iface
+                     for iface in get_network_interfaces()
+                     if NetworkHandler()._is_interface_active(iface)
+                     and not iface.startswith(("br-", "docker", "veth", "lo"))],
+            help="Interface to use with the script e.g (eth0, wlan0)"
+        )
         mode_group = parser.add_argument_group("mode-specific arguments")
         mode_group.add_argument(
             "--ip",
@@ -324,7 +233,8 @@ class InteractionHandler:
         )
         mode_group.add_argument(
             "-r",
-            "--resume",
+            "--resume_file",
+            dest="resume",
             help="File with unresponsive hosts - required for resume",
         )
         mode_group.add_argument(
@@ -433,6 +343,8 @@ class InteractionHandler:
     def handle_internal_arguments(self, args, module):
         """Handle Internal PT arguments"""
         action = args.action
+        interface = args.interface
+        print(interface)
         if action == "scan":
             # scan network
             ip_cidr = args.ip
@@ -450,6 +362,7 @@ class InteractionHandler:
                 "action": action,
                 "subnet": ip_cidr,
                 "output": output,
+                "interface": interface
             }
         elif action == "resume":
             # Resume scan
@@ -468,9 +381,5 @@ class InteractionHandler:
                 "action": action,
                 "resume_file": resume_file,
                 "mask": mask,
+                "interface": interface
             }
-
-
-if __name__ == "__main__":
-    interaction = InteractionHandler()
-    interaction.main()

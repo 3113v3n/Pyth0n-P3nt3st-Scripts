@@ -63,10 +63,10 @@ class ExternalConfigs:
 
     HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
     EXTERNAL_HELPER_STRING = f"""{HEADLINE}
-    Module scans the targets domain [domain.xy.z] and uses different techniques
-     to try and enumerate information on the target.
+Module scans the targets domain [domain.xy.z] and uses different techniques
+    to try and enumerate information on the target.
 
-    {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
-            {color.OKGREEN}domain {color.ENDC}  Target domain to scan
+{color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
+        {color.OKGREEN}domain {color.ENDC}  Target domain to scan
 
 {HEADLINE}"""

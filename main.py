@@ -145,6 +145,8 @@ class PentestFramework(ScreenHandler):
                 _output_file = _vars["output"]
                 network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
+        
+
         network.initialize_network_variables(_vars, test_domain, ProgressBar)
 
         internal.initialize_variables(is_cmdl= self.cmd_args,

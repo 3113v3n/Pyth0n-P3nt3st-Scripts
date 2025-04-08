@@ -23,6 +23,7 @@ class InternalAssessment(DisplayHandler):
 
     def initialize_variables(self, mode, output_file, is_cmdl=False):
         # Sets user provided values
+
         self.mode = mode
         self.hide_helper = is_cmdl
         if mode == "scan":
@@ -37,7 +38,8 @@ class InternalAssessment(DisplayHandler):
          to increase your attack surface
         """
         if not self.hide_helper:
-            self._helper.internal_helper("scanner")
+            #self._helper.internal_helper("scanner")
+            pass
         live_ip_count = self.network_manager.get_live_ips(
             output=self.output_file)
         paths = self.network_manager.get_file_paths()
