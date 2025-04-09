@@ -29,12 +29,12 @@ class InteractionHandler:
             formatter_class=RawTextHelpFormatter
         )  #
         # Verbosity flag
-        parser.add_argument(
-            "-v",
-            "--verbose",
-            action="store_true",
-            help="Show full help text when used with --help",
-        )
+        # parser.add_argument(
+        #     "-v",
+        #     "--verbose",
+        #     action="store_true",
+        #     help="Show full help text when used with --help",
+        # )
 
         parser.add_argument(
             "-M",

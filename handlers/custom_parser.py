@@ -22,11 +22,12 @@ class CustomHelp(Action):
 This is a custom CLI tool for Penetration Testing.
               
 {self.color.BOLD}Usage:{self.color.ENDC}
-               {self.color.ITALICS}main.py -M <interactive|cli_args> [MODULE] [OPTIONS]{self.color.ENDC}
+               {self.color.ITALICS}main.py -M <interactive|cli_args [MODULES..] [OPTIONS..]> {self.color.ENDC}
+                
 {self.color.BOLD}Options:{self.color.ENDC}
     -M MODE   Select mode: 'interactive' or 'cli_args'
               {self.color.OKGREEN}interactive:{self.color.ENDC} Run with user interaction
-              {self.color.OKGREEN}cli_args:{self.color.ENDC} Run with command-line arguments
+              {self.color.OKGREEN}cli_args:{self.color.ENDC}    Run with command-line arguments
         
 {self.color.BOLD}MODULE:{self.color.ENDC}       Choose module:                          mobile, internal, password, va, external
                    internal:                          Handle Internal Penetration Testing
@@ -77,9 +78,10 @@ This is a custom CLI tool for Penetration Testing.
         -d, --domain            <domain>            : Domain to test
 
 {self.color.BOLD}EXAMPLES:{self.color.ENDC}==> 
-        [Run script interactively]
+        [{self.color.OKGREEN}Run script interactively{self.color.ENDC}]
         main.py -M interactive 
 
+        [{self.color.OKGREEN}Run script with command line arguments{self.color.ENDC}]
         1.{self.color.WARNING}Mobile:{self.color.ENDC}
                 main.py -M cli_args mobile -P /path/to/app.apk
         
