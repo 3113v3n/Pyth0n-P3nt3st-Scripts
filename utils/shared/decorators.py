@@ -59,7 +59,38 @@ class CustomDecorators:
     def print_total_time(cls, message="Total execution time:"):
         """Print the total time taken to execute all functions"""
         hours, minutes, seconds = cls.format_time(cls.total_time)
-        print(f"\n{message} {hours} hours, {minutes} minutes and {seconds} seconds")
+
+        def format_unit(unit:int, label:str):
+            """Format label accordingly
+            Args:
+                unit:  time measurement
+                label: [minutes,seconds,hours]
+            """
+            if unit == 1:
+                return f"{unit} {label}"
+            else:
+                return f"{unit} {label}s"
+
+        time_text = ""
+
+        if seconds and not (minutes or hours):
+            time_text = format_unit(seconds, "second")
+        elif seconds and minutes and not (hours):
+            time_text = f"{format_unit(minutes, "minute")} and {format_unit(seconds, "second")}."
+        elif minutes and not (hours or seconds):
+            time_text = format_unit(minutes, "minute")
+        elif hours and not (minutes or seconds):
+            time_text = format_unit(hours, "hour")
+        elif hours and minutes and not seconds:
+            time_text = f"{format_unit(hours, "hour")} and {format_unit(minutes, "minute")}"
+        elif hours and seconds and not minutes:
+            time_text = f"{format_unit(hours, "hour")} and {format_unit(seconds, "second")}."
+        else:
+            time_text = f"{format_unit(hours, "hour")}, {format_unit(minutes, "minute")} and {format_unit(seconds, "second")}"
+
+        #print(f"{hours} hours:{minutes} minutes:{seconds} seconds")
+
+        print(f"\n{message} {time_text}")
 
     @staticmethod
     def format_time(time_in_seconds):
@@ -74,3 +105,9 @@ class CustomDecorators:
         """Reset the total time to 0"""
         # global total_time
         cls.total_time = 0
+
+
+if __name__ == "__main__":
+    decorator = CustomDecorators()
+
+    decorator.print_total_time()

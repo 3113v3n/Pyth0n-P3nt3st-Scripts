@@ -109,8 +109,7 @@ class PentestFramework(ScreenHandler):
 
             return False
 
-    
-    def handle_internal_assessment(self,user, network, internal, **kwargs):
+    def handle_internal_assessment(self, user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
         _vars = {}
@@ -145,17 +144,14 @@ class PentestFramework(ScreenHandler):
                 _output_file = _vars["output"]
                 network.existing_unresponsive_ips = user.existing_unresponsive_ips
 
-        
-
         network.initialize_network_variables(_vars, test_domain, ProgressBar)
 
-        internal.initialize_variables(is_cmdl= self.cmd_args,
-                                      mode=_action, 
+        internal.initialize_variables(is_cmdl=self.cmd_args,
+                                      mode=_action,
                                       output_file=_output_file)
         internal.enumerate_hosts()
 
-    
-    def handle_password_operations(self,user, password, **kwargs):
+    def handle_password_operations(self, user, password, **kwargs):
         """Handle Password related operations"""
         # Initialize Password class variables
         output_dir = user.output_directory
@@ -218,29 +214,22 @@ class PentestFramework(ScreenHandler):
             # Set scanner
             vulnerability_analysis.set_scanner(scanner_type)
 
-            formatted_issues = vulnerability_analysis.analyze_scan_files(
-                test_domain, input_files)
-            if formatted_issues is None:
-                raise ValueError("No vulnerabilities found to process")
-
-            # pprint(formatted_issues)
-
-            success = vulnerability_analysis.sort_vulnerabilities(
-                formatted_issues,
+            vulnerability_analysis.analyze_scan_files(
+                test_domain,
+                input_files,
                 output_file
-            )
-            if not success:
-                raise ValueError("Failed to sort and save vulnerabilities")
-
-            # Sync success message
+                )
+            vulnerability_analysis.decorator.print_total_time(
+                "Analysis Completed in Approximately: ")
             return True
         except Exception as e:
             self.print_error_message(
                 message="Error in vulnerability assessment", exception_error=e)
             return False
+        finally:
+            vulnerability_analysis.decorator.reset_total_time()
 
-    
-    def handle_mobile_assessment(self,user, mobile, **kwargs):
+    def handle_mobile_assessment(self, user, mobile, **kwargs):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
         _vars = None
@@ -257,8 +246,7 @@ class PentestFramework(ScreenHandler):
         mobile.initialize_variables(mobile_testing_vars)
         mobile._inspect_files(test_domain)
 
-    
-    def handle_external_assessment(self,user):
+    def handle_external_assessment(self, user):
         """Handle external assessment"""
         # initialize variables that will be used to test different External PT modules
         # external.initialize_variables(variables=domain_vars)
