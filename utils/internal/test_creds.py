@@ -144,6 +144,7 @@ class CredentialsUtil(Bcolors):
                 self.FAIL,
                 self.handle_string_replace
             )
+
         elif self.SUCCESS_DECORATOR in cleaned_line and self.get_string_from_list(self.LOGON_SUCCESS_TEXT, cleaned_line):
             colored_line = self.handle_colored_text(
                 cleaned_line,
@@ -171,8 +172,8 @@ class CredentialsUtil(Bcolors):
         parts = cleaned_line.split(decorator)
         if len(parts) > 1:
             # Color decorator and text
-            colored_line = (f"{parts[0]}{dec_color_start}{decorator}{color_end} {handle_string_replace(
-                parts[1], text_to_colour, txt_color_start, color_end)}"
+            colored_line = (
+                f"{parts[0]}{dec_color_start}{decorator}{color_end} {handle_string_replace(parts[1], text_to_colour, txt_color_start, color_end)}"
             )
         else:
             colored_line = cleaned_line  #
@@ -185,9 +186,10 @@ class CredentialsUtil(Bcolors):
             possible_vars: list,
             start_color: str,
             end_color: str) -> str:
+
         sentence = full_text
         for word in possible_vars:
             if word in sentence:
                 colored_word = f"{start_color}{word}{end_color}"
                 sentence = sentence.replace(word, colored_word)
-        return sentence
+            return sentence
