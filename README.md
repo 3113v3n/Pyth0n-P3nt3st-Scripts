@@ -28,24 +28,18 @@ Some of the Scope covered or in progress include but not limited to:
 |                              |                                                                    |
 
 The script runs in two modes: [interactive and cli_args]
-    1. interactive: An interactive mode that takes user input step by step (Good for first time run)
-    2. cli_args:    Takes command line arguments and execute the script in a one liner
+    - 1. interactive: An interactive mode that takes user input step by step (Good for first time run)
+    - 2. cli_args:    Takes command line arguments and execute the script in a one liner
 
 ## 1. Internal Penetration Testing
 
 - Focuses on enumerating an organization's _Internal Network_
 - To run the module simply enter [ **_Number displayed on Right_** ] on the provided prompt
 - Requires one to pass in an ip address in the following format (ip_address/subnet)
- 
-  ```text
-  Example:
-      10.0.0.3/16
 
-  ```
-  
-  ![internal help](images/internal-2.png)
   ![Internal Module](images/internal.png)
-
+  ![internal help](images/internal-2.png)
+  
 - The script then enumerates the provided subnet and uses ICMP protocol to determine hosts that are alive on the network
 - The scan runs on two modes **SCAN** and **RESUME**
 - SCAN mode: default mode where the script runs a scan and saves to a csv file
@@ -111,7 +105,7 @@ python main.py -M cli_args mobile -P "/Path/To/Apk_or_iOS_file"
 This module has two actions:
     generate ==> Generates a password list from your already cracked hashes and ntds file
     test ==> test your credentials against a particular IP address using SMB protocol (uses netexec)
-    
+
 ![module help](images/password1.png)
 
 ```sh
