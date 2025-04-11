@@ -5,6 +5,7 @@ from utils.shared import Validator
 from handlers.network_handler import (NetworkHandler,
                                       get_network_interfaces)
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
+from handlers.file_handler import FileHandler
 
 
 def get_basename(fullpath):
@@ -20,6 +21,7 @@ class InteractionHandler:
         self.argument_mode = False
         self.arguments = {}
         self.validator = Validator()
+        self.filehandler = FileHandler()
 
     def main(self):
         """Main Program"""
@@ -283,7 +285,15 @@ class InteractionHandler:
             raise ValueError(
                 f"Path {path} is not a valid directory. Ensure it exists and is a directory"
             )
-        return {"module": module, "output_file": file, "scan_folder": path}
+        # ENSURE THE FILES ARE OF VALID FILETYPES [.CSV,.XLSX,.XLX]
+        self.filehandler.find_files(path) # generates a list of all files
+        file_collection = self.filehandler._get_file_collections()
+        valid_files = self.filehandler._filter_files_by_extension(
+            file_collection, extension="both")
+
+        return {"module": module,
+                "output_file": file,
+                "scan_files": valid_files}
 
     def handle_password_arguments(self, args, module):
         """Handle Password arguments"""

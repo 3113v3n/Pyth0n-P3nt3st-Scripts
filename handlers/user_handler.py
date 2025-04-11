@@ -126,6 +126,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
                 file_extension = self.SCAN_FILE_FORMAT[file_format_index]
+            
 
                 self.print_info_message(
                     f"Scanning {file_extension.upper()} file extensions")

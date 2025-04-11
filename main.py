@@ -194,9 +194,9 @@ class PentestFramework(ScreenHandler):
                 _vars = kwargs.get("user_data")
                 test_domain: str = _vars["module"]
                 output_file: str = _vars["output_file"]
-                scan_folder = _vars["scan_folder"]
 
-                all_files = user.find_files(scan_folder)
+                all_files = _vars["scan_files"]
+
                 if not all_files:
                     raise ValueError(
                         "No files found in the specified scan folder")
@@ -218,7 +218,7 @@ class PentestFramework(ScreenHandler):
                 test_domain,
                 input_files,
                 output_file
-                )
+            )
             vulnerability_analysis.decorator.print_total_time(
                 "Analysis Completed in Approximately: ")
             return True

@@ -232,10 +232,15 @@ class FileHandler(Validator, DisplayHandler):
         # Resume scan
         return self._handle_analysis(**kwargs)
 
-    def _get_filtered_files(self, **kwargs) -> list:
+    def _get_filtered_files(self,**kwargs) -> list:
         """Get filtered files based on user input
+        
+        kwargs: 
+            [Keyword arguments]
+            scan_extension:         return files with given extension
+            resume_scan:            returns an IP address from the given file
+            display_application:    returns mobile applications
 
-        :param kwargs: Keyword arguments
         :return: List of filtered files
         """
         file_collection = self._get_file_collections()
