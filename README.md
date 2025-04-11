@@ -28,8 +28,8 @@ Some of the Scope covered or in progress include but not limited to:
 |                              |                                                                    |
 
 The script runs in two modes: [interactive and cli_args]
-    - 1. interactive: An interactive mode that takes user input step by step (Good for first time run)
-    - 2. cli_args:    Takes command line arguments and execute the script in a one liner
+- 1. interactive: An interactive mode that takes user input step by step (Good for first time run)
+- 2. cli_args:    Takes command line arguments and execute the script in a one liner
 
 ## 1. Internal Penetration Testing
 
