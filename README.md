@@ -33,8 +33,8 @@ The script runs in two modes: [interactive and cli_args]
 
 ## 1. Internal Penetration Testing
 
-Focuses on enumerating an organization's _Internal Network_
-To run the module simply enter [ **_Number displayed on Right_** ] on the provided prompt
+Focuses on enumerating an organization's _Internal Network_.
+To run the module simply enter [ **_Number displayed on Right_** ] on the provided prompt.
 
 Requires one to pass in an ip address in the following format (ip_address/subnet)
 
@@ -46,7 +46,7 @@ The scan runs on two modes **SCAN** and **RESUME**
 
 **SCAN MODE**: default mode where the script runs a scan and saves to a csv file.
 ```sh
-    python main.py -M cli_args internal -a scan -I eth0 --ip 10.0.0.3/16 -o Output_file
+python main.py -M cli_args internal -a scan -I eth0 --ip 10.0.0.3/16 -o Output_file
 ```
 ![scan mode](images/internal_scan.png)
 
@@ -113,10 +113,6 @@ python main.py -M cli_args mobile -P "/Path/To/Apk_or_iOS_file"
 ### Start script
 
 ![Mobile Penetration](images/mobile-start.png)
-
-### Check for hardcoded values
-
-![Hardcoded strings](images/mobile-hardcoded.png)
 
 ***
 
