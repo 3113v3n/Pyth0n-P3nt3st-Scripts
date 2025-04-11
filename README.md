@@ -38,6 +38,9 @@ Some of the Scope covered or in progress include but not limited to:
   Example:
       10.0.0.3/16
   ```
+  ```sh
+  ╰─ python main.py -M cli_args internal -a scan -I eth0 --ip 10.0.0.3/16 -o Output_file
+  ```
   ![Internal Module](images/internal-2.png)
 
 - The script then enumerates the provided subnet and uses ICMP protocol to determine hosts that are alive on the network
@@ -51,8 +54,9 @@ It then sorts the IPs and selects the last IP in the file and resumes scan from 
 The script then looks for a file with a similar filename excluding "unresponsive" to update
 
 The user is however required to provide the subnet that was being scanned initially i.e /8 /16 /24 e.t.c
-
- 
+```
+```sh
+╰─ python main.py -M cli_args internal -a resume  -I eth0 --resume <file-containing-unresponsive-host > --mask 16
 
 ```
 ![Resume_scan](images/internal_resume.png)
