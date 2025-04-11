@@ -39,7 +39,7 @@ Some of the Scope covered or in progress include but not limited to:
       10.0.0.3/16
   ```
   ```sh
-  ╰─ python main.py -M cli_args internal -a scan -I eth0 --ip 10.0.0.3/16 -o Output_file
+    python main.py -M cli_args internal -a scan -I eth0 --ip 10.0.0.3/16 -o Output_file
   ```
   ![Internal Module](images/internal-2.png)
 
@@ -56,7 +56,7 @@ The script then looks for a file with a similar filename excluding "unresponsive
 The user is however required to provide the subnet that was being scanned initially i.e /8 /16 /24 e.t.c
 ```
 ```sh
-╰─ python main.py -M cli_args internal -a resume  -I eth0 --resume <file-containing-unresponsive-host > --mask 16
+    python main.py -M cli_args internal -a resume  -I eth0 --resume /Path/to/unresponsive-file --mask 16
 
 ```
 ![Resume_scan](images/internal_resume.png)
@@ -72,6 +72,9 @@ The user is however required to provide the subnet that was being scanned initia
     Path to Scanned files: The Nessus output file (csv)
     Output file: The Name of your analyzed file
 ```
+```sh
+python main.py -M cli_args va -s nessus -o OUTPUT -P "/Path/to/scanned/files" 
+```
 ![Vulnerability Analysis](images/va.png)
 
 ## 3. Mobile Penetration Testing
@@ -84,6 +87,9 @@ The user is however required to provide the subnet that was being scanned initia
 2. URLs present within the application
 3. IP addresses present
 4. Decode any available base64 strings
+```sh
+python main.py -M cli_args mobile -P /Path/To/[Apk or iOS] file
+```
 
 ### Start script
 ![Mobile Penetration](images/mobile-start.png)
@@ -106,11 +112,21 @@ in the following format:
             dumped hashes format :
                                  USERNAME: ACCOUNTID: LMHASH: NTHASH ::: (ACC STATUS)
 ```
+```sh
+# Generate Password List
+python main.py -M cli_args password -g --crack /Path/to/cracked_hashes --output my_password_list --dump Path/to/dumps.ntds
+
+# Test Password
+python main.py -M cli_args password -t --ip 10.0.0.3 --domain testdomain.co --pass_file my_password_list
+
+```
 
 ### Select module
 ![module](images/password1.png)
 ### Required arguments
 ![arguments](images/password-02.png)
+### Test Passwords
+![test](images/test-pass.png)
 
 ## 5. External Penetration Testing
 
