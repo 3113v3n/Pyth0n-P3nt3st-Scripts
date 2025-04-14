@@ -5,6 +5,8 @@ from .user_handler import UserHandler
 from .messages import DisplayHandler
 from .screen import ScreenHandler
 from .helper_handler import HelpHandler
+from .interaction import InteractionHandler
+from .custom_parser import CustomArgumentParser
 
 __all__ = [
     FileHandler,
@@ -12,6 +14,8 @@ __all__ = [
     UserHandler,
     NetworkHandler,
     PackageHandler,
-    DisplayHandler, 
-    HelpHandler
+    DisplayHandler,
+    HelpHandler,
+    InteractionHandler,
+    CustomArgumentParser
 ]

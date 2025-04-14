@@ -2,10 +2,14 @@ from pathlib import Path
 import os
 import re
 from handlers import FileHandler, ScreenHandler
-from utils.shared import Commands, Config
+from utils.shared import Commands, Config, CustomDecorators
 
 
-class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
+class MobileCommands(
+        FileHandler,
+        Config,
+        Commands,
+        ScreenHandler, CustomDecorators):
     def __init__(self):
         super().__init__()
 
@@ -17,6 +21,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
         self.temp_data = ""
         self.temp_base64_data = ""
         self.templates_folder = ""
+        self.debug = False
 
     @staticmethod
     def rename_folders_with_spaces(path):
@@ -76,6 +81,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
         :return:
             Folder name
         """
+
         self.templates_folder = self.output_directory + "/mobile-nuclei-templates"
         platform = platform.title() if platform == "android" else platform
 
@@ -105,7 +111,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             command = android_cmd if self.file_type.lower() == "apk" else ios_cmd
             if not self.check_folder_exists(folder_name):
 
-                self.print_success_message(
+                self.print_info_message(
                     f" Decompiling the {self.file_name} application ..."
                 )
                 result = self.run_os_commands(command)
@@ -134,6 +140,9 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
         return self.folder_name
 
+    @CustomDecorators.with_loader(desc="\n[*] Finding application files for analysis",
+                                  end="\n[+] Found Files for Analysis..",
+                                  spinner_type="pipe")
     def find_app_files(self, app_folder, output):
         with open(output, "a") as output_file:
             for file in Path(app_folder).rglob("*"):
@@ -143,13 +152,16 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                     if result.stdour.strip():
                         output_file.write(f"{result.stdout}")
 
+    @CustomDecorators.with_loader(desc="\n[*] Finding Potential Hardcoded Strings in Files",
+                                  end="\n[+] Found Potential Hardcoded Strings...")
     def find_hardcoded_data(self, app_folder, output):
         with open(output, "a") as outfile:
             for file in Path(app_folder).rglob("*"):
                 if file.is_file():
-                    self.print_info_message(
-                        "Searching For hardcoded strings in File", file=file
-                    )
+                    if self.debug:
+                        self.print_info_message(
+                            "Searching For hardcoded strings in File", file=file
+                        )
                     command = f"rabin2 -zzzqq  {file}"
                     regex_patterns = [
                         self.BEARER_REGEX,
@@ -165,38 +177,44 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
                         if result.returncode == 0 and result.stdout != "":
                             # Sort and remove duplicates, then write to temp_file
-                            unique_lines = sorted(set(result.stdout.splitlines()))
+                            unique_lines = sorted(
+                                set(result.stdout.splitlines()))
                             joined_string = "\n".join(unique_lines) + "\n"
-                            formated_string = self.format_content(joined_string)
-                            self.print_success_message(
-                                "Writing Potential Hardcoded string to temporary file ",
-                                flush=True,
-                            )
+                            formated_string = self.format_content(
+                                joined_string)
+                            if self.debug:
+                                self.print_success_message(
+                                    "Writing Potential Hardcoded string to temporary file ",
+                                    flush=True,
+                                )
                             outfile.write(formated_string)
 
     def get_base64_strings(self, folder, base_name, platform):
         path_2_folder = Path(folder)
         output = f"{base_name}_{platform}_base64.txt"
 
-        # TODO: refactor code:
-        # avoid saving to file
-        # use class memory
-
         if not self.temp_data:
             self.create_temp_file(path_2_folder)
 
         if not self.temp_base64_data:
-            self.print_info_message("Processing base64 strings ...")
+            if self.debug:
+                self.print_info_message("Processing base64 strings ...")
             base64_strings = re.findall(self.BASE64_REGEX, self.temp_data)
             self.temp_base64_data = sorted(set(base64_strings))
-            self.print_success_message("Base64 strings processed and stored in memory.")
+            if self.debug:
+                self.print_success_message(
+                    "Base64 strings processed and stored in memory.")
 
         self.decode_base64(output)
 
+    @CustomDecorators.with_loader(desc="\n[*] Creating Temporary File",
+                                  end="\n[+] Created temporary file",
+                                  spinner_type="arc")
     def create_temp_file(self, folder_path):
-        self.print_info_message(
-            "Creating in-memory temp data from folder: ", file=folder_path
-        )
+        if self.debug:
+            self.print_info_message(
+                "Creating in-memory temp data from folder: ", file=folder_path
+            )
         temp_data_list = []
         folder = Path(self.folder_name)
 
@@ -210,7 +228,9 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
                     if result.stdout.strip():
                         joined_string = "\n".join(unique_lines) + "\n"
-                        self.print_info_message(" Getting strings from: ", file=file)
+                        if self.debug:
+                            self.print_info_message(
+                                " Getting strings from: ", file=file)
                         temp_data_list.append(joined_string)
                 except Exception as error:
                     self.print_error_message(
@@ -219,11 +239,11 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
         self.temp_data = "".join(temp_data_list)
 
+    @CustomDecorators.with_loader(desc="\n[*] Decoding base64 strings",
+                                  end="\n[-] Decoding Complete",
+                                  spinner_type="bounce")
     def decode_base64(self, output):
         """Decode base64 strings stored in memory and write to file"""
-        loader = self.show_loader(
-            "Decoding base64 strings ", "Decoding Complete", continuous=True
-        )
         try:
             with open(output, "a") as out_f:
                 # Set loading variable
@@ -237,16 +257,17 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                             decoded = self.run_os_commands(command)
 
                             if decoded.stdout:
-                                self.print_info_message(
-                                    message="Encoded String: ",
-                                    flush=True,
-                                    encoded_string=string,
-                                )
-                                self.print_success_message(
-                                    message="Decoded String: ",
-                                    extras=decoded.stdout,
-                                    flush=True,
-                                )
+                                if self.debug:
+                                    self.print_info_message(
+                                        message="Encoded String: ",
+                                        flush=True,
+                                        encoded_string=string,
+                                    )
+                                    self.print_success_message(
+                                        message="Decoded String: ",
+                                        extras=decoded.stdout,
+                                        flush=True,
+                                    )
                                 out_f.write(
                                     f"Encoded String: {string}\nDecoded string: {decoded.stdout}\n"
                                 )
@@ -259,8 +280,6 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             self.print_error_message(
                 message="Error decoding base64 strings", exception_error=e
             )
-        finally:
-            loader.stop()
 
     def get_deeplinks(self, application_folder, basename):
         url_name = f"{basename}_URLs.txt"
@@ -281,7 +300,8 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                     # returns a list of URLS that don't match the ignored REGEX
                     filtered_urls = list(
                         filter(
-                            lambda url: not re.search(self.DEEPLINKS_IGNORE_REGEX, url),
+                            lambda url: not re.search(
+                                self.DEEPLINKS_IGNORE_REGEX, url),
                             unfiltered_urls,
                         )
                     )
@@ -292,9 +312,10 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                     ips = re.findall(self.IP_REGEX, result.stdout)
 
                     if len(ips) != 0:
-                        self.print_warning_message(
-                            message="Possible IP(s) found", data=ips, flush=True
-                        )
+                        if self.debug:
+                            self.print_warning_message(
+                                message="Possible IP(s) found", data=ips, flush=True
+                            )
                         all_ips.extend([ip for ip in ips])
 
                 except Exception as e:
@@ -306,7 +327,8 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
 
         # Process IPs and URLs
         ip_count = self.sort_urls_and_ips(ip_name, all_ips) if all_ips else 0
-        url_count = self.sort_urls_and_ips(url_name, all_urls) if all_urls else 0
+        url_count = self.sort_urls_and_ips(
+            url_name, all_urls) if all_urls else 0
 
         # Print success message
         if ip_count > 0:
@@ -363,7 +385,8 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
         # get url scheme
         self.ios_url_scheme(decompiled_app_folder, basename=file_basename)
         # find files
-        self.find_app_files(app_folder=decompiled_app_folder, output=output_dir)
+        self.find_app_files(
+            app_folder=decompiled_app_folder, output=output_dir)
 
     def ios_url_scheme(self, decompiled_folder, basename):
         filename = f"{basename}_iOS_URL_schemes.txt"
@@ -391,6 +414,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
         self.run_os_commands(db_command)
         self.run_os_commands(pl_command)
 
+    @CustomDecorators.measure_execution_time
     def inspect_application_files(self, application: str, test_domain: str):
         try:
             self.update_output_directory(test_domain)
@@ -420,6 +444,7 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                 message="Application scanning complete, all your files are located here :==>",
                 mobile_success=self.mobile_output_dir,
             )
+
             self.flush_system()
         except Exception as e:
             self.print_error_message(
@@ -439,7 +464,8 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             self.flush_system("I/O")
             self.kill_processes()
         except Exception as e:
-            self.print_error_message(message="Error during cleanup", exception_error=e)
+            self.print_error_message(
+                message="Error during cleanup", exception_error=e)
 
     def create_subfolder(self):
         """Create subfolder from the filename of package being scanned to score scan results"""
@@ -468,7 +494,8 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
             try:
 
                 self.run_os_commands(command)
-                self.print_success_message(" Nuclei template Installed successfully")
+                self.print_success_message(
+                    " Nuclei template Installed successfully")
 
             except Exception as e:
                 self.print_error_message(
@@ -503,4 +530,5 @@ class MobileCommands(FileHandler, Config, Commands, ScreenHandler):
                 self.run_os_commands(android_nuclei)
 
         except Exception as e:
-            self.print_error_message(message="Error running command", exception_error=e)
+            self.print_error_message(
+                message="Error running command", exception_error=e)

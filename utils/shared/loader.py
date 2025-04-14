@@ -3,6 +3,7 @@ from shutil import get_terminal_size
 from threading import Thread, Event
 from time import sleep
 from typing import Optional
+from .colors import Bcolors
 
 
 class Loader:
@@ -32,8 +33,7 @@ class Loader:
                  timeout: float = 0.1,
                  timer: int = 10,
                  spinner_type: str = "dots",
-                 continuous: bool = False
-
+                 continuous=True
                  ):
 
         self.desc = desc
@@ -41,12 +41,12 @@ class Loader:
         self.timeout = max(0.1, timeout)
         self.spinner = self.DEFAULT_SPINNER.get(
             spinner_type, self.DEFAULT_SPINNER["dots"])
-        self.continuous = continuous
 
         self._done = Event()
         self._thread: Optional[Thread] = None
         self._cols = get_terminal_size((80, 20)).columns
         self.timer = timer
+        self.continuous = continuous
 
     def start(self):
         """Start Animation"""
@@ -54,9 +54,6 @@ class Loader:
             self._done.clear()
             self._thread = Thread(target=self._animate, daemon=True)
             self._thread.start()
-            if not self.continuous:
-                # Timed loading
-                self._thread.join()
 
     def _animate(self) -> None:
         try:
@@ -65,7 +62,7 @@ class Loader:
             if self.continuous:
                 while not self._done.is_set():
                     frame = next(spinner_cycle)
-                    output = f"\r{self.desc} {frame} "
+                    output = f"\033[F\033[G{Bcolors.OKCYAN}{self.desc}{Bcolors.ENDC} {frame} "
                     print(output, flush=True, end="")
                     sleep(self.timeout)
 
@@ -76,7 +73,10 @@ class Loader:
                         break
 
                     frame = next(spinner_cycle)
-                    print(f"\r{self.desc} {frame} ", flush=True, end="")
+                    # print(f"\033[F\033[G{self.desc} {frame} ",
+                    #       flush=True, end="")
+                    print(
+                        f"\r{Bcolors.OKCYAN}{self.desc}{Bcolors.ENDC} {frame} ", flush=True, end="")
                     sleep(self.timeout)
                 self._done.set()
 
@@ -84,7 +84,7 @@ class Loader:
             # Clear the line and print end message
             print("\r" + " " * self._cols, end="", flush=True)
             if self.end:
-                print(f"\r{self.end}", flush=True)
+                print(f"\r{Bcolors.OKGREEN}{self.end}{Bcolors.ENDC}", flush=True)
 
     def stop(self):
         """Stop Animation"""

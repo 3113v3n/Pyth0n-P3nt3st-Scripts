@@ -6,12 +6,13 @@ from handlers import NetworkHandler, DisplayHandler, HelpHandler
 class InternalAssessment(DisplayHandler):
     """class will be responsible for handling all Internal PT"""
 
-    def __init__(self, network: NetworkHandler,helper_instance:HelpHandler) -> None:
+    def __init__(self, network: NetworkHandler, helper_instance: HelpHandler) -> None:
         super().__init__()
         self.output_file = "sample.txt"
         self.mode = "SCAN"
         self.network_manager = network
         self._helper = helper_instance
+        self.hide_helper = False
 
     @classmethod
     def reset_class_states(cls, network: NetworkHandler):
@@ -20,9 +21,11 @@ class InternalAssessment(DisplayHandler):
         cls.mode = "SCAN"
         cls.network_manager = network
 
-    def initialize_variables(self, mode, output_file):
+    def initialize_variables(self, mode, output_file, is_cmdl=False):
         # Sets user provided values
+
         self.mode = mode
+        self.hide_helper = is_cmdl
         if mode == "scan":
             self.output_file = self.network_manager.generate_unique_name(
                 output_file, "csv")
@@ -34,7 +37,9 @@ class InternalAssessment(DisplayHandler):
         """Lists all possible hosts on a network using ICMP protocol
          to increase your attack surface
         """
-        self._helper.internal_helper("scanner")
+        if not self.hide_helper:
+            #self._helper.internal_helper("scanner")
+            pass
         live_ip_count = self.network_manager.get_live_ips(
             output=self.output_file)
         paths = self.network_manager.get_file_paths()
@@ -54,7 +59,6 @@ class InternalAssessment(DisplayHandler):
         elif unresponsive:
             self.print_warning_message(
                 "Scan incomplete, retaining unresponsive file ", file_path=unresponsive)
-
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

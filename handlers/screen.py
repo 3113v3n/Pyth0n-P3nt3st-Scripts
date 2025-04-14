@@ -30,8 +30,7 @@ class ScreenHandler(DisplayHandler):
         message: str,
         end_message: str,
         spinner_type: str = "dots",
-        continuous: bool = False,
-        timer=30
+        timer=10
     ):
         """Display Loading functionality to a user
         :param message: message to display
@@ -43,12 +42,11 @@ class ScreenHandler(DisplayHandler):
             desc=message,
             end=end_message,
             spinner_type=spinner_type,
-            continuous=continuous,
             timer=timer
         )
         loader.start()
-        if continuous:
-            return loader  # return loader only for continuous loading
+        # if continuous:
+        #     return loader  # return loader only for continuous loading
 
         return None
 
@@ -63,7 +61,7 @@ class ScreenHandler(DisplayHandler):
             if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
                 continue
-            self.print_info_message(f"Validator status: {check_exists(file_path)}")
+            #self.print_info_message(f"Validator status: {check_exists(file_path)}")
             return file_path
 
     def get_output_filename(self, prompt: str = "\n[+] Please enter the output filename: "):

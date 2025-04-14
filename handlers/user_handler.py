@@ -4,6 +4,7 @@ from utils.shared import Config
 from handlers.screen import ScreenHandler
 from handlers.helper_handler import HelpHandler
 from handlers import FileHandler
+from handlers.network_handler import get_network_interfaces,NetworkHandler
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):
@@ -19,6 +20,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.OPTIONS = self.set_test_options()
         self.helper_ = helper_instance
         self.command_ = command_instance
+        self.debug = False
         self.formatted_question = (
             "\nWhat would you like to do?\n"
             f"{self.OPTIONS}\n"
@@ -54,22 +56,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def start_domain_helper(self,
                             helper_function: callable,
-                            loader_start_text: str,
-                            loader_end_text: str,
-                            spinner_type="bounce",
-                            timer=30,
                             **kwargs):
         if kwargs.get("helper_text"):
             text = kwargs.get("helper_text")
             helper_function(text)
         else:
             helper_function()
-        self.show_loader(
-            loader_start_text,
-            loader_end_text,
-            spinner_type=spinner_type,
-            timer=timer
-        )
+
         input_text = ("[-] Would you like to start ? [ "
                       f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
         valid_options = {"yes", "y", "no", "n", "quit", "exit"}
@@ -85,11 +78,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def mobile_ui_handler(self):
 
-        self.start_domain_helper(
-            self.helper_.mobile_helper,
-            "Loading Mobile Assessment Module... ",
-            "Starting Mobile Assessment...\n"
-        )
+        self.start_domain_helper(self.helper_.mobile_helper)
         while True:
             try:
                 package_path = self.get_file_path(
@@ -109,13 +98,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 self.print_error_message(error)
 
     def va_ui_handler(self):
-        self.start_domain_helper(
-            self.helper_.vulnerability_helper,
-            "Loading Vulnerability Analysis Module... ",
-            "Starting Vulnerability Analysis...\n",
-            spinner_type="pipe",
-            timer=5
-        )
+        self.start_domain_helper(self.helper_.vulnerability_helper)
         while True:
 
             try:
@@ -143,6 +126,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
 
                 file_extension = self.SCAN_FILE_FORMAT[file_format_index]
+            
 
                 self.print_info_message(
                     f"Scanning {file_extension.upper()} file extensions")
@@ -172,12 +156,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 return None
 
     def external_ui_handler(self):
-        self.start_domain_helper(
-            self.helper_.external_helper,
-            "Loading External Assessment Module... ",
-            "Starting External Assessment...\n",
-            spinner_type="arc"
-        )
+        self.start_domain_helper(self.helper_.external_helper)
         try:
             website_domain = (
                 self.get_user_input(
@@ -195,7 +174,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             get_filepath_func: callable,
             is_file: callable,
             get_filename: callable,
-            module: str):
+            action: str):
         # Enter File Path to cracked hashes
         cracked_hashes = get_filepath_func(
             "\n[-] Enter full path to your cracked hashes \n",
@@ -209,10 +188,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         # Enter file output path
         output_filename = get_filename()
         return {
-            "cracked_hashes": cracked_hashes,
+            "hashes": cracked_hashes,
             "dumps": dumps,
             "filename": output_filename,
-            "module": module
+            "action": action
         }
 
     @staticmethod
@@ -224,7 +203,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             is_file: callable,
             display_text: str,
             domain_text: str,
-            module: str):
+            action: str):
         ip_error = "Invalid ip provided. Please enter a valid one"
         target = ip_validator(
             get_user_input,
@@ -242,19 +221,14 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         return {
             "target": target,
             "domain": domain,
-            "pass_list": pass_list,
+            "pass_file": pass_list,
             "filename": "Successful_Logins.txt",
-            "module": module
+            "action": action
         }
 
     def password_ui_handler(self):
         self.start_domain_helper(
-            self.helper_.internal_helper,
-            "Loading Password Assessment Module... ",
-            "Starting Password Assessment Module...\n",
-            helper_text="hashfunction",
-            spinner_type="bounce"
-        )
+            self.helper_.internal_helper, helper_text="hashfunction")
         target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
         domain_text = "[*] Enter the domain of your target [ testdomain.xy.z ] \n"
         valid_operations = {"generate", "test"}
@@ -287,21 +261,29 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         """Handle internal assessment UI interactions"""
 
         self.start_domain_helper(
-            self.helper_.internal_helper,
-            "Loading Internal Assessment Module... ",
-            "Starting Internal Assessment...\n",
-            helper_text="scanner"
-        )
+            self.helper_.internal_helper, helper_text="scanner")
         try:
             subnet = ""
             output_file = ""
-            valid_modes = {"scan", "resume"}
-            mode = self.validate_user_choice(
-                valid_modes,
+            valid_actions = {"scan", "resume"}
+            valid_interfaces = [iface 
+                                for iface in get_network_interfaces()
+                                if NetworkHandler()._is_interface_active(iface)
+                                and not iface.startswith(("br-", "docker", "veth", "lo"))]
+            if self.debug:
+                print(f"DEBUG: Available active interfaces={valid_interfaces}")
+                
+            action = self.validate_user_choice(
+                valid_actions,
                 self.get_user_input,
                 self.internal_mode_choice)
+            interface = self.validate_user_choice(
+                valid_interfaces,
+                self.get_user_input,
+                f"Enter a network interface to run your scan \n{valid_interfaces} "
+            )
 
-            if mode == "resume":
+            if action == "resume":
                 resume_ip = self.display_saved_files(
                     self.output_directory,
                     resume_scan=True
@@ -310,7 +292,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 if resume_ip is None:
                     self.print_warning_message(
                         "No previous scan files found. Defaulting to scan mode.")
-                    mode = "scan"
+                    action = "scan"
                 else:
                     output_file = self.filepath
                     while True:
@@ -324,14 +306,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                             continue
 
             # If mode is scan or defaulted to scan
-            if mode == "scan":
+            if action == "scan":
                 subnet = self.get_user_subnet()
                 output_file = self.get_output_filename()
 
             return {
                 "subnet": subnet,
-                "mode": mode,
+                "action": action,
                 "output": output_file,
+                "interface": interface
             }
 
         except Exception as error:
