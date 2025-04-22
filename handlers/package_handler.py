@@ -22,7 +22,7 @@ class PackageHandler(
         cls.operating_system = platform.system().lower()
         cls.is_supported_os = None
 
-    def _check_os_support(self) -> bool:
+    def _check_is_supported(self) -> bool:
         supported = self.operating_system == "linux"
         if not supported:
             self.print_warning_message(

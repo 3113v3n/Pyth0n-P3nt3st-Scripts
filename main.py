@@ -2,7 +2,6 @@ import termios
 import time
 import sys
 
-
 # [Test Domains]
 from domains import (
     InternalAssessment,
@@ -49,10 +48,10 @@ class PentestFramework(ScreenHandler):
 
             return {
                 "package": PackageHandler(),
-                "command":  command_instance,
+                "command": command_instance,
                 "network": network_instance,
                 "user": UserHandler(helper_instance, command_instance),
-                "mobile":  MobileAssessment(),
+                "mobile": MobileAssessment(),
                 "vulnerability": VulnerabilityAnalysis(),
                 "password": PasswordModule(),
                 "internal": InternalAssessment(
@@ -74,46 +73,51 @@ class PentestFramework(ScreenHandler):
         Returns:
             Boolean indicating if all required packages are present
         """
+        # va mobile password external internal
+        _package = self.classes["package"]
 
-        package = self.classes["package"]
+        if user_test_domain != "va":
+            # install packages for modules not equal to va
+            # Initialize OS check
+            print(Bcolors.HEADER + "Checking required packages..." + Bcolors.ENDC)
+            if _package.is_supported_os is None:
+                _package.is_supported_os = _package._check_is_supported()
 
-        # Initialize OS check
-        if package.is_supported_os is None:
-            package.is_supported_os = package._check_os_support()
+            # If OS is not supported, continue without package checks
+            if not _package.is_supported_os:
+                self.print_info_message(
+                    "Skipping package installation on unsupported OS")
+                return True
 
-        # If OS is not supported, continue without package checks
-        if not package.is_supported_os:
-            self.print_info_message(
-                "Skipping package installation on unsupported OS")
-            return True
+            missing_packages = _package.get_missing_packages(user_test_domain)
 
-        missing_packages = package.get_missing_packages(user_test_domain)
+            if not missing_packages:
+                return True
 
-        if not missing_packages:
-            return True
+            num_of_packages = len(missing_packages)
+            self.print_warning_message(
+                f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
+            # update to run check again
+            try:
+                success = _package.install_packages(missing_packages)
+                if not success:
+                    return False
+                return self.check_packages(user_test_domain)
+            except RuntimeError as error:
+                self.print_error_message(
+                    message="Failed to install some packages",
+                    exception_error=error
+                )
 
-        num_of_packages = len(missing_packages)
-        self.print_warning_message(
-            f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
-        # update to run check again
-        try:
-            success = package.install_packages(missing_packages)
-            if not success:
                 return False
-            return self.check_packages(user_test_domain)
-        except RuntimeError as error:
-            self.print_error_message(
-                message="Failed to install some packages",
-                exception_error=error
-            )
-
-            return False
+        else:
+            return True
 
     def handle_internal_assessment(self, user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment"""
         # initialize variables that will be used to test different Internal PT modules
         _vars = {}
-        test_domain = ""
+        # test_domain = ""
         _action = ""
         _output_file = ""
 
@@ -151,13 +155,14 @@ class PentestFramework(ScreenHandler):
                                       output_file=_output_file)
         internal.enumerate_hosts()
 
-    def handle_password_operations(self, user, password, **kwargs):
+    @staticmethod
+    def handle_password_operations(user, password, **kwargs):
         """Handle Password related operations"""
         # Initialize Password class variables
         output_dir = user.output_directory
         generator_func = user.generate_unique_name
         variables = {}
-        selected_action = ""
+        # selected_action = ""
 
         if kwargs.get("user_data"):
             # Handles command line arguments
@@ -178,7 +183,7 @@ class PentestFramework(ScreenHandler):
                 output_dir)
         }
         run_action = module_handler.get(selected_action)
-       # Run selected action
+        # Run selected action
         if run_action:
             run_action()
 
@@ -186,9 +191,7 @@ class PentestFramework(ScreenHandler):
         """Handle Vulnerability analysis"""
         try:
             scanner_type = "nessus"
-            input_files = ""
-            test_domain = ""
-            output_file = ""
+
             if kwargs.get("user_data"):
                 # Run with command line arguments
                 _vars = kwargs.get("user_data")
@@ -229,11 +232,11 @@ class PentestFramework(ScreenHandler):
         finally:
             vulnerability_analysis.decorator.reset_total_time()
 
-    def handle_mobile_assessment(self, user, mobile, **kwargs):
+    @staticmethod
+    def handle_mobile_assessment(user, mobile, **kwargs):
         """Handle mobile application assessment"""
         # initialize variables that will be used to test different Mobile modules
         _vars = None
-        test_domain = ""
         if kwargs.get("user_data"):
             _vars = kwargs["user_data"]
             test_domain = _vars.get("module")
@@ -300,8 +303,9 @@ class PentestFramework(ScreenHandler):
             self.print_error_message("Invalid test domain selected")
 
     @staticmethod
-    def get_user_input() -> str:
+    def get_user_input_() -> str:
         """Get user input for program exit"""
+
         def flush_input_output():
             """Flush any pending input and output"""
             try:
@@ -315,7 +319,7 @@ class PentestFramework(ScreenHandler):
             try:
                 # Clear buffers
                 flush_input_output()
-                # Add a small delay to ensure all input is processed
+                # Add a small delay to ensure all inputs are processed
                 time.sleep(0.1)
 
                 choice = input(
@@ -380,7 +384,7 @@ class PentestFramework(ScreenHandler):
                 valid_user_choices = {"yes", "y", "no", "n"}
 
                 while True:
-                    exit_request = self.get_user_input()
+                    exit_request = self.get_user_input_()
                     if exit_request in valid_user_choices:
                         break
                     self.print_warning_message(
@@ -398,7 +402,7 @@ class PentestFramework(ScreenHandler):
                     message="An error in Main Program occurred", exception_error=e)
 
     def run_program_interactively(self, user_data: dict) -> None:
-        """Run Interactive version of the program
+        """Run an Interactive version of the program
         Args:
             user_data: Dictionary containing user data
         """
@@ -411,7 +415,7 @@ class PentestFramework(ScreenHandler):
             # Update class instance
             self.cmd_args = user_data.get("use_args")
 
-            # Update test domain if need be
+            # Update test domain if a need be
             user.update_output_directory(test_domain)
 
             # Check packages before getting user input
