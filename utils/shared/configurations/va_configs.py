@@ -20,7 +20,8 @@ class VAConfigs:
             "rce": self._compile_regex(self.RCE_STRING),
             "patch_or_upgrade": self._compile_regex(self.PATCH_OR_UPGRADE),
             "ssh": self._compile_regex(self.SSH_STRINGS),
-            "info": self._compile_regex(self.INFO_DISCLOSURE_STRINGS)
+            "info": self._compile_regex(self.INFO_DISCLOSURE_STRINGS),
+            "speculative":self._compile_regex(self.WIN_SPECULATIVE)
         }
 
     def _compile_regex(self, string_pattern):
@@ -137,6 +138,7 @@ class VAConfigs:
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b"
     PATCH_OR_UPGRADE = "[Uu]pdate|[Uu]pgrade"
+    WIN_SPECULATIVE = r"\b[Ww]indows [Ss]peculative [Ee]xecution\b"
     SSH_STRINGS = "SSH|SSH [Ss]erver|rlogin"
     INFO_DISCLOSURE_STRINGS = r"\b[Ii]nformation [Dd]isclosure\b"
     # Scanner-specific column mappings
