@@ -7,12 +7,11 @@ class HashUtil:
         super().__init__()
         pass
 
-
     @staticmethod
     def format_username(username: str) -> str:
         """ Remove domain if is part of the username 
 
-        :param username: username to format
+        :param username: Username to format
         :return formated username
         """
         _parts = username.split('\\', 1)
@@ -37,14 +36,14 @@ class HashUtil:
                         f"[-] Skipping malformed line in {h2c}:{line.strip()}")
         return cracked_hashes
 
-    def compare_hash_from_dump(self, hash2compare, dump, userpass_list) -> str | list:
+    def compare_hash_from_dump(self, hash2compare, dump, userpass_list) -> str | list | tuple[int, int]:
         """
         Compares a particular hash from a particular list and returns all
         possible matches:
-        Appropriate for determining users with similar passwords
-        :Param:
-            hash to compare: The hash you would like to run a search on
-            dump: List containing your dumped hash
+        Appropriate for determining users with similar passwords:
+
+        @Param hash to compare: The hash you would like to run a search on
+        @Param dump: List containing your dumped hash
         """
 
         cracked_hashes = self.get_hashes(hash2compare)

@@ -1,0 +1,73 @@
+.
+├── README.md
+├── domains                             [ Main Modules ]
+│        ├── __init__.py
+│        ├── external_module.py
+│        ├── internal_module.py
+│        ├── mobile_module.py
+│        ├── password_module.py
+│        └── vulnerability_module.py
+├── handlers                            [ helpers for the modules ]
+│        ├── __init__.py
+│        ├── custom_parser.py
+│        ├── file_handler.py
+│        ├── helper_handler.py
+│        ├── interaction.py
+│        ├── messages.py
+│        ├── network_handler.py
+│        ├── package_handler.py
+│        ├── screen.py
+│        └── user_handler.py
+├── images                              [ images for README ]
+│        ├── help1.png
+│        ├── help2.png
+│        ├── internal-2.png
+│        ├── internal.png
+│        ├── internal_resume.png
+│        ├── internal_scan.png
+│        ├── mobile-hardcoded.png
+│        ├── mobile-start.png
+│        ├── password-02.png
+│        ├── password1.png
+│        ├── resume.png
+│        ├── scan_progress.png
+│        ├── test-pass.png
+│        ├── va.png
+│        ├── va_help.png
+│        └── va_scanner_filetype.png
+├── main.py                                [ Main Program ]
+├── requirements.txt
+└── utils                                  [ Utility helpers for different modules ]
+    ├── __init__.py
+    ├── external
+    │        └── __init__.py
+    ├── internal
+    │        ├── __init__.py
+    │        ├── credentials_match.py
+    │        ├── hash_util.py
+    │        ├── ldap_info.py
+    │        ├── netexec.py
+    │        └── test_creds.py
+    ├── mobile
+    │        ├── __init__.py
+    │        └── mobile_commands.py
+    ├── shared                              [ Shared helpers between the modules ]
+    │  ├── __init__.py
+    │  ├── colors.py
+    │  ├── commands.py
+    │  ├── config.py
+    │  ├── configurations
+    │  │         ├── __init__.py
+    │  │         ├── external_configs.py
+    │  │         ├── internal_configs.py
+    │  │         ├── mobile_configs.py
+    │  │         └── va_configs.py
+    │  ├── decorators.py
+    │  ├── loader.py
+    │  ├── progress_bar.py
+    |         └── validators.py
+    └── vulnerability
+        ├── __init__.py
+        └── filter_vulnerabilities.py
+
+11 directories, 60 files

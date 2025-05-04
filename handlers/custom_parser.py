@@ -24,7 +24,7 @@ class CustomHelp(Action,Config):
         simple_help_text = self.config.SUMMARY_HELPER_TEXT 
         more_text = self.config.EXTRA_HELPER_TEXT
         
-        # Check if verbose flag is set in namespace
+        # Check if a verbose flag is set in namespace
         # print(namespace)
 
         full_help_text = simple_help_text + more_text

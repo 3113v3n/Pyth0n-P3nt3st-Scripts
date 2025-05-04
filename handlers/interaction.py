@@ -26,7 +26,7 @@ class InteractionHandler:
     def main(self):
         """Main Program"""
         parser = CustomArgumentParser(
-            description="Penetest Framework: A modular penetration testing tool",
+            description="Pentest Framework: A modular penetration testing tool",
             add_help=False,
             formatter_class=RawTextHelpFormatter
         )  #
@@ -35,8 +35,7 @@ class InteractionHandler:
         #     "-v",
         #     "--verbose",
         #     action="store_true",
-        #     help="Show full help text when used with --help",
-        # )
+        #     help="Show full help text when used with --help")
 
         parser.add_argument(
             "-M",
@@ -256,8 +255,8 @@ class InteractionHandler:
             raise ValueError(f"File {path} does not exist")
             # Check if the file is an APK or IPA
         if not (
-            self.validator.check_filetype(path, "apk")
-            or self.validator.check_filetype(path, "ipa")
+                self.validator.check_filetype(path, "apk")
+                or self.validator.check_filetype(path, "ipa")
         ):
             # Valid mobile application file
             raise ValueError(f"File {path} is not a valid APK or IPA file")
@@ -286,7 +285,7 @@ class InteractionHandler:
                 f"Path {path} is not a valid directory. Ensure it exists and is a directory"
             )
         # ENSURE THE FILES ARE OF VALID FILETYPES [.CSV,.XLSX,.XLX]
-        self.filehandler.find_files(path) # generates a list of all files
+        self.filehandler.find_files(path)  # generates a list of all files
         file_collection = self.filehandler._get_file_collections()
         valid_files = self.filehandler._filter_files_by_extension(
             file_collection, extension="both")
@@ -327,7 +326,7 @@ class InteractionHandler:
                 "pass_file": pass_file,
             }
         elif args.generate:
-            # Generate password list
+            # Generate a password list
             hashes = args.crack
             output = args.output
             dump = args.dump
@@ -336,8 +335,8 @@ class InteractionHandler:
                     "For Generate mode, --crack, --output and --dump are required"
                 )
             if not (
-                self.validator.isfile_and_exists(hashes)
-                and self.validator.isfile_and_exists(dump)
+                    self.validator.isfile_and_exists(hashes)
+                    and self.validator.isfile_and_exists(dump)
             ):
                 raise ValueError(f"File {hashes} or {dump} does not exist")
             print(

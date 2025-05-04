@@ -108,7 +108,7 @@ class FileHandler(Validator, DisplayHandler):
                         # to prevent hyperlink detection
                         df[url_column_name] = df[url_column_name].astype(str).apply(
                             lambda x: ' ' + x if pandas.notnull(x) else x)
-                        
+
                     df.to_excel(writer, sheet_name=sheetname, index=False)
 
                     # TODO: handle URLs in See Also to prevent errors
@@ -132,7 +132,7 @@ class FileHandler(Validator, DisplayHandler):
         #     message="Analyzed Vulnerabilities have been written to :",
         #     extras=self.filepath
         # ) 
-        self.print_info_message( 
+        self.print_info_message(
             message="Analyzed Vulnerabilities have been written to :",
             file_path=self.filepath)
 
@@ -168,7 +168,7 @@ class FileHandler(Validator, DisplayHandler):
 
         # Flatten nested lists if present
         flat_content = [item if not isinstance(
-            item, (list, tuple))else item[0] for item in content]
+            item, (list, tuple)) else item[0] for item in content]
         data = pandas.DataFrame(flat_content, columns=None)
 
         if self.file_exists(f"{file_path}"):
@@ -232,7 +232,7 @@ class FileHandler(Validator, DisplayHandler):
         # Resume scan
         return self._handle_analysis(**kwargs)
 
-    def _get_filtered_files(self,**kwargs) -> list:
+    def _get_filtered_files(self, **kwargs) -> list:
         """Get filtered files based on user input
         
         kwargs: 
@@ -283,7 +283,7 @@ class FileHandler(Validator, DisplayHandler):
         both_files = csv_files + xlsx_files
         application_files = list(filter(
             lambda file: self.check_filetype(file["filename"], "apk") or
-            self.check_filetype(file["filename"], "ipa"),
+                         self.check_filetype(file["filename"], "ipa"),
             self.files
         ))
         return {
@@ -318,7 +318,7 @@ class FileHandler(Validator, DisplayHandler):
 
         :return: List of files filtered by extension
         """
-        if extension not in ["csv", "xlsx","xlx", "both"]:
+        if extension not in ["csv", "xlsx", "xlx", "both"]:
             self.print_error_message(f"Invalid extension: {extension}")
             return None
         filtered_files = collections[extension]
@@ -472,7 +472,8 @@ class FileHandler(Validator, DisplayHandler):
                 "Resuming scan from IP address : ", file_path=last_address)
             return last_address
 
-    def load_existing_ips(self, datafile):
+    @staticmethod
+    def load_existing_ips(datafile):
         existing_ips = set()
         with open(datafile, 'r') as file:
             for line in file:
@@ -482,7 +483,7 @@ class FileHandler(Validator, DisplayHandler):
         return existing_ips
 
     @staticmethod
-    def concat_dataframes(df:list):
+    def concat_dataframes(df: list):
         """Concatenate data Frames"""
         return pandas.concat(df, ignore_index=True, axis=0)
 
@@ -523,7 +524,7 @@ class FileHandler(Validator, DisplayHandler):
             return file.readlines()
 
     def remove_file(self, file):
-        """Delete file from system"""
+        """Delete a file from system"""
         try:
             file_path = Path(file)
             file_path.unlink(missing_ok=True)
