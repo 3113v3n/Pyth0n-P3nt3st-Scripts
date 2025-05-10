@@ -80,7 +80,7 @@ class PentestFramework(ScreenHandler):
         if user_test_domain != "va":
             # install packages for modules not equal to va
             # Initialize OS check
-            print(Bcolors.HEADER + "Checking required packages..." + Bcolors.ENDC)
+            print(Bcolors.WARNING + "[?] Checking for required packages..." + Bcolors.ENDC)
             if _package.is_supported_os is None:
                 _package.is_supported_os = _package._check_is_supported()
                 self.os = _package.operating_system

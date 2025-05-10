@@ -18,12 +18,12 @@ class ExternalConfigs:
         {
             "name": ["subjs"],
             "command": "multiple",
-            "cmd": "GO111MODULE=on go get -u -v github.com/lc/subjs@latest"
+            "cmd": "go install github.com/lc/subjs@latest && sudo cp ~/go/bin/subjs /usr/bin"
         },
         {
           "name": ["qsreplace"],
           "command": "multiple",
-          "cmd": "go install github.com/tomnomnom/qsreplace@latest"
+          "cmd": "go install github.com/tomnomnom/qsreplace@latest && sudo cp ~/go/bin/qsreplace /usr/bin"
         },
         {
             "name": ["gowitness"],
@@ -33,27 +33,27 @@ class ExternalConfigs:
         {
             "name": ["gauplus"],
             "command": "multiple",
-            "cmd": "go install github.com/bp0lr/gauplus@latest"
+            "cmd": "go install github.com/bp0lr/gauplus@latest && sudo cp ~/go/bin/gauplus /usr/bin"
         },
         {
-            "name": ["gf", "wayback"],
+            "name": ["gf", "waybackurls"],
             "command": "multiple",
-            "cmd": "go install github.com/tomnomnom/waybackurls@latest && go install github.com/tomnomnom/gf@latest"
+            "cmd": "go install github.com/tomnomnom/waybackurls@latest && go install github.com/tomnomnom/gf@latest && sudo cp ~/go/bin/waybackurls /usr/bin&& sudo cp ~/go/bin/gf /usr/bin"
         },
         {
             "name": [
                 "getallurls", "httpx-toolkit",
                 "assetfinder", "findomain",
                 "brutespray", "subfinder",
-                "amass", "dnsx", "snapd",
+                "amass", "dnsx",
                 "s3scanner", "ffuf", "ruby"
             ],
-            "command": "multiple",
-            "cmd": "sudo apt install",
+            "command": "sudo apt install",
         },
         {
-            "name": ["aquatone"],
-            "command": "gem install ",
+            "name": ["aquatone-discover","aquatone-scan"],
+            "command":"multiple",
+            "cmd": "sudo gem install aquatone",
         },
         {
             "name": ["urlhunter"],
@@ -61,24 +61,28 @@ class ExternalConfigs:
             "cmd": "go install -v github.com/utkusen/urlhunter@latest &&  sudo cp ~/go/bin/urlhunter /usr/bin",
         },
         {
+            "name":["snap"],
+            "command":"multiple",
+            "cmd": "sudo apt install snapd && sudo systemctl enable --now snapd.socket "
+        },
+        {
             "name": ["dalfox"],
             "command": "multiple",
-            "cmd": "sudo snap install snapd && sudo snap install dalfox"
+            "cmd": "sudo snap install dalfox && sudo cp /snap/bin/dalfox /usr/bin"
         },
         {
             "name": ["Gxss"],
             "command": "multiple",
-            "cmd": "go install github.com/KathanP19/Gxss@latest"
+            "cmd": "go install github.com/KathanP19/Gxss@latest && sudo cp ~/go/bin/Gxss /usr/bin"
         },
         {
             "name": ["chad"],
             "command": "multiple",
-            "cmd": "pipx install google-chad && pipx install --upgrade google-chad && playwright install chromium",
+            "cmd": "pipx install google-chad && pipx upgrade google-chad && playwright install chromium",
         },
-        {"name": ["bbot", "uro"], "command": "pipx install"},
         {
-            "name": ["python3-dnspython", "python3-urllib3", "python3-bs4"],
-            "command": "sudo apt install",
+            "name": ["bbot", "uro"], 
+            "command": "pipx install"
         },
         {
             "name": ["snallygaster"],
@@ -88,7 +92,7 @@ class ExternalConfigs:
         {
             "name": ["subzy"],
             "command": "multiple",
-            "cmd": "go install -v github.com/luKaSikic/subzy@latest && sudo cp ~/go/bin/subzy /usr/bin",
+            "cmd": "go install -v github.com/PentestPad/subzy@latest && sudo cp ~/go/bin/subzy /usr/bin",
         },
         {
             "name": ["subjack"],

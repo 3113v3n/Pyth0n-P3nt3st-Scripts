@@ -92,6 +92,7 @@ class PackageHandler(
                 self.print_info_message(
                     f"Installing the following package: {package['name']}")
                 # Install Missing packages
+                #print(f"Running Command: {package['command']}\n")
                 install_status = self.run_os_commands(
                     command=package["command"])
                 if install_status.returncode != 0:

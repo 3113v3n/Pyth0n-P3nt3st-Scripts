@@ -101,12 +101,12 @@ This is a custom CLI tool for Penetration Testing.
     domain_select_error = ("\n[!] Please choose one of: \n")
 
     test_domains = [
-        {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
-        {"domain": "Internal Penetration Testing",
-            "alias": "internal", "icon": "🖥️"},
-        # {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
-        {"domain": "Password Module", "alias": "password", "icon": "🔐"},
+        #{"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
+        #{"domain": "Internal Penetration Testing",
+         #   "alias": "internal", "icon": "🖥️"},
+        {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
+        #{"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
+        #{"domain": "Password Module", "alias": "password", "icon": "🔐"},
         {"domain": "Exit Program", "alias": "exit", "icon": "✖"}
     ]
     scan_modes = ["SCAN", "RESUME"]

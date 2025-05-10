@@ -12,3 +12,6 @@ tqdm==4.66.4            # For progress bars
 XlsxWriter==3.2.2       # For writing Excel files
 psutil==7.0.0
 netifaces2==0.0.22      # Handle network interfaces
+dnspython==2.7.0
+urllib3==2.4.0
+beautifulsoup4==4.13.4
