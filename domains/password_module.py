@@ -14,12 +14,16 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         self.output_dir = ""
         self.pass_list = ""
 
-    def generate_passlist_from_hashes(
+    def generate_password_list_from_hashes(
             self,
             domain_variables: dict,
             save_dir: str,
             generate_filename: callable):
-        """Generate user:pass list from cracked hashes and ntds dump"""
+        """Generate user:pass list from cracked hashes and ntds dump
+        :param domain_variables: dictionary containing domain-specific variables
+        :param save_dir: directory to save the output files
+        :param generate_filename: function that generates a unique output file name
+        """
         if domain_variables["hashes"]:
             print("Getting cracked hashes")
             self.cracked_hashes = domain_variables["hashes"]
@@ -42,7 +46,10 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
             save_dir: str,
     ):
         """
-        Test credentials against hosts
+        Test credentials against particular host
+        :param domain_variables: dictionary containing domain-specific variables
+        :param save_dir: directory to save the output files
+        :param generate_filename: function that generates a unique output file name
         """
 
         filename = generate_filename(domain_variables['filename'])

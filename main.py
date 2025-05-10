@@ -31,6 +31,7 @@ class PentestFramework(ScreenHandler):
         self.exit_menu = False
         self.debug = False
         self.cmd_args = False
+        self.os = ""
 
     # [Utils]
     # Initializers
@@ -82,6 +83,7 @@ class PentestFramework(ScreenHandler):
             print(Bcolors.HEADER + "Checking required packages..." + Bcolors.ENDC)
             if _package.is_supported_os is None:
                 _package.is_supported_os = _package._check_is_supported()
+                self.os = _package.operating_system
 
             # If OS is not supported, continue without package checks
             if not _package.is_supported_os:
@@ -114,7 +116,12 @@ class PentestFramework(ScreenHandler):
             return True
 
     def handle_internal_assessment(self, user, network, internal, **kwargs):
-        """Handle Internal penetration testing assessment"""
+        """Handle Internal penetration testing assessment
+        :param user: User class object
+        :param network: Network class object
+        :param internal: Internal assessment class object
+        :param kwargs: Keyword arguments
+        :keyword (dict) user_data: cli supplied data"""
         # initialize variables that will be used to test different Internal PT modules
         _vars = {}
         # test_domain = ""
@@ -157,7 +164,12 @@ class PentestFramework(ScreenHandler):
 
     @staticmethod
     def handle_password_operations(user, password, **kwargs):
-        """Handle Password related operations"""
+        """Handle Password related operations
+        :param user: User class object
+        :param password: Password class object
+        :param kwargs: Keyword arguments
+        :keyword (dict) user_data: cli supplied values
+        """
         # Initialize Password class variables
         output_dir = user.output_directory
         generator_func = user.generate_unique_name
@@ -173,7 +185,7 @@ class PentestFramework(ScreenHandler):
             selected_action = variables["action"]
 
         module_handler = {
-            "generate": lambda: password.generate_passlist_from_hashes(
+            "generate": lambda: password.generate_password_list_from_hashes(
                 variables,
                 output_dir,
                 generator_func),
@@ -188,7 +200,12 @@ class PentestFramework(ScreenHandler):
             run_action()
 
     def handle_vulnerability_assessment(self, user: callable, vulnerability_analysis: callable, **kwargs):
-        """Handle Vulnerability analysis"""
+        """Handle Vulnerability analysis
+        :param user: User class object
+        :param vulnerability_analysis: Vulnerability analysis class
+        :param kwargs: Keyword arguments
+        :keyword (dict) user_data: cli supplied values
+        """
         try:
             scanner_type = "nessus"
 
@@ -232,9 +249,13 @@ class PentestFramework(ScreenHandler):
         finally:
             vulnerability_analysis.decorator.reset_total_time()
 
-    @staticmethod
-    def handle_mobile_assessment(user, mobile, **kwargs):
-        """Handle mobile application assessment"""
+    def handle_mobile_assessment(self, user, mobile, **kwargs):
+        """Handle mobile application assessment
+        :param user: User class object
+        :param mobile: Mobile class object
+        :param kwargs: Keyword arguments
+        :keyword (dict) user_data: cli supplied value
+        """
         # initialize variables that will be used to test different Mobile modules
         _vars = None
         if kwargs.get("user_data"):
@@ -247,7 +268,7 @@ class PentestFramework(ScreenHandler):
         mobile_testing_vars = _vars
 
         mobile.initialize_variables(mobile_testing_vars)
-        mobile._inspect_files(test_domain)
+        mobile._inspect_files(test_domain, self.os)
 
     def handle_external_assessment(self, user):
         """Handle external assessment"""
@@ -258,11 +279,9 @@ class PentestFramework(ScreenHandler):
 
     def process_domain(self, user_test_domain: str, **kwargs) -> None:
         """Process the selected testing domain
-
-        Args:
-            user_test_domain: Selected testing domain
-            kwargs: Handle command line arguments passed by user
-
+        :param user_test_domain: Selected testing domain
+        :param kwargs: Keyword arguments
+        :keyword (dict) user_data: cli supplied values
         """
 
         if self.debug:

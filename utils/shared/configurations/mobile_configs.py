@@ -6,6 +6,7 @@ class MobileConfigs:
 
     def __init__(self):
         pass
+
     mobile_packages = [
         # Mobile
         # Install on Device
@@ -25,7 +26,11 @@ class MobileConfigs:
             "name": ["go"],
             "command": "multiple",
             "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
-            "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+        },
+        {
+            "name": ["grep"],
+            "command": "brew install grep"
         },
         {
             "name": [
@@ -63,13 +68,13 @@ class MobileConfigs:
     # MOBILE ANALYSIS CONSTANTS
     # Define regex patterns as raw strings for better readability and handling
     IOS_FILE_SEARCH = r"hasOnlySecureContent|javaScriptEnabled|UIWebView|WKWebView"
-    BEARER_REGEX = r"[^\w\d]+(basic|bearer)\s.+"
+    BEARER_REGEX = r"\b(basic | bearer)\s + [A - Za - z0 - 9 + /=]{16, }\b"
     HARDCODED_REGEX = (
-        r"(\?access|account|admin|basic|bearer|card|conf|cred|customer|email|history|id|info|jwt|key"
+        r"\b(\?access|account|admin|basic|bearer|card|conf|cred|customer|email|history|id|info|jwt|key"
         r"|kyc|log|otp|pass|pin|priv|refresh|salt|secret|seed|setting|sign|token|transaction|transfer"
-        r'|user)\w*(?:"\s*:\s*|\s*=).+'
+        r"|user)\b\w*(?::\s*|=\s*)([A-Za-z0-9+/=]{8,}|\w{8,})"
     )
-    HARDCODED_REGEX_2 = r"([^\w\d]+(to(_|\s)do|todo|note)\s|//|/\*|\*/).+"
+    HARDCODED_REGEX_2 = r"(?://|/\*)\s*(todo|note|to[_ ]do)\s+[A-Za-z0-9\s.,;:'\"-]{10,}(?:\*/)?\b"
     BASE64_REGEX = r"(?:[a-zA-Z0-9\+\/]{4})*(?:[a-zA-Z0-9\+\/]{4}|[a-zA-Z0-9\+\/]{3}=|[a-zA-Z0-9\+\/]{2}==)"
     IP_REGEX = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
     URL_REGEX = r"\w+://[\w\-\.\@\:\/\?\=\%\&\#]+"

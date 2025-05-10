@@ -15,16 +15,21 @@ class MobileAssessment(MobileCommands):
         cls.package_path = ""
 
     def initialize_variables(self, data):
-        
+
         # Sets user provided values
         self.package_name = data["filename"]  # application filename
         self.package_path = data["full_path"]  # fullpath to the application
 
-    def _inspect_files(self, test_domain):
+    def _inspect_files(self, test_domain: str, operating_system: str):
+        """Execute the mobile application testing module
+        :param test_domain: Test domain
+        :param operating_system: Running Operating system"""
         try:
 
             self.inspect_application_files(
-                application=self.package_path, test_domain=test_domain
+                application=self.package_path,
+                test_domain=test_domain,
+                operating_system=operating_system
             )
             self.print_total_time(f"Total analysis time for {self.package_name}")
         finally:
