@@ -71,12 +71,18 @@ class FileHandler(Validator, DisplayHandler):
             )
 
     def save_txt_file(self, filename, content):
+        """
+        Save content to txt file
+
+        :param filename: Name of the file
+        :param content: Content of the file
+        """
         self.filepath = f"{self.output_directory}/{filename}"
         with open(f"{self.output_directory}/{filename}", "a") as file:
             file.write(f"{content}\n")
 
     def write_to_multiple_sheets(
-            self, dataframe_objects: list, filename: str, **kwargs
+            self, dataframe_objects: list, filename: str
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename, extension='xlsx')}"
@@ -121,17 +127,13 @@ class FileHandler(Validator, DisplayHandler):
                     # format cell
                     formatted_cell = workbook.add_format(cell_formats)
 
-                    # Apply header format to the first row (A1:G1)
+                    # Apply a header format to the first row (A1: G1)
                     for col_num, value in enumerate(df.columns.values):
                         worksheet.write(0, col_num, value, formatted_headers)
 
-                    # Apply cell format to data rows
+                    # Apply a cell format to data rows
                     worksheet.set_column('A:ZZ', 15, formatted_cell)
 
-        # self.print_success_message(
-        #     message="Analyzed Vulnerabilities have been written to :",
-        #     extras=self.filepath
-        # ) 
         self.print_info_message(
             message="Analyzed Vulnerabilities have been written to :",
             file_path=self.filepath)
@@ -203,8 +205,7 @@ class FileHandler(Validator, DisplayHandler):
             os.makedirs(folder_path)
 
     def find_files(self, search_path):
-        """
-        Searches for a file in the given directory and its subdirectories.
+        """Searches for a file in the given directory and its subdirectories.
 
         :param search_path: Directory to start the search from.
         :return: Full path of the files if found, None otherwise.
@@ -234,12 +235,10 @@ class FileHandler(Validator, DisplayHandler):
 
     def _get_filtered_files(self, **kwargs) -> list:
         """Get filtered files based on user input
-        
-        kwargs: 
-            [Keyword arguments]
-            scan_extension:         return files with given extension
-            resume_scan:            returns an IP address from the given file
-            display_application:    returns mobile applications
+        :param kwargs: Keyword Arguments
+        :keyword scan_extension:         return files with a given extension [apk,csv,ipa,xslx]
+        :keyword resume_scan:            returns an IP address from the given file
+        :keyword display_application:    returns mobile applications
 
         :return: List of filtered files
         """
@@ -258,17 +257,13 @@ class FileHandler(Validator, DisplayHandler):
         return self.files
 
     def _get_file_collections(self) -> dict:
-        """ Get different collections of files b type
-        :Returns: Dictionary of file collections
-        """
+        """ Get different collections of files by type."""
 
         def get_files_by_type(ext):
             """Filter files by extension type
 
-            :param
-                ext: File extension
-            :Returns
-                list: Files matching the extension
+            :param ext: File extension
+            :returns: list of files matching the extension
             """
             return list(filter(
                 lambda file: self.check_filetype(
@@ -312,10 +307,8 @@ class FileHandler(Validator, DisplayHandler):
     def _filter_files_by_extension(self, collections, extension) -> Any | None:
         """Filter files by extension
 
-        :param
-                collections: Dictionary of file collections
-                extension: Extension to filter by
-
+        :param collections: Dictionary of file collections
+        :param extension: Extension to filter by (csv, xlx, both, xlsx)
         :return: List of files filtered by extension
         """
         if extension not in ["csv", "xlsx", "xlx", "both"]:
@@ -334,6 +327,12 @@ class FileHandler(Validator, DisplayHandler):
             self.print_selection_items(file, index)
 
     def _handle_analysis(self, **kwargs):
+        """Handle different analysis options
+        :param kwargs: Keyword Arguments
+        :keyword (bool) scan_extension: Perform VA analysis on scanned files
+        :keyword (bool) resume_scan: Resume scan from the given file
+        :keyword (bool) display_application: Display mobile applications
+        """
         if kwargs.get("scan_extension"):
             # Display files to perform VA analysis
             return self.do_analysis("files")
@@ -404,11 +403,11 @@ class FileHandler(Validator, DisplayHandler):
     @staticmethod
     def read_csv(dataframe, **kwargs):
         """Handles reading of CSV files
-        Args:
-            dataframe : The file to be read
-        **kwargs: 
-               header
-               ip_list : handles file that have ips
+
+        :param dataframe : The file to be read
+        :param kwargs: Keyword Arguments
+        :keyword header: True or False
+        :keyword ip_list :True or False (handles file that have ips)
         """
         if "header" in kwargs:
             return pandas.read_csv(dataframe, header="infer")

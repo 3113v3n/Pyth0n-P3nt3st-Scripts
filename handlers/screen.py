@@ -27,16 +27,17 @@ class ScreenHandler(DisplayHandler):
 
     @staticmethod
     def show_loader(
-        message: str,
-        end_message: str,
-        spinner_type: str = "dots",
-        timer=10
+            message: str,
+            end_message: str,
+            spinner_type: str = "dots",
+            timer=10
     ):
         """Display Loading functionality to a user
-        :param message: message to display
-        :param end_message: a message to display after loading complete
-        :param continuous: Boolean to control timer
-        :param spinner_type: type of spinner to use
+
+        :param message: Message to display
+        :param end_message: Message to display after loading complete
+        :param spinner_type: Type of spinner to use
+        :param timer: period for loader to display
         """
         loader = Loader(
             desc=message,
@@ -52,7 +53,7 @@ class ScreenHandler(DisplayHandler):
 
     def get_file_path(self, prompt: str, check_exists: callable):
         """Get and validate a file path from user"""
-        
+
         while True:
             file_path = self.prompt_format(prompt, path=True)
             if not file_path:
@@ -61,7 +62,6 @@ class ScreenHandler(DisplayHandler):
             if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
                 continue
-            #self.print_info_message(f"Validator status: {check_exists(file_path)}")
             return file_path
 
     def get_output_filename(self, prompt: str = "\n[+] Please enter the output filename: "):
@@ -88,9 +88,9 @@ class ScreenHandler(DisplayHandler):
             return user_input
 
     def prompt_format(self, prompt, **kwargs):
-        decorator = "..."*30
+        decorator = "..." * 30
         dotted_lines = f"{self.OKGREEN}{decorator}{self.ENDC}"
-        
+
         def not_lower():
             user_input = input(prompt).strip()
             print(dotted_lines)
@@ -98,7 +98,7 @@ class ScreenHandler(DisplayHandler):
 
         if kwargs.get('path'):
             return not_lower()
-        
+
         if kwargs.get('filename'):
             return not_lower()
 
@@ -107,10 +107,10 @@ class ScreenHandler(DisplayHandler):
         return user_input
 
     def validate_user_choice(
-        self,
-        options: dict,
-        get_user_input: callable,
-        text: str
+            self,
+            options: set,
+            get_user_input: callable,
+            text: str
     ):
         valid_options = options
         while True:

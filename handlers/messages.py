@@ -9,7 +9,7 @@ class DisplayHandler(Bcolors):
     @staticmethod
     def print_debug_message(message: str):
         """Print debug messages for debugging purposes
-        :message: message to print
+        :param message: message to print
         """
         print(
             f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
@@ -19,11 +19,11 @@ class DisplayHandler(Bcolors):
     @staticmethod
     def print_success_message(message: str, **kwargs):
         """Prints out a success message
-        :param message:  to print
-               **kwargs:  keyword arguments to ensure different messages are printed accordingly
-                - mobile_success: shows the directory where mobile scans are stored
-                - extras: any extra data to print
-                - flush: flush the message
+        :param message: Text to print
+        :param kwargs:  keyword arguments to ensure different messages are printed accordingly
+        :keyword (str) mobile_success : shows the directory where mobile scans are stored
+        :keyword (str) extras : any extra data to print
+        :keyword (bool) flush : flush the message
         """
         msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
 
@@ -46,9 +46,9 @@ class DisplayHandler(Bcolors):
     @staticmethod
     def print_error_message(message: str = "Error ", **kwargs):
         """Prints out error messages
-        :param message:  to print
-                **kwargs: Keyword arguments to handle exception type errors
-                    - exception_error: error raised from exceptions
+        :param message:  Text to print
+        :param kwargs: Keyword arguments to handle exception type errors
+        :keyword (str) exception_error : error raised from exceptions
         """
         msg = f"\n{Bcolors.FAIL}[!] Error: {message} {Bcolors.ENDC}"
 
@@ -61,11 +61,11 @@ class DisplayHandler(Bcolors):
     @staticmethod
     def print_warning_message(message: str, **kwargs):
         """Prints out warning messages
-        :param message:  to print
-                **kwargs: Keyword arguments to handle different print actions
-                    - data = list of IPs
-                    - flush = Boolean value to flush messages
-                    - file_path = file path
+        :param message: Text message to print out
+        :param kwargs: an Additional Keyword arguments
+        :keyword (list) data : list of IPs
+        :keyword (bool) flush : Boolean value to flush messages
+        :keyword (str) file_path : file path to an output file
         """
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):
@@ -81,18 +81,20 @@ class DisplayHandler(Bcolors):
 
     @staticmethod
     def print_trace_message(message: str):
-        """print trace messages on terminal"""
+        """print trace messages on the terminal
+        :param message: message to print
+        """
         msg = f"\n {Bcolors.HEADER}[TRACE]{Bcolors.ENDC} {message}"
         print(msg)
 
     @staticmethod
     def print_info_message(message: str, **kwargs):
         """Prints out info messages
-        :param message:  to print
-            **kwargs: Keyword arguments to handle different print actions
-                - flush = Boolean value to flush messages
-                - file_path: file path to VA scans
-                - file : files being scanned in mobile module
+        :param message:  Text message to print
+        :param kwargs: Additional Keyword arguments
+        :keyword (bool) flush  : Boolean value to flush messages
+        :keyword (str) file_path : file path to an output file
+        :keyword (str) file : files being scanned in mobile module
         """
         msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
         if kwargs.get("flush"):

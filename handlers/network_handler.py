@@ -82,7 +82,8 @@ class NetworkHandler(FileHandler, Commands):
         self.update_output_directory(test_domain)
         self.initial_interface_ip = self.get_interface_ip(self.interface)
 
-    def get_interface_ip(self, interface: str) -> str:
+    @staticmethod
+    def get_interface_ip(interface: str) -> str | None:
         """Get the IPv4 address of the specified interface."""
         try:
             addresses = netifaces.ifaddresses(interface)
@@ -106,7 +107,7 @@ class NetworkHandler(FileHandler, Commands):
         Generate a filename based on mode and host responsiveness.
 
         :param mode: Operation mode ('scan' or 'resume')
-        :param is_alive: Whether the host responded
+        :param is_alive: True if the host responsiveness
         :param filename: Base filename to modify
         :return: Formatted filename
         """
@@ -194,7 +195,7 @@ class NetworkHandler(FileHandler, Commands):
                                 f"DEBUG: Processing batch of {len(ip_batch)} IPs")
                         futures = {executor.submit(
                             self.set_progressbar, mode, output_file, ip, stdscr):
-                            ip for ip in ip_batch}
+                                       ip for ip in ip_batch}
                         for _ in as_completed(futures):
                             if self.shutdown_event.is_set():
                                 break
@@ -264,7 +265,7 @@ class NetworkHandler(FileHandler, Commands):
             ip_list = []
             # Iterate over IPs from start_ip to the end of network
             current_ip = start_ip
-            for ip_int in range(int(current_ip), int(network.broadcast_address)+1):
+            for ip_int in range(int(current_ip), int(network.broadcast_address) + 1):
                 ip = ipaddress.ip_address(ip_int)
                 if ip in network:
                     ip_str = str(ip)
@@ -274,6 +275,7 @@ class NetworkHandler(FileHandler, Commands):
                         ip_list = []
             if ip_list:  # Yield any remaining IPs
                 yield ip_list
+
         return chunked_ips()
 
     def set_progressbar(self, mode, filename, ip, stdscr):
@@ -309,7 +311,7 @@ class NetworkHandler(FileHandler, Commands):
         octets = list(map(int, ip.split(".")))
         network_mask_int = 0xFFFFFFFF << bits
         ip_int = (octets[0] << 24) + (octets[1] << 16) + \
-            (octets[2] << 8) + octets[3]
+                 (octets[2] << 8) + octets[3]
         network_base_int = ip_int & network_mask_int
         return {
             "ip_address": ip,
@@ -332,7 +334,7 @@ class NetworkHandler(FileHandler, Commands):
                 z * 256⁰ = Z
 
             3. Add the values together
-                ( W + X + Y + Z )
+                (W + X + Y + Z)
 
         :param ip_string: IP address to convert
         :return decimal equivalent:
@@ -349,8 +351,8 @@ class NetworkHandler(FileHandler, Commands):
             example: 10 --> 00001010
                     <<  --> 00001010 00000000 00000000 00000000 ==> 167772160
             """
-            start_ip_int = (octets[0] << 24) + (octets[1] << 16)\
-                + (octets[2] << 8) + octets[3]
+            start_ip_int = (octets[0] << 24) + (octets[1] << 16) \
+                           + (octets[2] << 8) + octets[3]
 
             # Calculate last IP in subnet
             last_ip_int = self.network_base_int + total_hosts - 1
@@ -360,7 +362,7 @@ class NetworkHandler(FileHandler, Commands):
         except Exception as e:
             self.print_error_message(exception_error=e)
 
-# TODO: include interface check before scanning
+    # TODO: include interface check before scanning
     def _is_interface_active(self, interface: str) -> bool:
         """Check if the interface is active and unchanged."""
         current_ip = self.get_interface_ip(interface)
