@@ -13,6 +13,8 @@ class InternalAssessment(DisplayHandler):
         self.network_manager = network
         self._helper = helper_instance
         self.hide_helper = False
+        # [AI] Set by PentestFramework.initialize_classes(); None means disabled
+        self.ai = None
 
     @classmethod
     def reset_class_states(cls, network: NetworkHandler):
@@ -51,6 +53,15 @@ class InternalAssessment(DisplayHandler):
                 message=f"Discovered {live_ip_count} hosts, and saved them to: ",
                 extras=live
             )
+
+            # [AI] Suggest likely host roles for discovered IPs.
+            if self.ai and self.ai.enabled:
+                live_ips = self._read_live_ips(live)
+                if live_ips:
+                    ai_analysis = self.ai.suggest_host_roles(live_ips)
+                    self.print_success_message(
+                        message="AI Host Role Suggestions:", extras=f"\n{ai_analysis}")
+
         # Delete unresponsive file only if scan completed successfully
         if self.network_manager.scan_complete and unresponsive:
             self.network_manager.remove_file(unresponsive)
@@ -59,6 +70,28 @@ class InternalAssessment(DisplayHandler):
         elif unresponsive:
             self.print_warning_message(
                 "Scan incomplete, retaining unresponsive file ", file_path=unresponsive)
+
+    @staticmethod
+    def _read_live_ips(filepath: str) -> list[str]:
+        """Read live IP addresses from the output CSV written by the network scan.
+
+        Args:
+            filepath: Path to the CSV file containing live hosts.
+
+        Returns:
+            List of IP address strings, or empty list on error.
+        """
+        ips: list[str] = []
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        # CSV may have additional columns; first column is the IP
+                        ips.append(line.split(",")[0])
+        except OSError:
+            pass
+        return ips
 
     def netexec_module(self):
         # Using CrackmapExec / Netexec Module

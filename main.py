@@ -13,6 +13,8 @@ from utils import (
     ProgressBar,
     Commands)
 from utils.shared import Bcolors
+# [AI] Claude-powered analysis assistant — degrades gracefully if key is absent
+from utils.shared.ai_assistant import PentestAI
 # [Handlers]
 from handlers import (
     NetworkHandler,
@@ -27,6 +29,9 @@ from handlers import (
 class PentestFramework(ScreenHandler):
     def __init__(self):
         super().__init__()
+        # [AI] Initialise early so initialize_classes() can inject the instance
+        # into each domain. Degrades silently if ANTHROPIC_API_KEY is not set.
+        self.ai = PentestAI()
         self.classes = self.initialize_classes()
         self.exit_menu = False
         self.debug = False
@@ -37,7 +42,11 @@ class PentestFramework(ScreenHandler):
     # Initializers
 
     def initialize_classes(self) -> dict:
-        """Initialize all required classes for the framework
+        """Initialize all required classes for the framework.
+
+        [AI] The PentestAI instance (self.ai) is injected into each domain class
+        as a `.ai` attribute so modules can call analysis methods without coupling
+        to the framework layer.
 
         Returns:
             Dictionary containing initialized class instances
@@ -47,18 +56,28 @@ class PentestFramework(ScreenHandler):
             helper_instance = HelpHandler()
             command_instance = Commands()
 
+            # [AI] Build domain instances and inject AI assistant
+            vuln = VulnerabilityAnalysis()
+            vuln.ai = self.ai
+
+            mobile = MobileAssessment()
+            mobile.ai = self.ai
+
+            password = PasswordModule()
+            password.ai = self.ai
+
+            internal = InternalAssessment(network_instance, helper_instance)
+            internal.ai = self.ai
+
             return {
                 "package": PackageHandler(),
                 "command": command_instance,
                 "network": network_instance,
                 "user": UserHandler(helper_instance, command_instance),
-                "mobile": MobileAssessment(),
-                "vulnerability": VulnerabilityAnalysis(),
-                "password": PasswordModule(),
-                "internal": InternalAssessment(
-                    network_instance,
-                    helper_instance
-                )
+                "mobile": mobile,
+                "vulnerability": vuln,
+                "password": password,
+                "internal": internal,
             }
         except Exception as error:
             self.print_error_message(
@@ -459,6 +478,11 @@ def main():
     _interaction = InteractionHandler()
     try:
         _interaction.main()
+        # [AI] Honour --no-ai flag: disable the AI instance before any domain
+        # module runs so all subsequent ai.enabled checks see False.
+        if not _interaction.arguments.get("use_ai", True):
+            framework.ai.enabled = False
+
         # Check if command line arguments are used
         use_cmdline_args = _interaction.argument_mode
         if not use_cmdline_args:

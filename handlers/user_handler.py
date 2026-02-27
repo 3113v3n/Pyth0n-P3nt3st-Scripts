@@ -27,9 +27,16 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             f"[Type '{self.BOLD}help{self.ENDC}' for info, or a number to choose a test domain]...\n "
         )
 
+    def reset_state(self) -> None:
+        """Reset instance state to defaults between runs."""
+        self.default_test_domains = []
+        self.not_valid_domain = False
+        self.domain = ""
+        self.domain_variables = ""
+
     @classmethod
     def reset_class_states(cls):
-        """Reset the states of the class"""
+        """Deprecated — use reset_state() on the instance instead."""
         cls.default_test_domains = []
         cls.not_valid_domain = False
         cls.domain = ""
@@ -266,10 +273,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             subnet = ""
             output_file = ""
             valid_actions = {"scan", "resume"}
-            valid_interfaces = [iface 
-                                for iface in get_network_interfaces()
-                                if NetworkHandler()._is_interface_active(iface)
-                                and not iface.startswith(("br-", "docker", "veth", "lo"))]
+            # [Performance] Reuse a single NetworkHandler instance for all checks
+            # instead of creating a new one per interface.
+            _nh = NetworkHandler()
+            valid_interfaces = [
+                iface
+                for iface in get_network_interfaces()
+                if _nh._is_interface_active(iface)
+                and not iface.startswith(("br-", "docker", "veth", "lo"))
+            ]
             if self.debug:
                 print(f"DEBUG: Available active interfaces={valid_interfaces}")
                 
@@ -388,14 +400,15 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                           error_text: str):
         while True:
             try:
-                user_iput = get_user_input(input_text)
-                if validator_func(user_iput):
+                # [Fix] Corrected typo: user_iput → user_input
+                user_input = get_user_input(input_text)
+                if validator_func(user_input):
                     break
                 else:
                     raise ValueError(error_text)
             except ValueError as error:
                 self.print_error_message(exception_error=error)
-        return user_iput
+        return user_input
 
     def help_me(self):
         self.helper_.main_program_helper()

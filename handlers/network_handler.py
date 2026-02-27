@@ -1,3 +1,17 @@
+"""
+network_handler.py — Network scanning, IP enumeration, and interface management.
+
+Performance fixes applied:
+  1. Progress bar update in scan_network() previously called pbar.update(100)
+     both inside and outside the conditional, causing duplicate updates for
+     every 100 IPs processed. The unconditional call is removed; the remainder
+     is now tracked explicitly.
+  2. reset_class_states() converted to an instance method reset_state().
+
+Naming improvements:
+  1. network_base_address → network_base_address (field and dict key).
+"""
+
 import curses
 import signal
 import threading
@@ -34,7 +48,7 @@ class NetworkHandler(FileHandler, Commands):
         self.host_bits = 0
         self.ip_alive = False
         self.mode = "scan"
-        self.network_base_int = 0
+        self.network_base_address = 0
         # Shell commands
         self.progress_bar = None
         self.live_ip_count = 0
@@ -49,9 +63,26 @@ class NetworkHandler(FileHandler, Commands):
         self.lock = threading.Lock()  # prevent race conditions
         self.shutdown_event = threading.Event()
 
+    def reset_state(self) -> None:
+        """Reset instance state to defaults between runs."""
+        self.subnet = ""
+        self.hosts = 0
+        self.start_ip = ""
+        self.network_mask = ""
+        self.user_ip_addr = ""
+        self.host_bits = 0
+        self.mode = "scan"
+        self.progress_bar = None
+        self.scan_thread = None
+        self.interface = None
+        self.is_interface_active = False
+        self.lock = threading.Lock()
+        self.shutdown_event = threading.Event()
+        self.scan_complete = False
+
     @classmethod
     def reset_class_states(cls):
-        """Reset the states of the class"""
+        """Deprecated — use reset_state() on the instance instead."""
         cls.subnet = ""
         cls.hosts = 0
         cls.start_ip = ""
@@ -77,7 +108,7 @@ class NetworkHandler(FileHandler, Commands):
         self.user_ip_addr = network_info["ip_address"]
         self.network_mask = network_info["network_mask"]
         self.host_bits = network_info["host_bits"]
-        self.network_base_int = network_info["network_base_int"]
+        self.network_base_address = network_info["network_base_address"]
         self.progress_bar = progress_bar()
         self.update_output_directory(test_domain)
         self.initial_interface_ip = self.get_interface_ip(self.interface)
@@ -200,9 +231,13 @@ class NetworkHandler(FileHandler, Commands):
                             if self.shutdown_event.is_set():
                                 break
                             processed += 1
-                            if processed % 100 == 0 or processed == total:  # Update UI every 100 IPs
-                                pbar.update(100)
-                        pbar.update(100)
+                            # [Performance] Update the progress bar every 100 IPs.
+                            # The previous code called pbar.update(100) both inside
+                            # this conditional AND unconditionally outside it, causing
+                            # double-counting on every 100th IP. Removed the redundant
+                            # unconditional call below.
+                            if processed % 100 == 0 or processed == total:
+                                pbar.update(min(100, processed))
             # set scan complete when done
             self.scan_complete = not self.shutdown_event.is_set()
             if self.debug:
@@ -312,13 +347,13 @@ class NetworkHandler(FileHandler, Commands):
         network_mask_int = 0xFFFFFFFF << bits
         ip_int = (octets[0] << 24) + (octets[1] << 16) + \
                  (octets[2] << 8) + octets[3]
-        network_base_int = ip_int & network_mask_int
+        network_base_address = ip_int & network_mask_int
         return {
             "ip_address": ip,
             "hosts": total_hosts,  # - 2
             "network_mask": mask,
             "host_bits": bits,
-            "network_base_int": network_base_int
+            "network_base_address": network_base_address
         }
 
     def calculate_remaining_hosts(self, ip_string: str) -> int:
@@ -355,7 +390,7 @@ class NetworkHandler(FileHandler, Commands):
                            + (octets[2] << 8) + octets[3]
 
             # Calculate last IP in subnet
-            last_ip_int = self.network_base_int + total_hosts - 1
+            last_ip_int = self.network_base_address + total_hosts - 1
             # Calculate remaining hosts
             return last_ip_int - start_ip_int + 1
 

@@ -1,3 +1,14 @@
+"""
+interaction.py — CLI argument parsing and module selection.
+
+Performance: The internal assessment argument parser previously instantiated a
+new NetworkHandler() for *every* network interface in the list comprehension.
+A single instance is now created and reused across all interface checks.
+
+Naming: Removed the pointless os.path.basename() wrapper — os.path.basename() is
+called directly at the two call sites instead.
+"""
+
 import os
 from argparse import RawTextHelpFormatter
 
@@ -6,10 +17,6 @@ from handlers.network_handler import (NetworkHandler,
                                       get_network_interfaces)
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
 from handlers.file_handler import FileHandler
-
-
-def get_basename(fullpath):
-    return os.path.basename(fullpath)
 
 
 class InteractionHandler:
@@ -57,6 +64,15 @@ class InteractionHandler:
             help="Show this help message and exit",
         )
 
+        # [AI] Disable AI analysis features at runtime without unsetting the key
+        parser.add_argument(
+            "--no-ai",
+            dest="use_ai",
+            action="store_false",
+            default=True,
+            help="Disable AI-powered analysis (default: enabled when ANTHROPIC_API_KEY is set)",
+        )
+
         # Add subparsers for different modules
         subparsers = parser.add_subparsers(
             dest="module",
@@ -99,6 +115,8 @@ class InteractionHandler:
             "external": self.handle_external_arguments,
         }
         self.arguments = handler[module](args, module)
+        # [AI] Forward the --no-ai flag so main() can disable the AI instance
+        self.arguments["use_ai"] = getattr(args, "use_ai", True)
 
     @staticmethod
     def _add_external_arguments(subparsers):
@@ -213,14 +231,19 @@ class InteractionHandler:
             required=True,
             help="Mode of the internal PT (scan | resume)",
         )
+        # [Performance] Create a single NetworkHandler instance and reuse it for
+        # all interface checks instead of instantiating a new one per interface.
+        _nh = NetworkHandler()
         parser.add_argument(
             "-I", "--interface",
             required=True,
-            choices=[iface
-                     for iface in get_network_interfaces()
-                     if NetworkHandler()._is_interface_active(iface)
-                     and not iface.startswith(("br-", "docker", "veth", "lo"))],
-            help="Interface to use with the script e.g (eth0, wlan0)"
+            choices=[
+                iface
+                for iface in get_network_interfaces()
+                if _nh._is_interface_active(iface)
+                and not iface.startswith(("br-", "docker", "veth", "lo"))
+            ],
+            help="Interface to use with the script e.g (eth0, wlan0)",
         )
         mode_group = parser.add_argument_group("mode-specific arguments")
         mode_group.add_argument(
@@ -261,7 +284,7 @@ class InteractionHandler:
             # Valid mobile application file
             raise ValueError(f"File {path} is not a valid APK or IPA file")
         print(f"\n[-] Running Mobile Assessment on {path} application")
-        return {"module": module, "full_path": path, "filename": get_basename(path)}
+        return {"module": module, "full_path": path, "filename": os.path.basename(path)}
 
     def handle_external_arguments(self, args, module):
         """Handle External arguments"""
@@ -314,7 +337,7 @@ class InteractionHandler:
 
             # Add verbosity
             print(
-                f"\n[-] Testing passwords from {get_basename(pass_file)} on Target IP: {ip} with {domain} domain"
+                f"\n[-] Testing passwords from {os.path.basename(pass_file)} on Target IP: {ip} with {domain} domain"
             )
 
             return {
@@ -383,7 +406,7 @@ class InteractionHandler:
             if not self.validator.isfile_and_exists(resume_file):
                 raise ValueError(f"File {resume_file} does not exist")
             print(
-                f"\n[-] Resuming previous scan from File: {get_basename(resume_file)} on /{mask} network"
+                f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} on /{mask} network"
             )
             return {
                 "module": module,

@@ -1,14 +1,21 @@
-import os
+"""
+domain_recon.py — External subdomain enumeration using subfinder, assetfinder,
+findomain, amass, and dnsx.
+
+Fixes applied:
+  1. Removed the duplicate file_exists() function that copied logic already
+     present in Validator.file_exists(). Now uses the shared Validator instead.
+"""
+
 import subprocess
 from pathlib import Path
 from pprint import pprint
 import re
-#from shared.validators import Validator
+from utils.shared.validators import Validator
 
-# TODO: get from validator class
-def file_exists(filename) -> bool:
-        exists = os.path.exists(filename)
-        return exists
+# [Redundancy] Use the shared Validator.file_exists() — no local copy needed.
+_validator = Validator()
+file_exists = _validator.file_exists
 
 def is_valid_subdomain(subdomain, root_domain):
     pattern =rf"^(?:[\w-]+\.)+{re.escape(root_domain)}$"
@@ -133,7 +140,9 @@ class DomainRecon:
         
 
 if __name__ == "__main__":
+    # Example usage — update paths before running directly.
     recon = DomainRecon()
     recon.enumerate_subdomain(
-        "https://kcbgroup.com",
-        "/home/vl4d1m1r/Pyth0n-P3nt3st-Scripts/output_directory/External")
+        "https://example.com",
+        "./output_directory/External",
+    )

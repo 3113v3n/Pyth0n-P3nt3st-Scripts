@@ -1,3 +1,4 @@
+anthropic>=0.49.0       # Claude AI integration (PentestAI class)
 aioping==0.4.0          # For network ping operations
 dask==2025.3.0          # For parallel processing of large datasets
 fqdn==1.5.1

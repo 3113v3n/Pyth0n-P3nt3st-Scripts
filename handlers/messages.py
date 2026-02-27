@@ -1,15 +1,55 @@
+"""
+messages.py — Colored terminal output helpers for the pentest framework.
+
+All public print_*_message() methods delegate to the private _format_message()
+base method, eliminating the previous duplication of color-wrapping logic.
+"""
+
 from utils.shared.colors import Bcolors
 
 
 class DisplayHandler(Bcolors):
+    """Mixin that provides colored console output for all framework classes."""
+
     def __init__(self):
         super().__init__()
-        pass
+
+    # ------------------------------------------------------------------
+    # Private base formatter
+    # ------------------------------------------------------------------
 
     @staticmethod
-    def print_debug_message(message: str):
-        """Print debug messages for debugging purposes
-        :param message: message to print
+    def _format_message(
+        prefix: str,
+        color_start: str,
+        message: str,
+        suffix: str = "",
+    ) -> str:
+        """Build a color-wrapped message string.
+
+        Args:
+            prefix:      Label shown before the message, e.g. "[+]".
+            color_start: ANSI color escape sequence to open.
+            message:     The text body.
+            suffix:      Optional trailing text appended after the color reset.
+
+        Returns:
+            Formatted string ready for printing.
+        """
+        # [Redundancy] Single source of truth for color-wrapping logic that was
+        # previously repeated across all 7 print methods.
+        return f"\n{color_start}{prefix} {message}{Bcolors.ENDC}{suffix}"
+
+    # ------------------------------------------------------------------
+    # Public print methods
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def print_debug_message(message: str) -> None:
+        """Print a debug message (header color).
+
+        Args:
+            message: Debug text to display.
         """
         print(
             f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
@@ -17,26 +57,27 @@ class DisplayHandler(Bcolors):
         )
 
     @staticmethod
-    def print_success_message(message: str, **kwargs):
-        """Prints out a success message
-        :param message: Text to print
-        :param kwargs:  keyword arguments to ensure different messages are printed accordingly
-        :keyword (str) mobile_success : shows the directory where mobile scans are stored
-        :keyword (str) extras : any extra data to print
-        :keyword (bool) flush : flush the message
+    def print_success_message(message: str, **kwargs) -> None:
+        """Print a success message (green).
+
+        Args:
+            message: Success text to display.
+            kwargs:
+                mobile_success (str): Directory path shown underlined below the message.
+                extras (str):         Additional text appended inline.
+                flush (bool):         If True, flush stdout immediately.
         """
         msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
 
         if kwargs.get("mobile_success"):
             msg = (
                 f"\n{Bcolors.WARNING}[+]{Bcolors.ENDC} {message}\n"
-                f"{Bcolors.OKGREEN}{Bcolors.UNDERLINE}{kwargs["mobile_success"]}{Bcolors.ENDC}\n"
+                f"{Bcolors.OKGREEN}{Bcolors.UNDERLINE}{kwargs['mobile_success']}{Bcolors.ENDC}\n"
             )
         elif kwargs.get("extras"):
             extra_data = kwargs["extras"]
             msg = f"{msg}{extra_data}\n\n"
         elif kwargs.get("flush"):
-            # Default to empty string if absent
             extra_data = kwargs.get("extras", "")
             msg = f"{msg}{extra_data}"
             return print(msg, flush=kwargs["flush"])
@@ -44,69 +85,75 @@ class DisplayHandler(Bcolors):
         print(msg)
 
     @staticmethod
-    def print_error_message(message: str = "Error ", **kwargs):
-        """Prints out error messages
-        :param message:  Text to print
-        :param kwargs: Keyword arguments to handle exception type errors
-        :keyword (str) exception_error : error raised from exceptions
-        """
-        msg = f"\n{Bcolors.FAIL}[!] Error: {message} {Bcolors.ENDC}"
+    def print_error_message(message: str = "Error", **kwargs) -> None:
+        """Print an error message (red).
 
+        Args:
+            message: Error description.
+            kwargs:
+                exception_error: Exception instance or string to display.
+        """
         if kwargs.get("exception_error"):
             error = kwargs["exception_error"]
-            msg = f"\n{Bcolors.FAIL}[!] {message}: {str(error)}{Bcolors.ENDC}"
-
+            msg = f"\n{Bcolors.FAIL}[!] {message}: {error}{Bcolors.ENDC}"
+        else:
+            msg = f"\n{Bcolors.FAIL}[!] Error: {message} {Bcolors.ENDC}"
         print(msg)
 
     @staticmethod
-    def print_warning_message(message: str, **kwargs):
-        """Prints out warning messages
-        :param message: Text message to print out
-        :param kwargs: an Additional Keyword arguments
-        :keyword (list) data : list of IPs
-        :keyword (bool) flush : Boolean value to flush messages
-        :keyword (str) file_path : file path to an output file
+    def print_warning_message(message: str, **kwargs) -> None:
+        """Print a warning message (yellow).
+
+        Args:
+            message: Warning text.
+            kwargs:
+                flush (bool): Flush stdout; also requires a *data* list.
+                data (list):  IP list printed alongside the summary header.
+                file_path (str): File path appended after the message.
         """
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
+
         if kwargs.get("flush"):
             msg = f"\n{Bcolors.HEADER}[#] Summary: {message} {Bcolors.ENDC}\n"
             ip_list = kwargs["data"]
-            flush = kwargs["flush"]
-            return print(msg, ip_list, flush=flush)
+            return print(msg, ip_list, flush=kwargs["flush"])
+
         if kwargs.get("file_path"):
-            path = kwargs["file_path"]
-            msg = f"{msg}{path}"
+            msg = f"{msg}{kwargs['file_path']}"
 
         print(msg)
 
     @staticmethod
-    def print_trace_message(message: str):
-        """print trace messages on the terminal
-        :param message: message to print
+    def print_trace_message(message: str) -> None:
+        """Print a trace message (header color, no label prefix).
+
+        Args:
+            message: Trace text to display.
         """
-        msg = f"\n {Bcolors.HEADER}[TRACE]{Bcolors.ENDC} {message}"
-        print(msg)
+        print(f"\n {Bcolors.HEADER}[TRACE]{Bcolors.ENDC} {message}")
 
     @staticmethod
-    def print_info_message(message: str, **kwargs):
-        """Prints out info messages
-        :param message:  Text message to print
-        :param kwargs: Additional Keyword arguments
-        :keyword (bool) flush  : Boolean value to flush messages
-        :keyword (str) file_path : file path to an output file
-        :keyword (str) file : files being scanned in mobile module
+    def print_info_message(message: str, **kwargs) -> None:
+        """Print an informational message (cyan).
+
+        Args:
+            message: Info text.
+            kwargs:
+                flush (bool):          Flush stdout; also requires *encoded_string*.
+                encoded_string (str):  Appended after the message when flush is set.
+                file_path (str):       File path shown on a separate line.
+                file (str):            File being currently scanned (mobile module).
         """
         msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
+
         if kwargs.get("flush"):
-            flush = kwargs["flush"]
             encoded_string = kwargs.get("encoded_string", "")
             msg = f"{msg}{encoded_string}"
-            return print(msg, flush=flush)
+            return print(msg, flush=kwargs["flush"])
 
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
             msg = f"\n{Bcolors.HEADER}[-] Info: {message} {Bcolors.ENDC}\n{path}"
-
         elif kwargs.get("file"):
             msg = f"{msg}{kwargs['file']}"
 
@@ -114,9 +161,11 @@ class DisplayHandler(Bcolors):
 
     @staticmethod
     def print_selection_items(file: dict, index: int) -> None:
-        """Print items for selection on screen
-        :param file: file dictionary containing filename and full file path
-        :param index: index of the item to print
+        """Print a numbered file selection item for the interactive menu.
+
+        Args:
+            file:  Dictionary with "filename" key.
+            index: Display number shown to the user (1-based).
         """
         filename = f" {Bcolors.BOLD}{Bcolors.WARNING}{file['filename']}{Bcolors.ENDC}"
         display_str = (

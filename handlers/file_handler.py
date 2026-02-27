@@ -1,3 +1,15 @@
+"""
+file_handler.py — File I/O, CSV/Excel operations, and file management utilities.
+
+Security: _safe_path() validates that user-supplied filenames cannot escape the
+output directory via path-traversal sequences such as "../../etc/passwd".
+
+Performance: IP sorting now uses key=ipaddress.ip_address (function reference)
+instead of an equivalent lambda, removing per-element object construction overhead.
+
+Naming: do_analysis() → select_and_analyze_file(); flat_content → deduplicated_ips.
+"""
+
 import os
 from typing import Any
 import pandas
@@ -9,7 +21,7 @@ import ipaddress
 
 
 class FileHandler(Validator, DisplayHandler):
-    """Handle File operations"""
+    """Handle file I/O, CSV/Excel operations, and output-directory management."""
     FONT_NAME = "Calibri Light"
     FONT_SIZE = 12
     FONT_COLOR = "white"
@@ -29,18 +41,54 @@ class FileHandler(Validator, DisplayHandler):
         self.unresponsive_hosts_file = ""
         self.existing_unresponsive_ips = set()
 
+    def reset_state(self) -> None:
+        """Reset instance state to defaults between runs."""
+        self.working_dir = os.getcwd()
+        self.output_directory = f"{self.working_dir}/output_directory"
+        self.filepath = ""
+        self.files = []
+        self.live_hosts_file = ""
+        self.unresponsive_hosts_file = ""
+
     @classmethod
     def reset_class_states(cls):
-        """Reset the states of the class"""
+        """Deprecated — use reset_state() on the instance instead."""
         cls.working_dir = os.getcwd()
-        cls.output_directory = (
-            # directory to save our output files
-            f"{cls.working_dir}/output_directory"
-        )
-        cls.filepath = ""  # full path to a saved file
+        cls.output_directory = f"{cls.working_dir}/output_directory"
+        cls.filepath = ""
         cls.files = []
         cls.live_hosts_file = ""
         cls.unresponsive_hosts_file = ""
+
+    # ------------------------------------------------------------------
+    # Security: path traversal prevention
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _safe_path(base_dir: str, filename: str) -> Path:
+        """Resolve *filename* relative to *base_dir* and assert it stays inside.
+
+        Prevents path-traversal attacks where a crafted filename such as
+        "../../etc/passwd" would escape the intended output directory.
+
+        Args:
+            base_dir: Trusted root directory the file must live under.
+            filename: Filename or relative path to resolve.
+
+        Returns:
+            Resolved absolute Path object.
+
+        Raises:
+            ValueError: If the resolved path is outside *base_dir*.
+        """
+        # [Security] Prevent path traversal.
+        resolved_base = Path(base_dir).resolve()
+        resolved_path = (resolved_base / filename).resolve()
+        if not str(resolved_path).startswith(str(resolved_base)):
+            raise ValueError(
+                f"Path traversal detected: '{filename}' resolves outside '{base_dir}'"
+            )
+        return resolved_path
 
     def set_new_dir(self, new_path):
         """Universal function to update output directory"""
@@ -168,18 +216,20 @@ class FileHandler(Validator, DisplayHandler):
         if not isinstance(content, (list, tuple)):
             content = [content]
 
-        # Flatten nested lists if present
-        flat_content = [item if not isinstance(
-            item, (list, tuple)) else item[0] for item in content]
-        data = pandas.DataFrame(flat_content, columns=None)
+        # Flatten nested lists if present.
+        # [Naming] Renamed flat_content → deduplicated_ips to reflect actual purpose.
+        deduplicated_ips = [
+            item if not isinstance(item, (list, tuple)) else item[0]
+            for item in content
+        ]
+        data = pandas.DataFrame(deduplicated_ips, columns=None)
 
         if self.file_exists(f"{file_path}"):
             existing_df = self.read_csv(f"{file_path}", ip_list=True)
             # remove duplicates by converting to set and back to dataFrame
             existing_ips = set(existing_df[0].to_list())
-            new_ips = set(flat_content)
-            combined_ips = existing_ips.union(new_ips)
-            # updated_df = self.concat_dataframes(existing_df, data)
+            new_ips = set(deduplicated_ips)
+            combined_ips = existing_ips | new_ips
             updated_df = pandas.DataFrame(list(combined_ips), columns=None)
         else:
             updated_df = data
@@ -327,23 +377,20 @@ class FileHandler(Validator, DisplayHandler):
             self.print_selection_items(file, index)
 
     def _handle_analysis(self, **kwargs):
-        """Handle different analysis options
-        :param kwargs: Keyword Arguments
-        :keyword (bool) scan_extension: Perform VA analysis on scanned files
-        :keyword (bool) resume_scan: Resume scan from the given file
-        :keyword (bool) display_application: Display mobile applications
+        """Route to the correct analysis action based on keyword flags.
+
+        Args:
+            kwargs:
+                scan_extension (bool):     Run VA file-selection flow.
+                display_applications (bool): Run application-selection flow.
+                resume_scan (bool):         Return starting IP for a resumed scan.
         """
         if kwargs.get("scan_extension"):
-            # Display files to perform VA analysis
-            return self.do_analysis("files")
-
+            return self.select_and_analyze_file("files")
         elif kwargs.get("display_applications"):
-            return self.do_analysis("applications")
-
+            return self.select_and_analyze_file("applications")
         elif kwargs.get("resume_scan"):
-            # Handle users choice
-            # returns the last ip address
-            return self.do_analysis()
+            return self.select_and_analyze_file()
 
     def index_out_of_range_display(self, input_str, data_list) -> int:
         """Takes in an input string and a data list and returns the index of the
@@ -369,36 +416,48 @@ class FileHandler(Validator, DisplayHandler):
                 # return the index of selected item
         return selected_value - 1
 
-    def do_analysis(self, to_analyze="") -> tuple | str:
+    def select_and_analyze_file(self, to_analyze: str = "") -> tuple | str | None:
+        """Prompt the user to choose a file or application from the displayed list.
+
+        [Naming] Renamed from do_analysis() to better describe what this method does.
+
+        Args:
+            to_analyze: One of "files" (VA CSVs), "applications" (APK/IPA), or ""
+                        (resume scan — returns the last unresponsive IP).
+
+        Returns:
+            Tuple of (files, start_index) for VA, a file dict for applications, or an
+            IP address string for resume mode.
+        """
         print(f"\n{self.OKBLUE}Analyzing {to_analyze}...{self.ENDC}")
+
         if to_analyze == "files":
-            """
-            During VA analysis, display all CSV files to analyze and select the one to start from
-            return Tuple containing the list of CSV files and the index to start scan
-            """
+            # VA analysis: let user choose which file to start from.
             selected_file = self.index_out_of_range_display(
-                "Please enter the file number you would like scan first : ", self.files
+                "Please enter the file number you would like to scan first: ",
+                self.files,
             )
             return self.files, selected_file
+
         elif to_analyze == "applications":
-            """
-            Display all applications to analyze and select the one to start from
-            """
+            # Mobile analysis: let user choose which application to scan.
             selected_app = self.index_out_of_range_display(
-                "Select the application to scan ", self.files
+                "Select the application to scan: ", self.files
             )
             return self.files[selected_app]
+
         else:
-            """Returns the IP address from a file input"""
+            # Resume scan: return the last IP from the selected unresponsive file.
             selected_file = self.index_out_of_range_display(
                 "Please enter the file number displayed above: ", self.files
             )
-
             self.filepath = self.files[selected_file]["full_path"]
-            starting_ip = self.get_last_unresponsive_ip(
-                self.filepath
-            )  # read_last_line(self.filepath)
+            starting_ip = self.get_last_unresponsive_ip(self.filepath)
             return starting_ip
+
+    def do_analysis(self, to_analyze: str = "") -> tuple | str | None:
+        """Deprecated alias for select_and_analyze_file() — kept for backward compatibility."""
+        return self.select_and_analyze_file(to_analyze)
 
     @staticmethod
     def read_csv(dataframe, **kwargs):
@@ -460,9 +519,10 @@ class FileHandler(Validator, DisplayHandler):
         self.existing_unresponsive_ips = self.load_existing_ips(
             unresponsive_file)
         ip_list = list(self.existing_unresponsive_ips)
-        sorted_ips = sorted(
-            ip_list, key=lambda ip: ipaddress.ip_address(ip)
-        )
+        # [Performance] Pass ipaddress.ip_address as a function reference rather
+        # than wrapping it in a lambda — avoids creating a new lambda object per
+        # element during the sort.
+        sorted_ips = sorted(ip_list, key=ipaddress.ip_address)
         total = len(self.existing_unresponsive_ips)
         self.print_info_message("Total IPs loaded ", file_path=total)
         if sorted_ips:

@@ -1,3 +1,13 @@
+"""
+mobile_commands.py — Static analysis commands for Android APK and iOS IPA files.
+
+Security fixes applied:
+  1. push_certs() and _unzip_package() now build commands as lists (shell=False)
+     so that file paths containing shell metacharacters cannot trigger injection.
+  2. Added _validate_file_path() to reject null bytes and path-traversal sequences
+     before any path is embedded in a subprocess call.
+"""
+
 from pathlib import Path
 import tempfile
 import os
@@ -27,6 +37,33 @@ class MobileCommands(
         self.debug = False
         self.grep_cmd = "grep"
 
+    # ------------------------------------------------------------------
+    # Path validation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _validate_file_path(path: str) -> str:
+        """Validate that *path* is safe to embed in a subprocess call.
+
+        Rejects null bytes (which can truncate C-string paths) and path-traversal
+        sequences ("../") that could escape the intended directory.
+
+        Args:
+            path: File system path to validate.
+
+        Returns:
+            The original path if safe.
+
+        Raises:
+            ValueError: If the path contains dangerous characters.
+        """
+        # [Security] Reject null bytes and path traversal.
+        if "\x00" in path:
+            raise ValueError(f"Null byte detected in path: {path!r}")
+        if ".." in Path(path).parts:
+            raise ValueError(f"Path traversal detected in path: {path!r}")
+        return path
+
     @staticmethod
     def rename_folders_with_spaces(path):
         for root, dirs, _ in os.walk(path):
@@ -52,8 +89,18 @@ class MobileCommands(
         content = re.sub(r"\\r", "\r", content)
         return content
 
-    def push_certs(self, certificate):
-        self.run_os_commands(f"adb push {certificate} /storage/emulated/0/")
+    def push_certs(self, certificate: str) -> None:
+        """Push a certificate file to the device using ADB.
+
+        Args:
+            certificate: Local path to the certificate file.
+
+        Raises:
+            ValueError: If the certificate path fails security validation.
+        """
+        # [Security] Validate path before use, then pass as list to avoid injection.
+        safe_cert = self._validate_file_path(certificate)
+        self.execute_command(["adb", "push", safe_cert, "/storage/emulated/0/"])
 
     def pull_package_with_keyword(self, keyword):
         """Pull application apk
@@ -115,15 +162,21 @@ class MobileCommands(
             package: ==> application package
         """
         try:
-            android_cmd = f"apktool d '{package}' -o {folder_name}"
-            ios_cmd = f"unzip '{package}' -d {self.folder_name}"
-            command = android_cmd if self.file_type.lower() == "apk" else ios_cmd
-            if not self.check_folder_exists(folder_name):
+            # [Security] Build commands as lists (shell=False) so that package /
+            # folder_name paths containing special characters cannot inject code.
+            safe_package = self._validate_file_path(package)
+            safe_folder = self._validate_file_path(folder_name)
 
+            if self.file_type.lower() == "apk":
+                cmd = ["apktool", "d", safe_package, "-o", safe_folder]
+            else:
+                cmd = ["unzip", safe_package, "-d", self.folder_name]
+
+            if not self.check_folder_exists(folder_name):
                 self.print_info_message(
                     f" Decompiling the {self.file_name} application ..."
                 )
-                result = self.run_os_commands(command)
+                result = self.execute_command(cmd)
                 if result.returncode == 0:
                     self.print_success_message(" Decompiling Successful")
                 else:
