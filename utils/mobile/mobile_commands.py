@@ -32,6 +32,7 @@ import plistlib
 import re
 import shutil
 import tempfile
+import time
 import zipfile
 
 from handlers import FileHandler, ScreenHandler
@@ -61,11 +62,14 @@ class MobileCommands(
     MAX_TEXT_CHARS_PER_FILE = 500_000
     MAX_STRINGS_PER_FILE = 5_000
     THREAD_FACTOR = 2
+    NUCLEI_TEMPLATE_SYNC_TTL_SECONDS = 24 * 60 * 60
 
     # Binary/text extraction
     PRINTABLE_RE = re.compile(rb"[\x20-\x7E]{8,}")
     URL_RE = re.compile(r"\b(?:https?|wss?)://[^\s\"'<>]+", re.IGNORECASE)
-    IP_RE = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
+    IP_RE = re.compile(
+        r"(?<!\d\.)(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?!\.\d)"
+    )
     BASE64_TOKEN_RE = re.compile(r"\b(?:[A-Za-z0-9+/]{24,}={0,2})\b")
     BASE64_MAX_DECODE_DEPTH = 5
 
@@ -94,6 +98,10 @@ class MobileCommands(
     VERSION_CONTEXT_HINTS = (
         "version", "openssl", "libssl", "changelog", "release", "build", "sdk",
     )
+    OID_CONTEXT_HINTS = (
+        "oid", "asn1", "x509", "pkcs", "objectidentifier", "object identifier",
+    )
+    KNOWN_PUBLIC_SERVICE_IPS = {"1.1.1.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"}
 
     # Hardcoded secret detectors
     SECRET_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
@@ -481,7 +489,19 @@ class MobileCommands(
         path = parsed.path or ""
         if path == "/":
             path = ""
+        elif path:
+            path = path.rstrip("/")
         return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+
+    @staticmethod
+    def _collapse_urls_to_common_bases(urls: set[str]) -> list[str]:
+        """Keep only common base URLs when deeper paths are subsets of a base."""
+        kept: list[str] = []
+        for url in sorted(urls, key=len):
+            if any(url == base or url.startswith(f"{base}/") for base in kept):
+                continue
+            kept.append(url)
+        return kept
 
     @classmethod
     def _is_probable_version_ip(cls, ip_text: str, searchable_text: str) -> bool:
@@ -491,15 +511,24 @@ class MobileCommands(
         except ValueError:
             return False
 
-        # Semantic-version style dotted quads frequently show up in library versions.
-        if len(parts) != 4 or not all(0 <= part <= 9 for part in parts):
+        # We only evaluate IPv4 dotted quads here.
+        if len(parts) != 4:
             return False
 
-        snippet = cls._snippet_around(searchable_text.lower(), ip_text.lower(), radius=40)
+        if ip_text in cls.KNOWN_PUBLIC_SERVICE_IPS:
+            return False
+        if parts[0] == 0:
+            return True
+
+        snippet = cls._snippet_around(searchable_text.lower(), ip_text.lower(), radius=50)
+        if any(hint in snippet for hint in cls.OID_CONTEXT_HINTS):
+            return True
         if any(hint in snippet for hint in cls.VERSION_CONTEXT_HINTS):
             return True
         if any(hint in snippet for hint in cls.NETWORK_CONTEXT_HINTS):
             return False
+        if all(part <= 20 for part in parts):
+            return True
         return bool(re.search(rf"{re.escape(ip_text.lower())}[a-z]", snippet))
 
     @classmethod
@@ -695,8 +724,26 @@ class MobileCommands(
         return {"id": check_id, "cwe": "N/A", "cve": "N/A", "cvss": "N/A"}
 
     @staticmethod
-    def _http_get_json(url: str, timeout: int = 12) -> tuple[int, dict, str]:
-        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    def _http_json_request(
+        url: str,
+        timeout: int = 12,
+        method: str = "GET",
+        payload: dict | None = None,
+        headers: dict | None = None,
+    ) -> tuple[int, dict, str]:
+        request_headers = {"User-Agent": "Mozilla/5.0"}
+        if headers:
+            request_headers.update(headers)
+        data = None
+        if payload is not None:
+            request_headers.setdefault("Content-Type", "application/json")
+            data = json.dumps(payload).encode("utf-8")
+        request = Request(
+            url,
+            headers=request_headers,
+            data=data,
+            method=method.upper(),
+        )
         try:
             with urlopen(request, timeout=timeout) as response:
                 body = response.read().decode("utf-8", errors="replace")
@@ -728,10 +775,38 @@ class MobileCommands(
             restriction_detected = False
             invalid_key = False
             test_lines: list[str] = []
+            test_cases = [
+                {"name": name, "url": template.format(key=key), "method": "GET", "payload": None}
+                for name, template in self.GOOGLE_API_TEST_ENDPOINTS
+            ]
+            # Cloud-oriented probes (Firebase / Google Cloud APIs).
+            test_cases.extend(
+                [
+                    {
+                        "name": "firebase_identitytoolkit_lookup",
+                        "url": f"https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={key}",
+                        "method": "POST",
+                        "payload": {"idToken": "invalid"},
+                    },
+                    {
+                        "name": "cloud_translate_languages",
+                        "url": f"https://translation.googleapis.com/language/translate/v2/languages?key={key}",
+                        "method": "GET",
+                        "payload": None,
+                    },
+                ]
+            )
 
-            for test_name, template in self.GOOGLE_API_TEST_ENDPOINTS:
-                url = template.format(key=key)
-                http_code, payload, request_error = self._http_get_json(url)
+            for test_case in test_cases:
+                test_name = str(test_case["name"])
+                url = str(test_case["url"])
+                method = str(test_case["method"])
+                payload_body = test_case.get("payload")
+                http_code, payload, request_error = self._http_json_request(
+                    url,
+                    method=method,
+                    payload=payload_body if isinstance(payload_body, dict) else None,
+                )
                 error_message = self.extract_google_error(payload, request_error)
                 normalized_error = error_message.lower()
 
@@ -744,16 +819,32 @@ class MobileCommands(
                     api_status = str(payload.get("status", "")).upper() if isinstance(payload, dict) else ""
                     success = api_status in {"OK", "ZERO_RESULTS"}
                     status_label = api_status or ("ERROR" if error_message else "UNKNOWN")
-                else:
+                elif test_name == "youtube_data":
                     success = isinstance(payload, dict) and "error" not in payload and "kind" in payload
                     status_label = "OK" if success else "ERROR"
+                elif test_name == "firebase_identitytoolkit_lookup":
+                    firebase_markers = ("invalid_id_token", "missing_id_token", "user_not_found")
+                    success = any(marker in normalized_error for marker in firebase_markers) or bool(
+                        isinstance(payload, dict) and payload.get("users")
+                    )
+                    status_label = "OK" if success else "ERROR"
+                elif test_name == "cloud_translate_languages":
+                    success = (
+                        isinstance(payload, dict)
+                        and isinstance(payload.get("data"), dict)
+                        and isinstance(payload.get("data", {}).get("languages"), list)
+                    )
+                    status_label = "OK" if success else "ERROR"
+                else:
+                    success = False
+                    status_label = "UNKNOWN"
 
                 if success:
                     accessible_apis.append(test_name)
 
                 test_lines.append(
-                    f"KEY={masked_key} TEST={test_name} HTTP={http_code} STATUS={status_label} "
-                    f"MESSAGE={self.clean_line(error_message or 'none', max_len=180)}"
+                    f"{test_name}:{method}[HTTP={http_code},STATUS={status_label},"
+                    f"MESSAGE={self.clean_line(error_message or 'none', max_len=160)}]"
                 )
 
             vulnerable = False
@@ -807,32 +898,76 @@ class MobileCommands(
                         )
                     )
 
-            verdict = "VULNERABLE" if vulnerable else "NOT_VULNERABLE"
-            if invalid_key:
-                verdict = "NOT_VULNERABLE (INVALID_KEY)"
+            if vulnerable:
+                failed_checks: list[str] = []
+                if not restriction_detected:
+                    failed_checks.append("restriction-controls:FAIL")
+                    failed_checks.append("quota-and-billing-abuse:FAIL")
+                if len(accessible_apis) > 1:
+                    failed_checks.append("least-privilege-api-scope:FAIL")
 
-            checklist_status = {
-                "hardcoded-key-exposure": "FAIL",
-                "key-validity": "FAIL" if invalid_key else ("PASS" if accessible_apis else "UNKNOWN"),
-                "restriction-controls": (
-                    "PASS" if restriction_detected else ("FAIL" if accessible_apis and not invalid_key else "UNKNOWN")
-                ),
-                "least-privilege-api-scope": (
-                    "FAIL" if len(accessible_apis) > 1 else ("PASS" if len(accessible_apis) == 1 else "UNKNOWN")
-                ),
-                "quota-and-billing-abuse": (
-                    "FAIL" if accessible_apis and not restriction_detected and not invalid_key else "UNKNOWN"
-                ),
-            }
-            status_str = ",".join(f"{name}:{status}" for name, status in checklist_status.items())
-            report_lines.append(
-                f"KEY={masked_key} TYPE=Google API Key SOURCES={len(source_files)} "
-                f"VERDICT={verdict} ACCESSIBLE_APIS={','.join(accessible_apis) or 'none'} "
-                f"RESTRICTIONS_DETECTED={restriction_detected} CHECKLIST={status_str}"
-            )
-            report_lines.extend(test_lines)
+                report_lines.append(
+                    f"KEY={masked_key} TYPE=Google API Key SOURCES={len(source_files)} "
+                    "VERDICT=VULNERABLE "
+                    f"FAILED_CHECKS={','.join(failed_checks) or 'none'} "
+                    f"ACCESSIBLE_APIS={','.join(accessible_apis) or 'none'}"
+                )
+                report_lines.append(
+                    f"TEST_CONDUCTED=google-live-api-validation KEY={masked_key} "
+                    + " ; ".join(test_lines)
+                )
 
         return self._dedupe_findings(findings), report_lines
+
+    def _assess_cloud_tokens(
+        self,
+        key_type: str,
+        keys: dict[str, set[str]],
+        endpoint: str,
+        auth_header: str,
+        success_predicate: callable,
+        title: str,
+        test_label: str,
+    ) -> tuple[list[Finding], list[str]]:
+        findings: list[Finding] = []
+        report_lines: list[str] = []
+        exposure_meta = self._api_key_check_meta("hardcoded-key-exposure")
+
+        for key in sorted(keys):
+            source_files = keys.get(key, set())
+            masked_key = self.mask_secret(key)
+            http_code, payload, request_error = self._http_json_request(
+                endpoint,
+                headers={"Authorization": f"{auth_header} {key}"},
+            )
+            error_message = self.extract_google_error(payload, request_error)
+            is_vulnerable = success_predicate(http_code, payload)
+            if not is_vulnerable:
+                continue
+
+            findings.append(
+                Finding(
+                    category="api_key_exposure",
+                    title=title,
+                    severity="high",
+                    file="cloud_token_check",
+                    evidence=(
+                        f"key={masked_key} key_type={key_type} source_occurrences={len(source_files)} "
+                        f"checklist=cloud-token-validation CWE={exposure_meta['cwe']} "
+                        f"CVE={exposure_meta['cve']} CVSS={exposure_meta['cvss']}"
+                    ),
+                )
+            )
+            report_lines.append(
+                f"KEY={masked_key} TYPE={key_type} SOURCES={len(source_files)} "
+                "VERDICT=VULNERABLE FAILED_CHECKS=cloud-token-validation:FAIL"
+            )
+            report_lines.append(
+                f"TEST_CONDUCTED={test_label} KEY={masked_key} "
+                f"HTTP={http_code} STATUS=OK MESSAGE={self.clean_line(error_message or 'none', max_len=160)}"
+            )
+
+        return findings, report_lines
 
     def _assess_discovered_api_keys(self, hardcoded_findings: list[Finding]) -> tuple[list[Finding], list[str]]:
         discovered_keys = self._extract_unique_api_keys(hardcoded_findings)
@@ -868,12 +1003,44 @@ class MobileCommands(
                     "VERDICT=VULNERABLE CHECKLIST=hardcoded-key-exposure:FAIL "
                     f"CWE={exposure_meta['cwe']} CVE={exposure_meta['cve']} CVSS={exposure_meta['cvss']}"
                 )
+                report_lines.append(
+                    "TEST_CONDUCTED=static-hardcoded-key-detection "
+                    f"KEY={masked_key} RULE={key_type} source_occurrences={len(source_files)}"
+                )
 
         google_findings, google_report_lines = self._assess_google_api_keys(
             discovered_keys.get("Google API Key", {})
         )
         findings.extend(google_findings)
         report_lines.extend(google_report_lines)
+
+        github_findings, github_report_lines = self._assess_cloud_tokens(
+            key_type="GitHub Token",
+            keys=discovered_keys.get("GitHub Token", {}),
+            endpoint="https://api.github.com/user",
+            auth_header="token",
+            success_predicate=lambda code, payload: (
+                code == 200 and isinstance(payload, dict) and bool(payload.get("login"))
+            ),
+            title="GitHub Token Grants Cloud API Access",
+            test_label="github-user-api-validation",
+        )
+        findings.extend(github_findings)
+        report_lines.extend(github_report_lines)
+
+        stripe_findings, stripe_report_lines = self._assess_cloud_tokens(
+            key_type="Stripe Live Key",
+            keys=discovered_keys.get("Stripe Live Key", {}),
+            endpoint="https://api.stripe.com/v1/account",
+            auth_header="Bearer",
+            success_predicate=lambda code, payload: (
+                code == 200 and isinstance(payload, dict) and bool(payload.get("id"))
+            ),
+            title="Stripe Live Key Grants Cloud API Access",
+            test_label="stripe-account-api-validation",
+        )
+        findings.extend(stripe_findings)
+        report_lines.extend(stripe_report_lines)
 
         return self._dedupe_findings(findings), report_lines
 
@@ -995,10 +1162,16 @@ class MobileCommands(
                 if canonical_url:
                     result["urls"].add(canonical_url)
 
-        for match in self.IP_RE.findall(searchable):
+        for match_obj in self.IP_RE.finditer(searchable):
+            match = match_obj.group(0)
             try:
                 ip_obj = ipaddress.ip_address(match)
-                if not ip_obj.is_loopback and not ip_obj.is_multicast:
+                if (
+                    not ip_obj.is_loopback
+                    and not ip_obj.is_multicast
+                    and not ip_obj.is_unspecified
+                    and not ip_obj.is_reserved
+                ):
                     if self._is_probable_version_ip(match, searchable):
                         continue
                     result["ips"].add(match)
@@ -1173,6 +1346,24 @@ class MobileCommands(
             )
         return self._write_lines(path, rows)
 
+    @staticmethod
+    def _write_api_check_report(path: Path, lines: Iterable[str]) -> int:
+        """Write API check lines and add spacing after each successful test line."""
+        filtered_lines = [str(line).strip() for line in lines if str(line).strip()]
+        if not filtered_lines:
+            return 0
+
+        unique_lines = list(dict.fromkeys(filtered_lines))
+
+        count = 0
+        with path.open("w", encoding="utf-8") as fh:
+            for line in unique_lines:
+                fh.write(f"{line}\n")
+                count += 1
+                if line.startswith("TEST_CONDUCTED="):
+                    fh.write("\n")
+        return count
+
     @classmethod
     def _build_severity_score(cls, findings: list[Finding]) -> dict:
         """Build a normalized risk score from severity-weighted findings."""
@@ -1281,6 +1472,27 @@ class MobileCommands(
                 fh.write(f"{line}\n")
         return len(unique_lines)
 
+    @classmethod
+    def _is_nuclei_template_sync_fresh(cls, template_dir: Path) -> bool:
+        marker = template_dir / ".last_sync_epoch"
+        if not marker.exists():
+            return False
+        if not (template_dir / "Keys").exists():
+            return False
+        try:
+            last_sync = int(marker.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return False
+        return (int(time.time()) - last_sync) < cls.NUCLEI_TEMPLATE_SYNC_TTL_SECONDS
+
+    @staticmethod
+    def _mark_nuclei_template_sync(template_dir: Path) -> None:
+        marker = template_dir / ".last_sync_epoch"
+        try:
+            marker.write_text(str(int(time.time())), encoding="utf-8")
+        except OSError:
+            pass
+
     def install_nuclei_template(self, install_path: str) -> bool:
         """Ensure mobile nuclei templates exist locally and are updated."""
         template_dir = Path(install_path).resolve()
@@ -1296,6 +1508,13 @@ class MobileCommands(
 
         if template_dir.exists():
             if (template_dir / ".git").exists():
+                if self._is_nuclei_template_sync_fresh(template_dir):
+                    self.print_info_message(
+                        "Using cached mobile nuclei templates (recent sync found)",
+                        file_path=str(template_dir),
+                    )
+                    self._nuclei_templates_synced = True
+                    return True
                 self.print_info_message(
                     "Updating mobile nuclei templates to latest version",
                     file_path=str(template_dir),
@@ -1308,8 +1527,10 @@ class MobileCommands(
                         "Failed to update nuclei templates; continuing with local copy.",
                         file_path=error,
                     )
+                    self._mark_nuclei_template_sync(template_dir)
                     self._nuclei_templates_synced = True
                     return True
+                self._mark_nuclei_template_sync(template_dir)
                 self._nuclei_templates_synced = True
                 return True
 
@@ -1338,6 +1559,7 @@ class MobileCommands(
             self.print_error_message("Failed to clone nuclei templates", exception_error=clone.stderr.strip())
             return False
 
+        self._mark_nuclei_template_sync(template_dir)
         self._nuclei_templates_synced = True
         return True
 
@@ -1507,13 +1729,15 @@ class MobileCommands(
             control_file = Path(f"{basename}_integrity_controls.txt")
             summary_file = Path(f"{basename}_summary.json")
 
-            sorted_urls = sorted(urls)
+            sorted_urls = self._collapse_urls_to_common_bases(urls)
             sorted_ips = sorted(ips, key=lambda x: tuple(int(part) for part in x.split(".")))
 
             url_count = self._write_lines(urls_file, sorted_urls)
             ip_count = self._write_lines(ips_file, sorted_ips)
             hardcoded_count = self._write_findings_report(hardcoded_file, hardcoded)
-            api_key_assessment_count = self._write_lines(api_key_report_file, api_key_report_lines)
+            api_key_assessment_count = self._write_api_check_report(
+                api_key_report_file, api_key_report_lines
+            )
             base64_count = self._write_lines(base64_file, sorted(base64_lines))
             risk_count = self._write_findings_report(risk_file, risk_findings)
             control_count = self._write_findings_report(control_file, control_findings)
