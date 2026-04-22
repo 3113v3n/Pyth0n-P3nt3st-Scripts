@@ -83,11 +83,15 @@ files for potential valuable information
 
     {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
 
-        {color.OKGREEN}filepath{color.ENDC}  The path to the folder containing your ({color.WARNING}iOS | Android{color.ENDC}) applications  :
+        {color.OKGREEN}filepath{color.ENDC}  Path to a directory containing your ({color.WARNING}iOS | Android{color.ENDC}) applications.
+                  Interactive mode prompts for {color.BOLD}single{color.ENDC} or {color.BOLD}all{color.ENDC} scans.
+                  cli_args mode scans {color.BOLD}all{color.ENDC} apps by default when a directory is provided.
+                  Use {color.BOLD}--scan-mode single|all{color.ENDC} for explicit CLI directory handling.
 
     {color.OKCYAN}{color.UNDERLINE}:returns{color.ENDC}: 
 
         {color.OKGREEN}files{color.ENDC}     Files containing: [{color.WARNING} IP_address|URLs|Hardcoded_Strings|
                                         Base64_decoded_strings|nuclei results{color.ENDC} ]
+                  Nuclei templates are refreshed to latest before scan.
             
 {HEADLINE}"""

@@ -106,8 +106,27 @@ It decompiles the apk file using apktool and runs regex checks on the files pres
 2. URLs present within the application
 3. IP addresses present
 4. Decode any available base64 strings
+
+Mobile nuclei templates are automatically synced to the latest version before running nuclei checks.
+
+Interactive mode:
+- You provide a directory containing APK/IPA files.
+- If multiple apps are found, you are prompted to choose `single` app scan or `all` apps scan.
+
+CLI mode:
+- `-P` accepts either a single APK/IPA file or a directory.
+- If a directory is provided, the module scans all APK/IPA files in that directory by default.
+- Use `--scan-mode single|all` to explicitly control directory behavior.
+
 ```sh
+# Scan a single app file
 python main.py -M cli_args mobile -P "/Path/To/Apk_or_iOS_file"
+
+# Scan all APK/IPA files in a directory
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps"
+
+# Explicit directory scan mode
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all
 ```
 
 ### Start script
@@ -150,5 +169,3 @@ python main.py -M cli_args password -t --ip 10.0.0.3 --domain testdomain.co --pa
 [Coming Soon]
 
 - To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
-
-

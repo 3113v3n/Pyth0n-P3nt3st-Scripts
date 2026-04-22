@@ -285,6 +285,30 @@ class PentestFramework(ScreenHandler):
             test_domain = user.domain
 
         mobile_testing_vars = _vars
+        applications = (
+            mobile_testing_vars.get("applications")
+            if isinstance(mobile_testing_vars, dict)
+            else None
+        )
+
+        if applications:
+            total = len(applications)
+            self.print_info_message(
+                f"Running mobile assessment on {total} application(s)"
+            )
+            for index, app in enumerate(applications, 1):
+                filename = app.get("filename", "unknown")
+                self.print_info_message(
+                    message=f"Scanning application [{index}/{total}]",
+                    file=filename,
+                )
+                app_vars = {
+                    "filename": filename,
+                    "full_path": app.get("full_path"),
+                }
+                mobile.initialize_variables(app_vars)
+                mobile._inspect_files(test_domain, self.os)
+            return
 
         mobile.initialize_variables(mobile_testing_vars)
         mobile._inspect_files(test_domain, self.os)

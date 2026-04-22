@@ -89,19 +89,52 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         while True:
             try:
                 package_path = self.get_file_path(
-                    "Please provide the Path to your mobile application(s)\nPath to File:  ",
+                    "Please provide the path to a directory containing your mobile application(s)\nPath to Directory:  ",
                     self.check_folder_exists
                 )
 
-                applications = self.display_files_onscreen(
-                    package_path,
-                    self.display_saved_files,
-                    display_applications=True
-                )
-                if applications:
-                    return applications
+                self.files = []
+                self.find_files(package_path)
+                file_collection = self._get_file_collections()
+                applications = file_collection["applications"]
+                if not applications:
+                    raise FileNotFoundError(
+                        f"No APK/IPA files found in: {package_path}"
+                    )
 
-            except (ValueError, FileExistsError) as error:
+                total_apps = len(applications)
+                self.print_info_message(
+                    "Applications discovered in directory",
+                    file_path=f"{package_path} ({total_apps} found)",
+                )
+
+                if total_apps == 1:
+                    self.print_info_message(
+                        "Only one application found; scanning that app."
+                    )
+                    return applications[0]
+
+                mode = self.validate_user_choice(
+                    {"single", "s", "all", "a"},
+                    self.get_user_input,
+                    "Select scan mode [single | all]: ",
+                )
+
+                if mode in {"all", "a"}:
+                    return {
+                        "scan_mode": "all",
+                        "source_path": package_path,
+                        "applications": applications,
+                    }
+
+                self.files = applications
+                self._display_file_options()
+                selected_app = self.index_out_of_range_display(
+                    "Select the application to scan: ", self.files
+                )
+                return self.files[selected_app]
+
+            except (ValueError, FileExistsError, FileNotFoundError) as error:
                 self.print_error_message(error)
 
     def va_ui_handler(self):

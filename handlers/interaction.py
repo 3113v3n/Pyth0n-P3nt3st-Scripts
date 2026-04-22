@@ -141,7 +141,19 @@ class InteractionHandler:
             "--path",
             type=str,
             required=True,
-            help="Path to the mobile application file",
+            help=(
+                "Path to an APK/IPA file or a directory containing APK/IPA files. "
+                "When a directory is provided in cli_args mode, all discovered apps are scanned."
+            ),
+        )
+        parser.add_argument(
+            "--scan-mode",
+            choices=["single", "all"],
+            default="all",
+            help=(
+                "Directory handling mode in cli_args: 'all' scans all APK/IPA files, "
+                "'single' scans one app (requires a single file path, or a directory with exactly one app)."
+            ),
         )
 
     @staticmethod
@@ -289,17 +301,65 @@ class InteractionHandler:
     def handle_mobile_arguments(self, args, module):
         """Handle Mobile arguments"""
         path = args.path
+        scan_mode = args.scan_mode
+
+        # CLI behavior: if directory is provided, scan all APK/IPA files by default.
+        if self.validator.check_folder_exists(path):
+            self.filehandler.files = []
+            self.filehandler.find_files(path)
+            file_collection = self.filehandler._get_file_collections()
+            applications = sorted(
+                file_collection["applications"],
+                key=lambda app: app["filename"].lower(),
+            )
+            if not applications:
+                raise ValueError(
+                    f"No APK/IPA files found in directory: {path}"
+                )
+
+            if scan_mode == "single":
+                if len(applications) > 1:
+                    raise ValueError(
+                        "Scan mode 'single' requires a single APK/IPA file path. "
+                        "The provided directory contains multiple applications."
+                    )
+                app = applications[0]
+                print(f"\n[-] Running Mobile Assessment on {app['full_path']} application")
+                return {
+                    "module": module,
+                    "scan_mode": "single",
+                    "full_path": app["full_path"],
+                    "filename": app["filename"],
+                }
+
+            print(
+                f"\n[-] Running Mobile Assessment on all applications in {path} "
+                f"({len(applications)} found)"
+            )
+            return {
+                "module": module,
+                "scan_mode": "all",
+                "source_path": path,
+                "applications": applications,
+            }
+
         if not self.validator.isfile_and_exists(path):
-            raise ValueError(f"File {path} does not exist")
-            # Check if the file is an APK or IPA
+            raise ValueError(f"Path {path} does not exist")
+
+        # Check if the file is an APK or IPA
         if not (
-                self.validator.check_filetype(path, "apk")
-                or self.validator.check_filetype(path, "ipa")
+            self.validator.check_filetype(path, "apk")
+            or self.validator.check_filetype(path, "ipa")
         ):
-            # Valid mobile application file
             raise ValueError(f"File {path} is not a valid APK or IPA file")
+
         print(f"\n[-] Running Mobile Assessment on {path} application")
-        return {"module": module, "full_path": path, "filename": os.path.basename(path)}
+        return {
+            "module": module,
+            "scan_mode": "single",
+            "full_path": path,
+            "filename": os.path.basename(path),
+        }
 
     def handle_external_arguments(self, args, module):
         """Handle External arguments"""
