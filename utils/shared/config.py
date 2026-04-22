@@ -1,3 +1,5 @@
+import re
+
 from .configurations import (
     MobileConfigs,
     ExternalConfigs,
@@ -48,7 +50,8 @@ This is a custom CLI tool for Penetration Testing.
         -I, --interface              INTERFACE          : The network interface to use on the scan (eth0,wlan0)
 
     {self.color.OKCYAN}[mobile]{self.color.ENDC}
-        -P, --path                   FILE               : Path to the mobile application file (apk | ipa>)
+        -P, --path                   FILE/FOLDER        : Path to mobile app file (apk|ipa) or directory with apps
+            --scan-mode              MODE               : Directory handling mode in cli_args [single|all] (default: all)
 
     {self.color.OKCYAN}[password]{self.color.ENDC}
         -t, --test                                      : Test the password against a protocol
@@ -80,6 +83,7 @@ This is a custom CLI tool for Penetration Testing.
         [{self.color.OKGREEN}Run script with command line arguments{self.color.ENDC}]
         1.{self.color.WARNING}Mobile:{self.color.ENDC}
                 main.py -M cli_args mobile -P /path/to/app.apk
+                main.py -M cli_args mobile -P /path/to/apps --scan-mode all
         
         2.{self.color.WARNING}Internal:{self.color.ENDC}
             Scan:
@@ -98,6 +102,94 @@ This is a custom CLI tool for Penetration Testing.
         
  -h, --help  Show this custom help"""
         self.PROGRAM_HELPER_STRING = self.SUMMARY_HELPER_TEXT + self.EXTRA_HELPER_TEXT
+
+    # Reusable API key checklist constants (shared across modules).
+    GOOGLE_API_KEY_RE = re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")
+    GOOGLE_API_TEST_ENDPOINTS: tuple[tuple[str, str], ...] = (
+        (
+            "maps_geocoding",
+            "https://maps.googleapis.com/maps/api/geocode/json?address=Paris&key={key}",
+        ),
+        (
+            "youtube_data",
+            "https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key={key}",
+        ),
+    )
+    GOOGLE_RESTRICTION_MARKERS: tuple[str, ...] = (
+        "not authorized to use this api key",
+        "api keys with referer restrictions",
+        "requests from referer",
+        "this ip, site or mobile application is not authorized",
+        "android apps package name and sha-1 certificate fingerprint",
+        "ios apps bundle identifier",
+    )
+
+    API_KEY_VALUE_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+        ("Google API Key", GOOGLE_API_KEY_RE),
+        ("AWS Access Key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+        ("Stripe Live Key", re.compile(r"\bsk_live_[0-9A-Za-z]{16,}\b")),
+        ("GitHub Token", re.compile(r"\bghp_[A-Za-z0-9]{36}\b")),
+    )
+    GENERIC_API_KEY_ASSIGNMENT_RE = re.compile(
+        r"(?i)\bapi[_-]?key\b\s*(?:[:=]|=>)\s*[\"']([^\"'\n]{8,})[\"']"
+    )
+
+    API_KEY_CHECKLIST: tuple[dict[str, str], ...] = (
+        {
+            "id": "hardcoded-key-exposure",
+            "cwe": "CWE-798",
+            "cve": "N/A",
+            "cvss": "7.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N)",
+        },
+        {
+            "id": "restriction-controls",
+            "cwe": "CWE-284",
+            "cve": "N/A",
+            "cvss": "8.2 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:L)",
+        },
+        {
+            "id": "least-privilege-api-scope",
+            "cwe": "CWE-285",
+            "cve": "N/A",
+            "cvss": "7.4 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:L/A:N)",
+        },
+        {
+            "id": "quota-and-billing-abuse",
+            "cwe": "CWE-770",
+            "cve": "N/A",
+            "cvss": "6.5 (AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:H)",
+        },
+    )
+
+    @staticmethod
+    def clean_line(text: str, max_len: int = 220) -> str:
+        text = " ".join(str(text).strip().split())
+        if len(text) <= max_len:
+            return text
+        return text[: max_len - 3] + "..."
+
+    @staticmethod
+    def mask_secret(secret: str, keep: int = 4) -> str:
+        if len(secret) <= keep * 2:
+            return "*" * len(secret)
+        return f"{secret[:keep]}...{secret[-keep:]}"
+
+    @staticmethod
+    def extract_google_error(payload: dict, fallback: str = "") -> str:
+        if not isinstance(payload, dict):
+            return fallback
+
+        if payload.get("error_message"):
+            return str(payload["error_message"])
+
+        error_obj = payload.get("error")
+        if isinstance(error_obj, dict) and error_obj.get("message"):
+            return str(error_obj.get("message"))
+
+        status = payload.get("status")
+        if isinstance(status, str) and status not in {"OK", "ZERO_RESULTS"}:
+            return status
+        return fallback
     domain_select_error = ("\n[!] Please choose one of: \n")
 
     test_domains = [
@@ -119,6 +211,6 @@ This is a custom CLI tool for Penetration Testing.
         {
             "name": ["pipx"],
             "command": "multiple",
-            "cmd": "sudo apt install pipx git && pipx ensurepath",
+            "cmd": "sudo apt-get -y install pipx git && pipx ensurepath",
         }
     ]

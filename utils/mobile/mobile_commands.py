@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import base64
 import hashlib
@@ -65,6 +67,7 @@ class MobileCommands(
     URL_RE = re.compile(r"\b(?:https?|wss?)://[^\s\"'<>]+", re.IGNORECASE)
     IP_RE = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
     BASE64_TOKEN_RE = re.compile(r"\b(?:[A-Za-z0-9+/]{24,}={0,2})\b")
+    BASE64_MAX_DECODE_DEPTH = 5
 
     # Useful extensions for direct text decode
     TEXT_EXTENSIONS = {
@@ -84,6 +87,13 @@ class MobileCommands(
         "android.googlesource.com",
         "www.w3.org",
     }
+    NETWORK_CONTEXT_HINTS = (
+        "http://", "https://", "wss://", "host", "ip", "endpoint",
+        "server", "socket", "connect", "address", "dns",
+    )
+    VERSION_CONTEXT_HINTS = (
+        "version", "openssl", "libssl", "changelog", "release", "build", "sdk",
+    )
 
     # Hardcoded secret detectors
     SECRET_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
@@ -269,6 +279,7 @@ class MobileCommands(
         self.grep_cmd = "grep"  # retained for backward compatibility
 
         self._scan_stats: dict = {}
+        self._nuclei_templates_synced = False
 
     # ------------------------------------------------------------------
     # Legacy compatibility helpers
@@ -443,13 +454,6 @@ class MobileCommands(
             entropy -= p * (0.0 if p == 0 else math.log2(p))
         return entropy
 
-    @staticmethod
-    def _clean_line(text: str, max_len: int = 220) -> str:
-        text = " ".join(text.strip().split())
-        if len(text) <= max_len:
-            return text
-        return text[: max_len - 3] + "..."
-
     @classmethod
     def _severity_weight(cls, severity: str) -> int:
         return cls.SEVERITY_WEIGHTS.get(severity.lower(), 1)
@@ -469,6 +473,34 @@ class MobileCommands(
         if cls.URL_IGNORE_RE.search(url):
             return False
         return True
+
+    @staticmethod
+    def _canonicalize_url(url: str) -> str:
+        """Canonical URL for reporting: drop query/fragment and normalize root slash."""
+        parsed = urlparse(url)
+        path = parsed.path or ""
+        if path == "/":
+            path = ""
+        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
+
+    @classmethod
+    def _is_probable_version_ip(cls, ip_text: str, searchable_text: str) -> bool:
+        """Heuristic guard against dotted-version false positives (e.g. 1.1.1.1)."""
+        try:
+            parts = [int(part) for part in ip_text.split(".")]
+        except ValueError:
+            return False
+
+        # Semantic-version style dotted quads frequently show up in library versions.
+        if len(parts) != 4 or not all(0 <= part <= 9 for part in parts):
+            return False
+
+        snippet = cls._snippet_around(searchable_text.lower(), ip_text.lower(), radius=40)
+        if any(hint in snippet for hint in cls.VERSION_CONTEXT_HINTS):
+            return True
+        if any(hint in snippet for hint in cls.NETWORK_CONTEXT_HINTS):
+            return False
+        return bool(re.search(rf"{re.escape(ip_text.lower())}[a-z]", snippet))
 
     @classmethod
     def _is_valuable_secret_evidence(cls, title: str, evidence: str) -> bool:
@@ -536,19 +568,38 @@ class MobileCommands(
         # Quick reject: low diversity tokens are mostly noise
         if len(set(token)) < 8:
             return None
-        try:
-            padded = token + "=" * ((4 - len(token) % 4) % 4)
-            decoded = base64.b64decode(padded, validate=True)
-        except (ValueError, base64.binascii.Error):
+
+        def decode_once(candidate: str) -> str | None:
+            normalized = re.sub(r"\s+", "", candidate)
+            if len(normalized) < 8:
+                return None
+            try:
+                padded = normalized + "=" * ((4 - len(normalized) % 4) % 4)
+                decoded_bytes = base64.b64decode(padded, validate=True)
+            except (ValueError, base64.binascii.Error):
+                return None
+            if len(decoded_bytes) < 4 or len(decoded_bytes) > 600:
+                return None
+            decoded_text_ = decoded_bytes.decode("utf-8", errors="ignore").strip()
+            if len(decoded_text_) < 4:
+                return None
+            if any(ord(ch) < 32 and ch not in "\t\r\n" for ch in decoded_text_):
+                return None
+            return decoded_text_
+
+        decoded_text = decode_once(token)
+        if not decoded_text:
             return None
 
-        if len(decoded) < 12 or len(decoded) > 600:
-            return None
-        decoded_text = decoded.decode("utf-8", errors="ignore").strip()
-        if len(decoded_text) < 8:
-            return None
-        if any(ord(ch) < 32 and ch not in "\t\r\n" for ch in decoded_text):
-            return None
+        # Recursively decode if the decoded value is itself base64-looking.
+        for _ in range(cls.BASE64_MAX_DECODE_DEPTH - 1):
+            candidate = re.sub(r"\s+", "", decoded_text)
+            if not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", candidate or ""):
+                break
+            next_decoded = decode_once(candidate)
+            if not next_decoded or next_decoded == decoded_text:
+                break
+            decoded_text = next_decoded
 
         printable_ratio = sum(ch.isprintable() for ch in decoded_text) / max(len(decoded_text), 1)
         if printable_ratio < 0.9:
@@ -582,7 +633,7 @@ class MobileCommands(
             "jwt",
         )
         if any(marker in lowered for marker in sensitive_markers):
-            return cls._clean_line(decoded_text, max_len=260)
+            return cls.clean_line(decoded_text, max_len=260)
 
         # JSON blobs are useful only when they include sensitive key names.
         try:
@@ -594,7 +645,7 @@ class MobileCommands(
                     "apikey", "password", "client_secret", "private_key",
                 }
                 if keys & interesting_keys:
-                    return cls._clean_line(decoded_text, max_len=260)
+                    return cls.clean_line(decoded_text, max_len=260)
         except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
@@ -608,6 +659,223 @@ class MobileCommands(
         start = max(0, index - radius)
         end = min(len(text), index + len(needle) + radius)
         return " ".join(text[start:end].split())
+
+    @classmethod
+    def _extract_unique_api_keys(cls, findings: list[Finding]) -> dict[str, dict[str, set[str]]]:
+        """Collect unique API keys by type and track source files for deduped testing."""
+        discovered: dict[str, dict[str, set[str]]] = {}
+        key_titles = {title for title, _ in cls.API_KEY_VALUE_PATTERNS}
+
+        for finding in findings:
+            if finding.title in key_titles or finding.title == "Hardcoded Credential Assignment":
+                for key_title, pattern in cls.API_KEY_VALUE_PATTERNS:
+                    if finding.title not in {key_title, "Hardcoded Credential Assignment"}:
+                        continue
+                    for token in pattern.findall(finding.evidence):
+                        if not token:
+                            continue
+                        key_group = discovered.setdefault(key_title, {})
+                        key_group.setdefault(token, set()).add(finding.file)
+
+            if finding.title == "Hardcoded Credential Assignment":
+                for token in cls.GENERIC_API_KEY_ASSIGNMENT_RE.findall(finding.evidence):
+                    value = str(token).strip()
+                    if not value or value.lower() in cls.NOISE_SECRET_VALUES:
+                        continue
+                    generic_group = discovered.setdefault("Generic API Key", {})
+                    generic_group.setdefault(value, set()).add(finding.file)
+
+        return discovered
+
+    @classmethod
+    def _api_key_check_meta(cls, check_id: str) -> dict[str, str]:
+        for entry in cls.API_KEY_CHECKLIST:
+            if entry.get("id") == check_id:
+                return entry
+        return {"id": check_id, "cwe": "N/A", "cve": "N/A", "cvss": "N/A"}
+
+    @staticmethod
+    def _http_get_json(url: str, timeout: int = 12) -> tuple[int, dict, str]:
+        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                body = response.read().decode("utf-8", errors="replace")
+                payload = json.loads(body) if body.strip() else {}
+                return response.getcode(), payload, ""
+        except HTTPError as error:
+            try:
+                payload = json.loads(error.read().decode("utf-8", errors="replace"))
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+            return error.code, payload, str(error)
+        except (URLError, TimeoutError, OSError) as error:
+            return 0, {}, str(error)
+
+    def _assess_google_api_keys(self, google_keys: dict[str, set[str]]) -> tuple[list[Finding], list[str]]:
+        if not google_keys:
+            return [], []
+
+        findings: list[Finding] = []
+        report_lines: list[str] = []
+        restriction_meta = self._api_key_check_meta("restriction-controls")
+        scope_meta = self._api_key_check_meta("least-privilege-api-scope")
+        quota_meta = self._api_key_check_meta("quota-and-billing-abuse")
+
+        for key in sorted(google_keys):
+            source_files = google_keys.get(key, set())
+            masked_key = self.mask_secret(key)
+            accessible_apis: list[str] = []
+            restriction_detected = False
+            invalid_key = False
+            test_lines: list[str] = []
+
+            for test_name, template in self.GOOGLE_API_TEST_ENDPOINTS:
+                url = template.format(key=key)
+                http_code, payload, request_error = self._http_get_json(url)
+                error_message = self.extract_google_error(payload, request_error)
+                normalized_error = error_message.lower()
+
+                if "api key" in normalized_error and "invalid" in normalized_error:
+                    invalid_key = True
+                if any(marker in normalized_error for marker in self.GOOGLE_RESTRICTION_MARKERS):
+                    restriction_detected = True
+
+                if test_name == "maps_geocoding":
+                    api_status = str(payload.get("status", "")).upper() if isinstance(payload, dict) else ""
+                    success = api_status in {"OK", "ZERO_RESULTS"}
+                    status_label = api_status or ("ERROR" if error_message else "UNKNOWN")
+                else:
+                    success = isinstance(payload, dict) and "error" not in payload and "kind" in payload
+                    status_label = "OK" if success else "ERROR"
+
+                if success:
+                    accessible_apis.append(test_name)
+
+                test_lines.append(
+                    f"KEY={masked_key} TEST={test_name} HTTP={http_code} STATUS={status_label} "
+                    f"MESSAGE={self.clean_line(error_message or 'none', max_len=180)}"
+                )
+
+            vulnerable = False
+            if not invalid_key and accessible_apis:
+                if not restriction_detected:
+                    vulnerable = True
+                    findings.append(
+                        Finding(
+                            category="api_key_exposure",
+                            title="Google API Key Missing Restriction Controls",
+                            severity="high",
+                            file="google_api_key_check",
+                            evidence=(
+                                f"key={masked_key} accessible_apis={','.join(accessible_apis)} "
+                                "checklist=restriction-controls "
+                                f"CWE={restriction_meta['cwe']} CVE={restriction_meta['cve']} "
+                                f"CVSS={restriction_meta['cvss']}"
+                            ),
+                        )
+                    )
+                if len(accessible_apis) > 1:
+                    vulnerable = True
+                    findings.append(
+                        Finding(
+                            category="api_key_exposure",
+                            title="Google API Key Overly Broad API Scope",
+                            severity="medium",
+                            file="google_api_key_check",
+                            evidence=(
+                                f"key={masked_key} accessible_apis={','.join(accessible_apis)} "
+                                "checklist=least-privilege-api-scope "
+                                f"CWE={scope_meta['cwe']} CVE={scope_meta['cve']} "
+                                f"CVSS={scope_meta['cvss']}"
+                            ),
+                        )
+                    )
+                if not restriction_detected:
+                    vulnerable = True
+                    findings.append(
+                        Finding(
+                            category="api_key_exposure",
+                            title="Google API Key Potential Quota/Billing Abuse",
+                            severity="medium",
+                            file="google_api_key_check",
+                            evidence=(
+                                f"key={masked_key} accessible_apis={','.join(accessible_apis)} "
+                                "checklist=quota-and-billing-abuse "
+                                f"CWE={quota_meta['cwe']} CVE={quota_meta['cve']} "
+                                f"CVSS={quota_meta['cvss']}"
+                            ),
+                        )
+                    )
+
+            verdict = "VULNERABLE" if vulnerable else "NOT_VULNERABLE"
+            if invalid_key:
+                verdict = "NOT_VULNERABLE (INVALID_KEY)"
+
+            checklist_status = {
+                "hardcoded-key-exposure": "FAIL",
+                "key-validity": "FAIL" if invalid_key else ("PASS" if accessible_apis else "UNKNOWN"),
+                "restriction-controls": (
+                    "PASS" if restriction_detected else ("FAIL" if accessible_apis and not invalid_key else "UNKNOWN")
+                ),
+                "least-privilege-api-scope": (
+                    "FAIL" if len(accessible_apis) > 1 else ("PASS" if len(accessible_apis) == 1 else "UNKNOWN")
+                ),
+                "quota-and-billing-abuse": (
+                    "FAIL" if accessible_apis and not restriction_detected and not invalid_key else "UNKNOWN"
+                ),
+            }
+            status_str = ",".join(f"{name}:{status}" for name, status in checklist_status.items())
+            report_lines.append(
+                f"KEY={masked_key} TYPE=Google API Key SOURCES={len(source_files)} "
+                f"VERDICT={verdict} ACCESSIBLE_APIS={','.join(accessible_apis) or 'none'} "
+                f"RESTRICTIONS_DETECTED={restriction_detected} CHECKLIST={status_str}"
+            )
+            report_lines.extend(test_lines)
+
+        return self._dedupe_findings(findings), report_lines
+
+    def _assess_discovered_api_keys(self, hardcoded_findings: list[Finding]) -> tuple[list[Finding], list[str]]:
+        discovered_keys = self._extract_unique_api_keys(hardcoded_findings)
+        if not discovered_keys:
+            return [], []
+
+        findings: list[Finding] = []
+        report_lines: list[str] = []
+        exposure_meta = self._api_key_check_meta("hardcoded-key-exposure")
+
+        for key_type in sorted(discovered_keys):
+            key_map = discovered_keys[key_type]
+            for key_value in sorted(key_map):
+                source_files = key_map[key_value]
+                masked_key = self.mask_secret(key_value)
+                severity = "medium" if key_type == "Generic API Key" else "high"
+                findings.append(
+                    Finding(
+                        category="api_key_exposure",
+                        title=f"{key_type} Hardcoded in Application Package",
+                        severity=severity,
+                        file="api_key_checklist",
+                        evidence=(
+                            f"key={masked_key} key_type={key_type} source_occurrences={len(source_files)} "
+                            "checklist=hardcoded-key-exposure "
+                            f"CWE={exposure_meta['cwe']} CVE={exposure_meta['cve']} "
+                            f"CVSS={exposure_meta['cvss']}"
+                        ),
+                    )
+                )
+                report_lines.append(
+                    f"KEY={masked_key} TYPE={key_type} SOURCES={len(source_files)} "
+                    "VERDICT=VULNERABLE CHECKLIST=hardcoded-key-exposure:FAIL "
+                    f"CWE={exposure_meta['cwe']} CVE={exposure_meta['cve']} CVSS={exposure_meta['cvss']}"
+                )
+
+        google_findings, google_report_lines = self._assess_google_api_keys(
+            discovered_keys.get("Google API Key", {})
+        )
+        findings.extend(google_findings)
+        report_lines.extend(google_report_lines)
+
+        return self._dedupe_findings(findings), report_lines
 
     def _scan_text_for_indicators(self, text: str, rel_file: str) -> tuple[list[Finding], list[Finding]]:
         lowered = text.lower()
@@ -624,7 +892,7 @@ class MobileCommands(
                             title=title,
                             severity=severity,
                             file=rel_file,
-                            evidence=self._clean_line(self._snippet_around(lowered, n)),
+                            evidence=self.clean_line(self._snippet_around(lowered, n)),
                         )
                     )
                     break
@@ -633,7 +901,7 @@ class MobileCommands(
         for category, title, severity, pattern in self.ADVANCED_RISK_REGEX:
             match = pattern.search(text)
             if match:
-                snippet = self._clean_line(self._snippet_around(text, match.group(0)))
+                snippet = self.clean_line(self._snippet_around(text, match.group(0)))
                 risks.append(
                     Finding(
                         category=category,
@@ -654,7 +922,7 @@ class MobileCommands(
                             title=title,
                             severity=severity,
                             file=rel_file,
-                            evidence=self._clean_line(self._snippet_around(lowered, n)),
+                            evidence=self.clean_line(self._snippet_around(lowered, n)),
                         )
                     )
                     break
@@ -723,12 +991,16 @@ class MobileCommands(
         # URLs/IPs: extracted first because they are cheap and high-signal.
         for match in self.URL_RE.findall(searchable):
             if self._is_valuable_url(match):
-                result["urls"].add(match)
+                canonical_url = self._canonicalize_url(match)
+                if canonical_url:
+                    result["urls"].add(canonical_url)
 
         for match in self.IP_RE.findall(searchable):
             try:
                 ip_obj = ipaddress.ip_address(match)
                 if not ip_obj.is_loopback and not ip_obj.is_multicast:
+                    if self._is_probable_version_ip(match, searchable):
+                        continue
                     result["ips"].add(match)
             except ValueError:
                 continue
@@ -736,7 +1008,7 @@ class MobileCommands(
         # Hardcoded secret patterns are reported with contextual evidence.
         for title, severity, pattern in self.SECRET_PATTERNS:
             for m in pattern.finditer(searchable):
-                evidence = self._clean_line(m.group(0))
+                evidence = self.clean_line(m.group(0))
                 if not self._is_valuable_secret_evidence(title, evidence):
                     continue
                 result["hardcoded"].append(
@@ -757,8 +1029,9 @@ class MobileCommands(
             seen_b64.add(token)
             decoded = self._decode_base64_if_interesting(token)
             if decoded:
+                encoded_display = self.clean_line(token, max_len=260)
                 result["base64"].append(
-                    f"{decoded}"
+                    f"[{rel_file}] ENCODED: {encoded_display} | DECODED: {decoded}"
                 )
 
         # Any cleartext backend endpoint found in source is a high-value network risk signal.
@@ -770,7 +1043,7 @@ class MobileCommands(
                         title="Potential Cleartext Backend Endpoint",
                         severity="medium",
                         file=rel_file,
-                        evidence=self._clean_line(url, max_len=260),
+                        evidence=self.clean_line(url, max_len=260),
                     )
                 )
 
@@ -813,7 +1086,7 @@ class MobileCommands(
             re.IGNORECASE,
         )
         for m in exported_pattern.finditer(text):
-            snippet = self._clean_line(m.group(0))
+            snippet = self.clean_line(m.group(0))
             sev = "high" if "android:permission" not in snippet.lower() else "medium"
             title = "Exported Component Without Permission" if sev == "high" else "Exported Component"
             risks.append(Finding("component_exposure", title, sev, rel, snippet))
@@ -873,16 +1146,28 @@ class MobileCommands(
 
     @staticmethod
     def _write_lines(path: Path, lines: Iterable[str]) -> int:
+        filtered_lines = [str(line).strip() for line in lines if str(line).strip()]
+        if not filtered_lines:
+            return 0
+
+        unique_lines = list(dict.fromkeys(filtered_lines))
+
         count = 0
         with path.open("w", encoding="utf-8") as fh:
-            for line in lines:
+            for line in unique_lines:
                 fh.write(f"{line}\n")
                 count += 1
         return count
 
     def _write_findings_report(self, path: Path, findings: list[Finding]) -> int:
         rows = []
+        seen_values = set()
         for finding in findings:
+            # Keep one entry per finding value to prevent duplicates across files.
+            value_key = (finding.category.lower(), finding.title.lower(), finding.evidence.strip().lower())
+            if value_key in seen_values:
+                continue
+            seen_values.add(value_key)
             rows.append(
                 f"[{finding.severity.upper()}] {finding.category} | {finding.title} | {finding.file} | {finding.evidence}"
             )
@@ -947,7 +1232,10 @@ class MobileCommands(
                 "Mobile static analysis summary: "
                 f"files={summary['files_scanned']} skipped={summary['files_skipped']} "
                 f"urls={summary['url_count']} ips={summary['ip_count']} "
-                f"hardcoded={summary['hardcoded_count']} base64={summary['base64_count']} "
+                f"hardcoded={summary['hardcoded_count']} "
+                f"api_key_checks={summary.get('api_key_assessment_count', 0)} "
+                f"api_key_issues={summary.get('api_key_issue_count', 0)} "
+                f"base64={summary['base64_count']} "
                 f"risk_findings={summary['risk_count']} integrity_controls={summary['control_count']}"
             )
         )
@@ -970,23 +1258,88 @@ class MobileCommands(
                 print(f"  - {row}")
 
     # ------------------------------------------------------------------
-    # Optional nuclei scanning (offline-friendly)
+    # Optional nuclei scanning
     # ------------------------------------------------------------------
 
-    def install_nuclei_template(self, install_path: str) -> bool:
-        """Keep compatibility but avoid network cloning in restricted environments.
+    @staticmethod
+    def _dedupe_output_file(path: Path) -> int:
+        if not path.exists():
+            return 0
+        lines = []
+        with path.open("r", encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                value = line.strip()
+                if value:
+                    lines.append(value)
+        if not lines:
+            path.unlink(missing_ok=True)
+            return 0
 
-        If templates already exist locally, reuse them. Otherwise skip gracefully.
-        """
+        unique_lines = list(dict.fromkeys(lines))
+        with path.open("w", encoding="utf-8") as fh:
+            for line in unique_lines:
+                fh.write(f"{line}\n")
+        return len(unique_lines)
+
+    def install_nuclei_template(self, install_path: str) -> bool:
+        """Ensure mobile nuclei templates exist locally and are updated."""
         template_dir = Path(install_path).resolve()
-        if template_dir.exists():
+        repository = "https://github.com/optiv/mobile-nuclei-templates.git"
+
+        # Avoid repeated pulls when scanning multiple applications in one run.
+        if self._nuclei_templates_synced and template_dir.exists():
             return True
 
-        self.print_warning_message(
-            "Nuclei templates not found locally; skipping nuclei scan (offline-safe).",
+        if not shutil.which("git"):
+            self.print_error_message("git is required to update nuclei templates")
+            return False
+
+        if template_dir.exists():
+            if (template_dir / ".git").exists():
+                self.print_info_message(
+                    "Updating mobile nuclei templates to latest version",
+                    file_path=str(template_dir),
+                )
+                fetch = self.execute_command(["git", "-C", str(template_dir), "fetch", "--all", "--prune"])
+                pull = self.execute_command(["git", "-C", str(template_dir), "pull", "--ff-only"])
+                if fetch.returncode != 0 or pull.returncode != 0:
+                    error = pull.stderr.strip() or fetch.stderr.strip() or "Unknown git error"
+                    self.print_warning_message(
+                        "Failed to update nuclei templates; continuing with local copy.",
+                        file_path=error,
+                    )
+                    self._nuclei_templates_synced = True
+                    return True
+                self._nuclei_templates_synced = True
+                return True
+
+            self.print_warning_message(
+                "Existing nuclei template directory is not a git repository; recreating.",
+                file_path=str(template_dir),
+            )
+            try:
+                shutil.rmtree(template_dir)
+            except OSError as error:
+                self.print_error_message("Failed to recreate nuclei template directory", exception_error=error)
+                return False
+
+        try:
+            template_dir.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            self.print_error_message("Failed to prepare nuclei template path", exception_error=error)
+            return False
+
+        self.print_info_message(
+            "Cloning latest mobile nuclei templates",
             file_path=str(template_dir),
         )
-        return False
+        clone = self.execute_command(["git", "clone", "--depth", "1", repository, str(template_dir)])
+        if clone.returncode != 0:
+            self.print_error_message("Failed to clone nuclei templates", exception_error=clone.stderr.strip())
+            return False
+
+        self._nuclei_templates_synced = True
+        return True
 
     def scan_with_nuclei(self, application_folder: str, output_dir: str, platform: str) -> dict:
         results = {"keys_results": 0, "platform_results": 0, "ran": False}
@@ -1007,16 +1360,19 @@ class MobileCommands(
             input_file = tmp.name
 
         try:
-            key_cmd = ["nuclei", "-l", input_file, "-t", f"{nuclei_dir}/Keys", "-o", str(out_file)]
+            key_cmd = ["nuclei", "-silent", "-file", "-l", input_file, "-t", f"{nuclei_dir}/Keys", "-o", str(out_file)]
             key_res = self.execute_command(key_cmd)
             if key_res.returncode == 0:
                 results["ran"] = True
-                if out_file.exists():
-                    results["keys_results"] = sum(1 for _ in out_file.open("r", encoding="utf-8", errors="ignore"))
+            key_count = self._dedupe_output_file(out_file)
+            if key_count > 0:
+                results["keys_results"] = key_count
 
             if platform == "android":
                 plat_cmd = [
                     "nuclei",
+                    "-silent",
+                    "-file",
                     "-l",
                     input_file,
                     "-t",
@@ -1025,10 +1381,11 @@ class MobileCommands(
                     str(platform_file),
                 ]
                 plat_res = self.execute_command(plat_cmd)
-                if plat_res.returncode == 0 and platform_file.exists():
-                    results["platform_results"] = sum(
-                        1 for _ in platform_file.open("r", encoding="utf-8", errors="ignore")
-                    )
+                if plat_res.returncode == 0:
+                    results["ran"] = True
+                platform_count = self._dedupe_output_file(platform_file)
+                if platform_count > 0:
+                    results["platform_results"] = platform_count
         finally:
             try:
                 os.unlink(input_file)
@@ -1112,6 +1469,12 @@ class MobileCommands(
             risk_findings = self._dedupe_findings(risk_findings)
             control_findings = self._dedupe_findings(control_findings)
 
+            # Execute API key checklist once per unique key value.
+            api_key_findings, api_key_report_lines = self._assess_discovered_api_keys(hardcoded)
+            if api_key_findings:
+                risk_findings.extend(api_key_findings)
+                risk_findings = self._dedupe_findings(risk_findings)
+
             # Heuristic: if HTTPS endpoints exist but no pinning control is detected,
             # surface a low-severity visibility finding for manual verification.
             has_https_endpoint = any(url.lower().startswith("https://") for url in urls)
@@ -1138,6 +1501,7 @@ class MobileCommands(
             urls_file = Path(f"{basename}_urls.txt")
             ips_file = Path(f"{basename}_ips.txt")
             hardcoded_file = Path(f"{basename}_hardcoded.txt")
+            api_key_report_file = Path(f"{basename}_api_key_checklist.txt")
             base64_file = Path(f"{basename}_base64.txt")
             risk_file = Path(f"{basename}_integrity_findings.txt")
             control_file = Path(f"{basename}_integrity_controls.txt")
@@ -1149,9 +1513,25 @@ class MobileCommands(
             url_count = self._write_lines(urls_file, sorted_urls)
             ip_count = self._write_lines(ips_file, sorted_ips)
             hardcoded_count = self._write_findings_report(hardcoded_file, hardcoded)
+            api_key_assessment_count = self._write_lines(api_key_report_file, api_key_report_lines)
             base64_count = self._write_lines(base64_file, sorted(base64_lines))
             risk_count = self._write_findings_report(risk_file, risk_findings)
             control_count = self._write_findings_report(control_file, control_findings)
+            reports = {}
+            if url_count:
+                reports["urls"] = str(urls_file)
+            if ip_count:
+                reports["ips"] = str(ips_file)
+            if hardcoded_count:
+                reports["hardcoded"] = str(hardcoded_file)
+            if api_key_assessment_count:
+                reports["api_key_checklist"] = str(api_key_report_file)
+            if base64_count:
+                reports["base64"] = str(base64_file)
+            if risk_count:
+                reports["integrity_findings"] = str(risk_file)
+            if control_count:
+                reports["integrity_controls"] = str(control_file)
 
             risk_counter = {}
             for finding in combined_risk_findings:
@@ -1179,6 +1559,8 @@ class MobileCommands(
                 "url_count": url_count,
                 "ip_count": ip_count,
                 "hardcoded_count": hardcoded_count,
+                "api_key_assessment_count": api_key_assessment_count,
+                "api_key_issue_count": len(api_key_findings),
                 "base64_count": base64_count,
                 "risk_count": risk_count,
                 "control_count": control_count,
@@ -1187,14 +1569,7 @@ class MobileCommands(
                 "top_controls": top_controls,
                 "scoring": scoring,
                 "nuclei": nuclei_meta,
-                "reports": {
-                    "urls": str(urls_file),
-                    "ips": str(ips_file),
-                    "hardcoded": str(hardcoded_file),
-                    "base64": str(base64_file),
-                    "integrity_findings": str(risk_file),
-                    "integrity_controls": str(control_file),
-                },
+                "reports": reports,
             }
 
             summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")

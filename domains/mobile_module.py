@@ -64,6 +64,7 @@ class MobileAssessment(MobileCommands):
         # Keep case-insensitive matching for backward compatibility.
         category_map = {
             "_hardcoded.txt": "hardcoded",
+            "_api_key_checklist.txt": "api_key_checklist",
             "_urls.txt": "urls",
             "_ips.txt": "ips",
             "_base64.txt": "base64",
