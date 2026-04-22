@@ -19,7 +19,15 @@ class CustomDecorators:
             result = func(*args, **kwargs)
             end_time = time.time()
             execution_time = end_time - start_time
-            CustomDecorators.total_time += execution_time
+            # Track time against the concrete class that owns the method.
+            # This avoids writing into CustomDecorators.total_time while reads happen
+            # from a subclass (which would show 0s in output).
+            target_cls = CustomDecorators
+            if args:
+                owner = args[0]
+                if isinstance(owner, CustomDecorators):
+                    target_cls = owner.__class__
+            target_cls.total_time = getattr(target_cls, "total_time", 0) + execution_time
             # print(f"Execution time for {func.__name__}: {execution_time:.4f} seconds")
             return result
         return wrapper
@@ -87,6 +95,9 @@ class CustomDecorators:
             time_text = f"{format_unit(hours, "hour")} and {format_unit(seconds, "second")}."
         else:
             time_text = f"{format_unit(hours, "hour")}, {format_unit(minutes, "minute")} and {format_unit(seconds, "second")}"
+
+        if not (hours or minutes or seconds) and cls.total_time > 0:
+            time_text = f"{cls.total_time:.2f} seconds"
 
         #print(f"{hours} hours:{minutes} minutes:{seconds} seconds")
 
