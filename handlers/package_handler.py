@@ -9,6 +9,7 @@ package names were interpolated into a shell string.
 import re
 import shutil
 import platform
+from importlib import metadata
 from handlers.messages import DisplayHandler
 from utils.shared import Config, Commands
 from typing import Dict, List
@@ -38,6 +39,22 @@ class PackageHandler(Config, DisplayHandler, Commands):
         cls.operating_system = platform.system().lower()
         cls.is_supported_os = None
 
+    @staticmethod
+    def _is_pip_package_missing(package_name: str) -> bool:
+        """Return True when *package_name* is missing in the current Python env.
+
+        Uses importlib.metadata against the active interpreter so checks resolve
+        packages installed in the currently active virtualenv.
+        """
+        try:
+            metadata.version(package_name)
+            return False
+        except metadata.PackageNotFoundError:
+            return True
+        except Exception:
+            # Fallback to "missing" if metadata query fails unexpectedly.
+            return True
+
     def _check_is_supported(self) -> bool:
         """Return True if the current OS supports automatic package installation.
 
@@ -64,7 +81,6 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if not self.is_supported_os:
             return []
 
-        packages = self.general_packages.copy()
         domain_packages = {
             "mobile": self.mobile_packages,
             "internal": self.internal_packages,
@@ -73,7 +89,17 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if test_domain not in domain_packages:
             return []
 
-        packages.extend(domain_packages[test_domain])
+        module_packages = list(domain_packages[test_domain])
+
+        # Add shared bootstrap packages only when the selected module needs them.
+        requires_pipx = any(
+            str(pkg.get("command", "")).strip().startswith("pipx")
+            for pkg in module_packages
+        )
+        packages = []
+        if requires_pipx:
+            packages.extend(self.general_packages)
+        packages.extend(module_packages)
 
         missing_packages = []
         for pkg in packages:
@@ -123,19 +149,23 @@ class PackageHandler(Config, DisplayHandler, Commands):
         return missing_packages
 
     def _is_package_missing(self, package_name: str) -> bool:
-        """Return True if *package_name* is not found on PATH.
+        """Return True if *package_name* is not installed.
 
-        Uses shutil.which() instead of a shell `which <name>` command to
-        eliminate shell injection risk when package names contain metacharacters.
+        CLI tools are checked via shutil.which(); Python SDK dependencies such
+        as anthropic are checked via importlib.metadata in the active venv.
 
         Args:
-            package_name: Tool name to check, e.g. "nmap".
+            package_name: Dependency name to check, e.g. "nmap" or "anthropic".
 
         Returns:
-            True if the tool is not available on PATH.
+            True if the dependency is missing.
         """
         if not self.is_supported_os:
             return False
+
+        # Python SDK dependencies are checked against pip packages in the active venv.
+        if package_name == "anthropic":
+            return self._is_pip_package_missing("anthropic")
 
         # [Security] shutil.which() never spawns a shell — no injection possible.
         return shutil.which(package_name) is None
@@ -196,9 +226,9 @@ class PackageHandler(Config, DisplayHandler, Commands):
         return all_success
 
     def _verify_installation(self, package_name: str) -> bool:
-        """Return True if *package_name* is now available on PATH.
+        """Return True if *package_name* is now installed.
 
-        Uses shutil.which() — no shell injection risk.
+        Uses importlib.metadata for anthropic and shutil.which() for binaries.
 
         Args:
             package_name: Tool name to verify.
@@ -208,6 +238,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
         """
         if not self.is_supported_os:
             return True
+        if package_name == "anthropic":
+            return not self._is_pip_package_missing("anthropic")
         # [Security] shutil.which() replaces shell `which <name>`.
         return shutil.which(package_name) is not None
 

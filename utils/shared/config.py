@@ -212,5 +212,10 @@ This is a custom CLI tool for Penetration Testing.
             "name": ["pipx"],
             "command": "multiple",
             "cmd": "sudo apt-get -y install pipx git && pipx ensurepath",
+        },
+        {
+            "name": ["anthropic"],
+            "command": "multiple",
+            "cmd": "python -m pip install anthropic",
         }
     ]

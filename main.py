@@ -93,7 +93,6 @@ class PentestFramework(ScreenHandler):
         Returns:
             Boolean indicating if all required packages are present
         """
-        # va mobile password external internal
         _package = self.classes["package"]
         package_supported_domains = {"mobile", "internal", "external"}
 
@@ -123,12 +122,10 @@ class PentestFramework(ScreenHandler):
         num_of_packages = len(missing_packages)
         self.print_warning_message(
             f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
-        # update to run check again
+        # Single pass: only check/install for the selected module once.
         try:
             success = _package.install_packages(missing_packages)
-            if not success:
-                return False
-            return self.check_packages(user_test_domain)
+            return success
         except RuntimeError as error:
             self.print_error_message(
                 message="Failed to install some packages",
