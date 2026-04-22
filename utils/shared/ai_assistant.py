@@ -25,15 +25,10 @@ return a plain-text placeholder so the rest of the workflow is not interrupted.
 
 from __future__ import annotations
 
+import importlib
 import os
 import textwrap
 from typing import Optional
-
-try:
-    import anthropic
-    _ANTHROPIC_AVAILABLE = True
-except ImportError:
-    _ANTHROPIC_AVAILABLE = False
 
 try:
     import pandas as pd
@@ -58,9 +53,11 @@ class PentestAI:
 
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model
-        self._client: Optional["anthropic.Anthropic"] = None
+        self._client = None
 
-        if not _ANTHROPIC_AVAILABLE:
+        try:
+            anthropic_module = importlib.import_module("anthropic")
+        except ImportError:
             print(
                 "[AI] anthropic package not installed. "
                 "Run `pip install anthropic` to enable AI features."
@@ -77,7 +74,7 @@ class PentestAI:
             self.enabled = False
             return
 
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._client = anthropic_module.Anthropic(api_key=api_key)
         self.enabled = True
 
     # ------------------------------------------------------------------
