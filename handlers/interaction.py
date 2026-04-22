@@ -234,17 +234,32 @@ class InteractionHandler:
         # [Performance] Create a single NetworkHandler instance and reuse it for
         # all interface checks instead of instantiating a new one per interface.
         _nh = NetworkHandler()
-        parser.add_argument(
-            "-I", "--interface",
-            required=True,
-            choices=[
+        interface_choices = []
+        interface_help = "Interface to use with the script e.g (eth0, wlan0)"
+        try:
+            interface_choices = [
                 iface
                 for iface in get_network_interfaces()
                 if _nh._is_interface_active(iface)
                 and not iface.startswith(("br-", "docker", "veth", "lo"))
-            ],
-            help="Interface to use with the script e.g (eth0, wlan0)",
-        )
+            ]
+        except Exception as error:
+            # Some restricted environments raise EPERM when listing interfaces.
+            # Keep parser construction alive so unrelated modules (e.g. mobile)
+            # can still run in cli_args mode.
+            interface_help = (
+                "Interface to use with the script e.g (eth0, wlan0). "
+                f"Auto-discovery unavailable in this environment: {error}"
+            )
+
+        interface_kwargs = {
+            "required": True if interface_choices else False,
+            "help": interface_help,
+        }
+        if interface_choices:
+            interface_kwargs["choices"] = interface_choices
+
+        parser.add_argument("-I", "--interface", **interface_kwargs)
         mode_group = parser.add_argument_group("mode-specific arguments")
         mode_group.add_argument(
             "--ip",
@@ -376,6 +391,11 @@ class InteractionHandler:
         """Handle Internal PT arguments"""
         action = args.action
         interface = args.interface
+        if not interface:
+            raise ValueError(
+                "No network interface provided. Use -I/--interface explicitly "
+                "(interface auto-discovery may be restricted in this environment)."
+            )
         print(interface)
         if action == "scan":
             # scan network

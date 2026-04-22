@@ -58,11 +58,6 @@ class MobileConfigs:
             "command": "pipx install",
         },
         {"name": ["java"], "command": "sudo apt install default-jdk -y"},
-        {
-            "name": ["property-lister"],
-            "command": "pipx install --upgrade ",
-        },
-        {"name": ["plistutil"], "command": "apt-get -y install "},
     ]
 
     # MOBILE ANALYSIS CONSTANTS

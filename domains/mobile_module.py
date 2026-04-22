@@ -60,27 +60,36 @@ class MobileAssessment(MobileCommands):
         if not output_dir or not os.path.isdir(output_dir):
             return findings
 
-        # Map output file suffixes to category keys expected by PentestAI
+        # Map output file suffixes to category keys expected by PentestAI.
+        # Keep case-insensitive matching for backward compatibility.
         category_map = {
             "_hardcoded.txt": "hardcoded",
             "_urls.txt": "urls",
             "_ips.txt": "ips",
             "_base64.txt": "base64",
+            "_integrity_findings.txt": "integrity",
         }
         basename = getattr(self, "file_name", "")
         platform = "android" if getattr(self, "file_type", "").lower() == "apk" else "ios"
         prefix = f"{output_dir}/{basename}_{platform}"
 
+        # Build a case-insensitive index of files once.
+        file_lookup = {}
+        for entry in os.listdir(output_dir):
+            file_lookup[entry.lower()] = os.path.join(output_dir, entry)
+
         for suffix, category in category_map.items():
-            path = prefix + suffix
-            if os.path.isfile(path):
-                try:
-                    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-                        lines = [ln.strip() for ln in fh if ln.strip()]
-                    if lines:
-                        findings[category] = lines
-                except OSError:
-                    pass
+            target_name = f"{basename}_{platform}{suffix}".lower()
+            path = file_lookup.get(target_name)
+            if not path:
+                continue
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                    lines = [ln.strip() for ln in fh if ln.strip()]
+                if lines:
+                    findings[category] = lines
+            except OSError:
+                pass
         return findings
 
     # Install web proxies cert
