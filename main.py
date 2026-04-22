@@ -95,44 +95,47 @@ class PentestFramework(ScreenHandler):
         """
         # va mobile password external internal
         _package = self.classes["package"]
+        package_supported_domains = {"mobile", "internal", "external"}
 
-        if user_test_domain != "va":
-            # install packages for modules not equal to va
-            # Initialize OS check
-            print(Bcolors.WARNING + "[?] Checking for required packages..." + Bcolors.ENDC)
-            if _package.is_supported_os is None:
-                _package.is_supported_os = _package._check_is_supported()
-                self.os = _package.operating_system
-
-            # If OS is not supported, continue without package checks
-            if not _package.is_supported_os:
-                self.print_info_message(
-                    "Skipping package installation on unsupported OS")
-                return True
-
-            missing_packages = _package.get_missing_packages(user_test_domain)
-
-            if not missing_packages:
-                return True
-
-            num_of_packages = len(missing_packages)
-            self.print_warning_message(
-                f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
-            # update to run check again
-            try:
-                success = _package.install_packages(missing_packages)
-                if not success:
-                    return False
-                return self.check_packages(user_test_domain)
-            except RuntimeError as error:
-                self.print_error_message(
-                    message="Failed to install some packages",
-                    exception_error=error
-                )
-
-                return False
-        else:
+        # Skip package checks for domains that do not have managed dependencies
+        # (e.g. va, password, exit/help flows).
+        if user_test_domain not in package_supported_domains:
             return True
+
+        # install packages for selected module
+        # Initialize OS check
+        print(Bcolors.WARNING + "[?] Checking for required packages..." + Bcolors.ENDC)
+        if _package.is_supported_os is None:
+            _package.is_supported_os = _package._check_is_supported()
+            self.os = _package.operating_system
+
+        # If OS is not supported, continue without package checks
+        if not _package.is_supported_os:
+            self.print_info_message(
+                "Skipping package installation on unsupported OS")
+            return True
+
+        missing_packages = _package.get_missing_packages(user_test_domain)
+
+        if not missing_packages:
+            return True
+
+        num_of_packages = len(missing_packages)
+        self.print_warning_message(
+            f"Missing Packages Kindly be patient as we install {num_of_packages} package(s)..")
+        # update to run check again
+        try:
+            success = _package.install_packages(missing_packages)
+            if not success:
+                return False
+            return self.check_packages(user_test_domain)
+        except RuntimeError as error:
+            self.print_error_message(
+                message="Failed to install some packages",
+                exception_error=error
+            )
+
+            return False
 
     def handle_internal_assessment(self, user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment
@@ -484,6 +487,7 @@ class PentestFramework(ScreenHandler):
             if not self.check_packages(test_domain):
                 self.print_info_message(
                     "Required packages are missing. Installing them...")
+                return
 
             # print(f"User command line arguments are:\n {user_data}")
             self.process_domain(test_domain, user_data=user_data)

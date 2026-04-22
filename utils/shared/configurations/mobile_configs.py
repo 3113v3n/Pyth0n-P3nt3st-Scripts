@@ -16,17 +16,18 @@ class MobileConfigs:
         {
             "name": ["apktool"],
             "command": "multiple",
-            "cmd": "sudo apt -y install aapt \
-                wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool \
-                chmod +x apktool && cp apktool /usr/local/bin/apktool \
-                wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar \
-                chmod +x apktool.jar && cp apktool.jar /usr/local/bin/apktool.jar",
+            "cmd": (
+                "sudo apt-get -y install aapt wget && "
+                "wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O /tmp/apktool && "
+                "chmod +x /tmp/apktool && sudo cp /tmp/apktool /usr/local/bin/apktool && "
+                "wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O /tmp/apktool.jar && "
+                "sudo cp /tmp/apktool.jar /usr/local/bin/apktool.jar"
+            ),
         },
         {
             "name": ["go"],
             "command": "multiple",
-            "cmd": "wget https://go.dev/dl/go1.22.5.linux-amd64.tar.gz && sudo tar -C /usr/local -xzf "
-                   "go1.22.5.linux-amd64.tar.gz && export PATH=$PATH:/usr/local/go/bin",
+            "cmd": "sudo apt-get -y install golang-go",
         },
         {
             "name": ["grep"],
@@ -57,7 +58,7 @@ class MobileConfigs:
             "name": ["objection", "file-scraper"],  # "frida-tools",
             "command": "pipx install",
         },
-        {"name": ["java"], "command": "sudo apt install default-jdk -y"},
+        {"name": ["java"], "command": "multiple", "cmd": "sudo apt-get -y install default-jdk"},
     ]
 
     # MOBILE ANALYSIS CONSTANTS

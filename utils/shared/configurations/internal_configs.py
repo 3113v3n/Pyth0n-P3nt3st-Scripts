@@ -12,7 +12,8 @@ class InternalConfigs:
         },
         {
             "name": ["exiftool"],
-            "command": "sudo apt-get -y install libimage-exiftool-perl",
+            "command": "multiple",
+            "cmd": "sudo apt-get -y install libimage-exiftool-perl",
         },
     ]
 

@@ -77,14 +77,48 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
         missing_packages = []
         for pkg in packages:
-            for name in pkg["name"]:
-                if self._is_package_missing(name):
-                    install_cmd = (
-                        pkg["cmd"]
-                        if pkg["command"] == "multiple"
-                        else f"{pkg['command']} {name}"
+            names = pkg.get("name", [])
+            missing_names = [name for name in names if self._is_package_missing(name)]
+            if not missing_names:
+                continue
+
+            # Run grouped installation commands only once.
+            if pkg.get("command") == "multiple":
+                install_cmd = pkg.get("cmd")
+                if not install_cmd:
+                    self.print_error_message(
+                        f"Invalid package config for {missing_names}: missing 'cmd' value."
                     )
-                    missing_packages.append({"name": name, "command": install_cmd})
+                    continue
+                missing_packages.append(
+                    {
+                        "name": ", ".join(missing_names),
+                        "command": install_cmd,
+                        "verify_names": missing_names,
+                    }
+                )
+                continue
+
+            # Optional explicit command for non-multiple entries.
+            if pkg.get("cmd"):
+                missing_packages.append(
+                    {
+                        "name": ", ".join(missing_names),
+                        "command": pkg["cmd"],
+                        "verify_names": missing_names,
+                    }
+                )
+                continue
+
+            for name in missing_names:
+                install_cmd = f"{pkg['command']} {name}"
+                missing_packages.append(
+                    {
+                        "name": name,
+                        "command": install_cmd,
+                        "verify_names": [name],
+                    }
+                )
 
         return missing_packages
 
@@ -118,15 +152,19 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if not self.is_supported_os or not packages:
             return True
 
-        installed_packages = []
+        installed_packages = set()
+        all_success = True
         for package in packages:
             package_name = package["name"]
+            verify_names = package.get("verify_names") or [package_name]
 
-            # [Security] Validate package name before using in a shell command.
-            if not _SAFE_PACKAGE_NAME.match(package_name):
+            # [Security] Validate each package/binary token before using a shell command.
+            unsafe_names = [name for name in verify_names if not _SAFE_PACKAGE_NAME.match(name)]
+            if unsafe_names:
                 self.print_error_message(
-                    f"Skipping package with unsafe name: '{package_name}'"
+                    f"Skipping package with unsafe name(s): {unsafe_names}"
                 )
+                all_success = False
                 continue
 
             try:
@@ -134,25 +172,28 @@ class PackageHandler(Config, DisplayHandler, Commands):
                 install_status = self.run_os_commands(command=package["command"])
                 if install_status.returncode != 0:
                     self.print_error_message(f"Installation of {package_name} failed.")
+                    all_success = False
                     continue
 
-                if self._verify_installation(package_name):
-                    installed_packages.append(package_name)
+                if all(self._verify_installation(name) for name in verify_names):
+                    installed_packages.update(verify_names)
                     self.print_success_message(f"Successfully installed {package_name}")
                 else:
                     self.print_error_message(f"Installation of {package_name} failed.")
+                    all_success = False
 
             except Exception as error:
                 self.print_error_message(
                     message=f"Installation of {package_name} failed.",
                     exception_error=error,
                 )
+                all_success = False
 
         if installed_packages:
             self.print_success_message(
                 f"Successfully installed {len(installed_packages)} package(s)."
             )
-        return len(installed_packages) == len(packages)
+        return all_success
 
     def _verify_installation(self, package_name: str) -> bool:
         """Return True if *package_name* is now available on PATH.
