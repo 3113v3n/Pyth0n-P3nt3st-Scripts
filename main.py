@@ -29,9 +29,9 @@ from handlers import (
 class PentestFramework(ScreenHandler):
     def __init__(self):
         super().__init__()
-        # [AI] Initialise early so initialize_classes() can inject the instance
-        # into each domain. Degrades silently if ANTHROPIC_API_KEY is not set.
-        self.ai = PentestAI()
+        # [AI] Lazily initialized after module selection and dependency checks.
+        self.ai = None
+        self.use_ai = True
         self.classes = self.initialize_classes()
         self.exit_menu = False
         self.debug = False
@@ -56,7 +56,7 @@ class PentestFramework(ScreenHandler):
             helper_instance = HelpHandler()
             command_instance = Commands()
 
-            # [AI] Build domain instances and inject AI assistant
+            # [AI] Build domain instances; AI may be attached lazily later.
             vuln = VulnerabilityAnalysis()
             vuln.ai = self.ai
 
@@ -83,6 +83,24 @@ class PentestFramework(ScreenHandler):
             self.print_error_message(
                 message="Error initializing classes", exception_error=error)
             sys.exit(1)
+
+    def _attach_ai_to_domains(self) -> None:
+        """Attach current AI instance to all domain handlers."""
+        for domain_key in ("vulnerability", "mobile", "password", "internal"):
+            domain_obj = self.classes.get(domain_key)
+            if domain_obj is not None:
+                domain_obj.ai = self.ai
+
+    def ensure_ai_ready(self) -> None:
+        """Initialize AI once, only after dependency checks for selected module."""
+        if not self.use_ai:
+            self.ai = None
+            self._attach_ai_to_domains()
+            return
+
+        if self.ai is None:
+            self.ai = PentestAI()
+        self._attach_ai_to_domains()
 
     def check_packages(self, user_test_domain: str) -> bool:
         """Check and install required packages for the selected domain
@@ -437,6 +455,7 @@ class PentestFramework(ScreenHandler):
                         "Required packages are missing. Installing them...")
                     continue
 
+                self.ensure_ai_ready()
                 # get user input and set domain variables
                 user.set_domain_variables(test_domain)
                 self.process_domain(test_domain)
@@ -486,6 +505,7 @@ class PentestFramework(ScreenHandler):
                     "Required packages are missing. Installing them...")
                 return
 
+            self.ensure_ai_ready()
             # print(f"User command line arguments are:\n {user_data}")
             self.process_domain(test_domain, user_data=user_data)
 
@@ -506,7 +526,7 @@ def main():
         # [AI] Honour --no-ai flag: disable the AI instance before any domain
         # module runs so all subsequent ai.enabled checks see False.
         if not _interaction.arguments.get("use_ai", True):
-            framework.ai.enabled = False
+            framework.use_ai = False
 
         # Check if command line arguments are used
         use_cmdline_args = _interaction.argument_mode
