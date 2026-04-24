@@ -15,6 +15,8 @@ from typing import Any
 import pandas
 from datetime import datetime
 from pathlib import Path
+import json
+import xml.etree.ElementTree as ET
 from handlers.messages import DisplayHandler
 from utils.shared import Validator
 import ipaddress
@@ -125,9 +127,17 @@ class FileHandler(Validator, DisplayHandler):
         :param filename: Name of the file
         :param content: Content of the file
         """
-        self.filepath = f"{self.output_directory}/{filename}"
-        with open(f"{self.output_directory}/{filename}", "a") as file:
-            file.write(f"{content}\n")
+        target_path = self._safe_path(self.output_directory, filename)
+        self.filepath = str(target_path)
+        prepared = self._prepare_text_for_write(
+            content,
+            beautify_structured=True,
+            wrap_long_lines=False,
+        )
+        with target_path.open("a", encoding="utf-8") as file:
+            file.write(prepared)
+            if not prepared.endswith("\n"):
+                file.write("\n")
 
     def write_to_multiple_sheets(
             self, dataframe_objects: list, filename: str
@@ -553,8 +563,56 @@ class FileHandler(Validator, DisplayHandler):
     @staticmethod
     def append_to_txt(filename, content):
         """Update existing file"""
-        with open(f"{filename}", "a") as file:
-            file.write(f"{content}\n")
+        prepared = FileHandler._prepare_text_for_write(
+            content,
+            beautify_structured=True,
+            wrap_long_lines=False,
+        )
+        with open(f"{filename}", "a", encoding="utf-8") as file:
+            file.write(prepared)
+            if not prepared.endswith("\n"):
+                file.write("\n")
+
+    @staticmethod
+    def _beautify_structured_text(content: Any) -> tuple[str, str]:
+        if isinstance(content, (dict, list)):
+            return json.dumps(content, indent=2, ensure_ascii=False), "json"
+
+        text = str(content)
+        stripped = text.strip()
+        if not stripped:
+            return text, "text"
+
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, (dict, list)):
+                return json.dumps(parsed, indent=2, ensure_ascii=False), "json"
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+        if stripped.startswith("<") and stripped.endswith(">"):
+            try:
+                root = ET.fromstring(stripped)
+                tree = ET.ElementTree(root)
+                if hasattr(ET, "indent"):
+                    ET.indent(tree, space="  ")
+                return ET.tostring(root, encoding="unicode"), "xml"
+            except ET.ParseError:
+                pass
+
+        return text, "text"
+
+    @staticmethod
+    def _prepare_text_for_write(
+        content: Any,
+        beautify_structured: bool = True,
+        wrap_long_lines: bool = False,
+    ) -> str:
+        if beautify_structured:
+            formatted, _ = FileHandler._beautify_structured_text(content)
+        else:
+            formatted = str(content)
+        return formatted
 
     @staticmethod
     def read_last_line(filename) -> str:
