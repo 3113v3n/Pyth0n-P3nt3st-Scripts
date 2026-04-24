@@ -1,5 +1,6 @@
 **/venv
 **/.env
+**/.venv312
 **/__pycache__
 **/.trunk
 **/.idea
@@ -14,3 +15,10 @@ test-data
 dependencies.txt
 .codex
 .git
+# Local scratch folders (agent-created temp work)
+.tmp/
+.tmp
+.pytest_cache
+*.log
+*.pyc
+*.pyo
