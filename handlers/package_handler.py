@@ -201,7 +201,13 @@ class PackageHandler(Config, DisplayHandler, Commands):
                 self.print_info_message(f"Installing package: {package_name}")
                 install_status = self.run_os_commands(command=package["command"])
                 if install_status.returncode != 0:
-                    self.print_error_message(f"Installation of {package_name} failed.")
+                    stderr = (install_status.stderr or "").strip()
+                    stdout = (install_status.stdout or "").strip()
+                    details = stderr or stdout or f"exit code {install_status.returncode}"
+                    self.print_error_message(
+                        message=f"Installation of {package_name} failed.",
+                        exception_error=details,
+                    )
                     all_success = False
                     continue
 
@@ -209,7 +215,13 @@ class PackageHandler(Config, DisplayHandler, Commands):
                     installed_packages.update(verify_names)
                     self.print_success_message(f"Successfully installed {package_name}")
                 else:
-                    self.print_error_message(f"Installation of {package_name} failed.")
+                    self.print_error_message(
+                        message=f"Installation of {package_name} failed.",
+                        exception_error=(
+                            f"Verification failed for binaries: {', '.join(verify_names)}. "
+                            f"Command was: {package['command']}"
+                        ),
+                    )
                     all_success = False
 
             except Exception as error:

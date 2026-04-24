@@ -1,5 +1,6 @@
 import sys
-from utils.shared import Bcolors, Config
+from utils.shared.colors import Bcolors
+from utils.shared.config import Config
 
 from argparse import ArgumentParser, Action
 

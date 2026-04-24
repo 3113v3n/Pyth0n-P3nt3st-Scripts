@@ -1,4 +1,5 @@
 import os
+import re
 
 from utils.mobile import MobileCommands
 
@@ -28,25 +29,24 @@ class MobileAssessment(MobileCommands):
         """Execute the mobile application testing module
         :param test_domain: Test domain
         :param operating_system: Running Operating system"""
-        try:
-            self.inspect_application_files(
-                application=self.package_path,
-                test_domain=test_domain,
-                operating_system=operating_system
-            )
+        self.inspect_application_files(
+            application=self.package_path,
+            test_domain=test_domain,
+            operating_system=operating_system
+        )
 
-            # [AI] After scanning, surface high-signal findings to Claude.
-            # The hardcoded-strings output file is written to mobile_output_dir.
-            if self.ai and self.ai.enabled:
-                findings = self._collect_mobile_findings()
-                if findings:
-                    ai_analysis = self.ai.analyze_mobile_findings(findings)
-                    self.print_success_message(
-                        message="AI Findings Analysis:", extras=f"\n{ai_analysis}")
+        # [AI] After scanning, surface high-signal findings to Claude.
+        # The hardcoded-strings output file is written to mobile_output_dir.
+        if self.ai and self.ai.enabled:
+            findings = self._collect_mobile_findings()
+            if findings:
+                ai_analysis = self.ai.analyze_mobile_findings(findings)
+                self.print_success_message(
+                    message="AI Findings Analysis:", extras=f"\n{ai_analysis}")
 
-            self.print_total_time(f"Total analysis time for {self.package_name}")
-        finally:
-            self.reset_total_time()
+        self.print_last_execution_time(
+            f"Analysis time for {self.package_name}:"
+        )
 
     def _collect_mobile_findings(self) -> dict:
         """Read output files produced by the mobile scan and return a findings dict.
@@ -85,13 +85,35 @@ class MobileAssessment(MobileCommands):
             if not path:
                 continue
             try:
-                with open(path, "r", encoding="utf-8", errors="replace") as fh:
-                    lines = [ln.strip() for ln in fh if ln.strip()]
+                if category == "base64":
+                    lines = self._read_base64_report_entries(path)
+                else:
+                    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                        lines = [ln.strip() for ln in fh if ln.strip()]
                 if lines:
                     findings[category] = lines
             except OSError:
                 pass
         return findings
+
+    @staticmethod
+    def _read_base64_report_entries(path: str) -> list[str]:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                content = fh.read()
+        except OSError:
+            return []
+
+        block_pattern = re.compile(
+            r"^===== BASE64 FINDING(?: \d+)? START =====\n(.*?)\n===== BASE64 FINDING(?: \d+)? END =====$",
+            re.MULTILINE | re.DOTALL,
+        )
+        entries = [match.group(1).strip() for match in block_pattern.finditer(content)]
+        if entries:
+            return entries
+
+        # Backward-compatible fallback for older one-line base64 reports.
+        return [ln.strip() for ln in content.splitlines() if ln.strip()]
 
     # Install web proxies cert
     # 1. Take filepath to .der

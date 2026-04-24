@@ -2,28 +2,10 @@ import termios
 import time
 import sys
 
-# [Test Domains]
-from domains import (
-    InternalAssessment,
-    MobileAssessment,
-    VulnerabilityAnalysis,
-    PasswordModule)
-# [Utils]
-from utils import (
-    ProgressBar,
-    Commands)
-from utils.shared import Bcolors
+from handlers.screen import ScreenHandler
+from utils.shared.colors import Bcolors
 # [AI] Claude-powered analysis assistant — degrades gracefully if key is absent
 from utils.shared.ai_assistant import PentestAI
-# [Handlers]
-from handlers import (
-    NetworkHandler,
-    PackageHandler,
-    UserHandler,
-    HelpHandler,
-    ScreenHandler,
-    InteractionHandler
-)
 
 
 class PentestFramework(ScreenHandler):
@@ -42,54 +24,85 @@ class PentestFramework(ScreenHandler):
     # Initializers
 
     def initialize_classes(self) -> dict:
-        """Initialize all required classes for the framework.
-
-        [AI] The PentestAI instance (self.ai) is injected into each domain class
-        as a `.ai` attribute so modules can call analysis methods without coupling
-        to the framework layer.
-
-        Returns:
-            Dictionary containing initialized class instances
-        """
+        """Initialize core classes required for startup and shared flows."""
         try:
+            from handlers.helper_handler import HelpHandler
+            from handlers.network_handler import NetworkHandler
+            from handlers.package_handler import PackageHandler
+            from handlers.user_handler import UserHandler
+            from utils.shared.commands import Commands
+
             network_instance = NetworkHandler()
             helper_instance = HelpHandler()
             command_instance = Commands()
-
-            # [AI] Build domain instances; AI may be attached lazily later.
-            vuln = VulnerabilityAnalysis()
-            vuln.ai = self.ai
-
-            mobile = MobileAssessment()
-            mobile.ai = self.ai
-
-            password = PasswordModule()
-            password.ai = self.ai
-
-            internal = InternalAssessment(network_instance, helper_instance)
-            internal.ai = self.ai
 
             return {
                 "package": PackageHandler(),
                 "command": command_instance,
                 "network": network_instance,
                 "user": UserHandler(helper_instance, command_instance),
-                "mobile": mobile,
-                "vulnerability": vuln,
-                "password": password,
-                "internal": internal,
+                "helper": helper_instance,
+                "domains": {},
             }
+        except ModuleNotFoundError as error:
+            self.print_error_message(
+                message="Missing core dependency", exception_error=error
+            )
+            sys.exit(1)
         except Exception as error:
             self.print_error_message(
                 message="Error initializing classes", exception_error=error)
             sys.exit(1)
 
+    def _load_domain(self, domain_key: str):
+        """Lazily initialize and cache a domain handler."""
+        domain_cache = self.classes.setdefault("domains", {})
+        if domain_key in domain_cache:
+            return domain_cache[domain_key]
+
+        try:
+            if domain_key == "vulnerability":
+                from domains.vulnerability_module import VulnerabilityAnalysis
+                domain_obj = VulnerabilityAnalysis()
+            elif domain_key == "mobile":
+                from domains.mobile_module import MobileAssessment
+                domain_obj = MobileAssessment()
+            elif domain_key == "password":
+                from domains.password_module import PasswordModule
+                domain_obj = PasswordModule()
+            elif domain_key == "internal":
+                from domains.internal_module import InternalAssessment
+                domain_obj = InternalAssessment(
+                    self.classes["network"],
+                    self.classes["helper"],
+                )
+            else:
+                return None
+        except ModuleNotFoundError as error:
+            self.print_error_message(
+                message=f"Missing Python dependency for '{domain_key}' module",
+                exception_error=(
+                    f"{error.name}. Install dependencies with "
+                    "'pip install -r requirements.txt'"
+                ),
+            )
+            return None
+        except Exception as error:
+            self.print_error_message(
+                message=f"Error initializing '{domain_key}' module",
+                exception_error=error,
+            )
+            return None
+
+        domain_obj.ai = self.ai
+        domain_cache[domain_key] = domain_obj
+        return domain_obj
+
     def _attach_ai_to_domains(self) -> None:
         """Attach current AI instance to all domain handlers."""
-        for domain_key in ("vulnerability", "mobile", "password", "internal"):
-            domain_obj = self.classes.get(domain_key)
-            if domain_obj is not None:
-                domain_obj.ai = self.ai
+        domain_cache = self.classes.get("domains", {})
+        for domain_obj in domain_cache.values():
+            domain_obj.ai = self.ai
 
     def ensure_ai_ready(self) -> None:
         """Initialize AI once, only after dependency checks for selected module."""
@@ -159,6 +172,8 @@ class PentestFramework(ScreenHandler):
         :param internal: Internal assessment class object
         :param kwargs: Keyword arguments
         :keyword (dict) user_data: cli supplied data"""
+        from utils.shared.progress_bar import ProgressBar
+
         # initialize variables that will be used to test different Internal PT modules
         _vars = {}
         # test_domain = ""
@@ -309,6 +324,7 @@ class PentestFramework(ScreenHandler):
             else None
         )
 
+        mobile.reset_total_time()
         if applications:
             total = len(applications)
             self.print_info_message(
@@ -326,10 +342,16 @@ class PentestFramework(ScreenHandler):
                 }
                 mobile.initialize_variables(app_vars)
                 mobile._inspect_files(test_domain, self.os)
+            mobile.print_total_time("Total analysis time for all applications:")
+            mobile.reset_total_time()
             return
 
         mobile.initialize_variables(mobile_testing_vars)
         mobile._inspect_files(test_domain, self.os)
+        mobile.print_total_time(
+            f"Total analysis time for {mobile.package_name}:"
+        )
+        mobile.reset_total_time()
 
     def handle_external_assessment(self, user):
         """Handle external assessment"""
@@ -348,39 +370,56 @@ class PentestFramework(ScreenHandler):
         if self.debug:
             self.print_debug_message(
                 f"Commandline Arguments {kwargs.get("user_data")}")
-        # Match user_test_domain with the appropriate handler
-        handlers = {
-            "internal": lambda: self.handle_internal_assessment(
+        if user_test_domain == "internal":
+            internal = self._load_domain("internal")
+            if internal is None:
+                return
+            self.handle_internal_assessment(
                 self.classes["user"],
                 self.classes["network"],
-                self.classes["internal"],
-                user_data=kwargs.get("user_data")
-            ),
-            "va": lambda: self.handle_vulnerability_assessment(
-                self.classes["user"],
-                self.classes["vulnerability"],
-                user_data=kwargs.get("user_data")
-            ),
-            "mobile": lambda: self.handle_mobile_assessment(
-                self.classes["user"],
-                self.classes["mobile"],
-                user_data=kwargs.get("user_data")
-
-            ),
-            "external": lambda: print("External assessment not implemented yet"),
-            "password": lambda: self.handle_password_operations(
-                self.classes["user"],
-                self.classes["password"],
-                user_data=kwargs.get("user_data")
+                internal,
+                user_data=kwargs.get("user_data"),
             )
+            return
 
-        }
+        if user_test_domain == "va":
+            vulnerability = self._load_domain("vulnerability")
+            if vulnerability is None:
+                return
+            self.handle_vulnerability_assessment(
+                self.classes["user"],
+                vulnerability,
+                user_data=kwargs.get("user_data"),
+            )
+            return
 
-        handler = handlers.get(user_test_domain)
-        if handler:
-            handler()
-        else:
-            self.print_error_message("Invalid test domain selected")
+        if user_test_domain == "mobile":
+            mobile = self._load_domain("mobile")
+            if mobile is None:
+                return
+            self.handle_mobile_assessment(
+                self.classes["user"],
+                mobile,
+                user_data=kwargs.get("user_data"),
+            )
+            return
+
+        if user_test_domain == "external":
+            print("External assessment not implemented yet")
+            return
+
+        if user_test_domain == "password":
+            password = self._load_domain("password")
+            if password is None:
+                return
+            self.handle_password_operations(
+                self.classes["user"],
+                password,
+                user_data=kwargs.get("user_data"),
+            )
+            return
+
+        self.print_error_message("Invalid test domain selected")
 
     @staticmethod
     def get_user_input_() -> str:
@@ -419,20 +458,13 @@ class PentestFramework(ScreenHandler):
         """Reset the states of all classes"""
         try:
             self.classes = self.initialize_classes()
-            if self.classes["mobile"]:
-                self.classes["mobile"].reset_class_states()
-            if self.classes["internal"]:
-                self.classes["internal"].reset_class_states(
-                    self.classes["network"])
-            if self.classes["vulnerability"]:
-                self.classes["vulnerability"].reset_class_states()
             if self.classes["network"]:
                 self.classes["network"].reset_class_states()
             if self.classes["package"]:
                 self.classes["package"].reset_class_states()
             if self.classes["user"]:
                 self.classes["user"].reset_class_states()
-
+            self.classes["domains"] = {}
         except Exception as e:
             self.print_error_message(
                 message="Error resetting class states",
@@ -519,10 +551,12 @@ class PentestFramework(ScreenHandler):
 
 def main():
     """Entry point of the program"""
-    framework = PentestFramework()
+    from handlers.interaction import InteractionHandler
+
     _interaction = InteractionHandler()
     try:
         _interaction.main()
+        framework = PentestFramework()
         # [AI] Honour --no-ai flag: disable the AI instance before any domain
         # module runs so all subsequent ai.enabled checks see False.
         if not _interaction.arguments.get("use_ai", True):
@@ -537,8 +571,7 @@ def main():
             _interaction.arguments["use_args"] = use_cmdline_args
             framework.run_program_interactively(_interaction.arguments)
     except Exception as e:
-        framework.print_error_message(
-            message="Critical error", exception_error=e)
+        print(f"\n[!] Critical error: {e}")
         sys.exit(1)
 
 

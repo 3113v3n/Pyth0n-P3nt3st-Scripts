@@ -8,6 +8,7 @@ class CustomDecorators:
     """Calculate the time taken to execute a function"""
 
     total_time = 0
+    last_execution_time = 0
     _loader_active = False
 
     @staticmethod
@@ -27,6 +28,7 @@ class CustomDecorators:
                 owner = args[0]
                 if isinstance(owner, CustomDecorators):
                     target_cls = owner.__class__
+            target_cls.last_execution_time = execution_time
             target_cls.total_time = getattr(target_cls, "total_time", 0) + execution_time
             # print(f"Execution time for {func.__name__}: {execution_time:.4f} seconds")
             return result
@@ -66,42 +68,12 @@ class CustomDecorators:
     @classmethod
     def print_total_time(cls, message="Total execution time:"):
         """Print the total time taken to execute all functions"""
-        hours, minutes, seconds = cls.format_time(cls.total_time)
+        print(f"\n{message} {cls._humanize_duration(cls.total_time)}")
 
-        def format_unit(unit:int, label:str):
-            """Format label accordingly
-            Args:
-                unit:  time measurement
-                label: [minutes,seconds,hours]
-            """
-            if unit == 1:
-                return f"{unit} {label}"
-            else:
-                return f"{unit} {label}s"
-
-        time_text = ""
-
-        if seconds and not (minutes or hours):
-            time_text = format_unit(seconds, "second")
-        elif seconds and minutes and not (hours):
-            time_text = f"{format_unit(minutes, "minute")} and {format_unit(seconds, "second")}."
-        elif minutes and not (hours or seconds):
-            time_text = format_unit(minutes, "minute")
-        elif hours and not (minutes or seconds):
-            time_text = format_unit(hours, "hour")
-        elif hours and minutes and not seconds:
-            time_text = f"{format_unit(hours, "hour")} and {format_unit(minutes, "minute")}"
-        elif hours and seconds and not minutes:
-            time_text = f"{format_unit(hours, "hour")} and {format_unit(seconds, "second")}."
-        else:
-            time_text = f"{format_unit(hours, "hour")}, {format_unit(minutes, "minute")} and {format_unit(seconds, "second")}"
-
-        if not (hours or minutes or seconds) and cls.total_time > 0:
-            time_text = f"{cls.total_time:.2f} seconds"
-
-        #print(f"{hours} hours:{minutes} minutes:{seconds} seconds")
-
-        print(f"\n{message} {time_text}")
+    @classmethod
+    def print_last_execution_time(cls, message="Execution time:"):
+        """Print time taken by the most recent decorated call."""
+        print(f"\n{message} {cls._humanize_duration(cls.last_execution_time)}")
 
     @staticmethod
     def format_time(time_in_seconds):
@@ -112,10 +84,41 @@ class CustomDecorators:
         return hours, minutes, seconds
 
     @classmethod
+    def _humanize_duration(cls, time_in_seconds: float) -> str:
+        """Convert duration to human-readable text."""
+        hours, minutes, seconds = cls.format_time(time_in_seconds)
+
+        def format_unit(unit: int, label: str) -> str:
+            return f"{unit} {label}" if unit == 1 else f"{unit} {label}s"
+
+        if seconds and not (minutes or hours):
+            return format_unit(seconds, "second")
+        if seconds and minutes and not hours:
+            return f"{format_unit(minutes, 'minute')} and {format_unit(seconds, 'second')}."
+        if minutes and not (hours or seconds):
+            return format_unit(minutes, "minute")
+        if hours and not (minutes or seconds):
+            return format_unit(hours, "hour")
+        if hours and minutes and not seconds:
+            return f"{format_unit(hours, 'hour')} and {format_unit(minutes, 'minute')}"
+        if hours and seconds and not minutes:
+            return f"{format_unit(hours, 'hour')} and {format_unit(seconds, 'second')}."
+        if hours or minutes or seconds:
+            return (
+                f"{format_unit(hours, 'hour')}, "
+                f"{format_unit(minutes, 'minute')} and "
+                f"{format_unit(seconds, 'second')}"
+            )
+        if time_in_seconds > 0:
+            return f"{time_in_seconds:.2f} seconds"
+        return "0 seconds"
+
+    @classmethod
     def reset_total_time(cls):
         """Reset the total time to 0"""
         # global total_time
         cls.total_time = 0
+        cls.last_execution_time = 0
 
 
 if __name__ == "__main__":

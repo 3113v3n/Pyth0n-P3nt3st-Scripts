@@ -17,11 +17,15 @@ class MobileConfigs:
             "name": ["apktool"],
             "command": "multiple",
             "cmd": (
-                "sudo apt-get -y install aapt wget && "
-                "wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O /tmp/apktool && "
-                "chmod +x /tmp/apktool && sudo cp /tmp/apktool /usr/local/bin/apktool && "
-                "wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O /tmp/apktool.jar && "
-                "sudo cp /tmp/apktool.jar /usr/local/bin/apktool.jar"
+                "sudo apt-get -y install aapt wget curl && "
+                "APKTOOL_TAG=$(curl -fsSL https://api.github.com/repos/iBotPeaches/Apktool/releases/latest | "
+                "grep -m1 '\"tag_name\"' | cut -d '\"' -f 4) && "
+                "APKTOOL_VER=${APKTOOL_TAG#v} && "
+                "curl -fsSL https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -o /tmp/apktool && "
+                "chmod +x /tmp/apktool && "
+                "curl -fsSL \"https://github.com/iBotPeaches/Apktool/releases/download/${APKTOOL_TAG}/apktool_${APKTOOL_VER}.jar\" -o /tmp/apktool.jar && "
+                "sudo install -m 0755 /tmp/apktool /usr/local/bin/apktool && "
+                "sudo install -m 0644 /tmp/apktool.jar /usr/local/bin/apktool.jar"
             ),
         },
         {
@@ -31,12 +35,17 @@ class MobileConfigs:
         },
         {
             "name": ["grep"],
-            "command": "brew install grep"
+            "command": "multiple",
+            "cmd": "sudo apt-get -y install grep"
+        },
+        {
+            "name": ["d2j-dex2jar"],
+            "command": "multiple",
+            "cmd": "sudo apt-get -y install dex2jar",
         },
         {
             "name": [
                 "adb",
-                "d2j-dex2jar",
                 "nuclei",
                 "radare2",
                 # "libusbmuxd-tools",

@@ -15,7 +15,6 @@ Naming improvements:
 import curses
 import signal
 import threading
-import netifaces
 import sys
 import time
 # import psutil
@@ -27,6 +26,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from handlers import FileHandler
 # from scapy.all import IP, ICMP, sr1
 from utils.shared import Commands
+
+try:
+    import netifaces
+except ModuleNotFoundError:
+    netifaces = None
 
 
 class NetworkHandler(FileHandler, Commands):
@@ -116,6 +120,9 @@ class NetworkHandler(FileHandler, Commands):
     @staticmethod
     def get_interface_ip(interface: str) -> str | None:
         """Get the IPv4 address of the specified interface."""
+        if netifaces is None:
+            return None
+
         try:
             addresses = netifaces.ifaddresses(interface)
             if netifaces.AF_INET in addresses:
@@ -447,6 +454,9 @@ def get_active_interface():
     """
 
     try:
+        if netifaces is None:
+            return None
+
         active_ = netifaces.gateways()
         default_gateway: tuple = active_[2][0]
 
@@ -463,5 +473,8 @@ def get_network_interfaces() -> List[str]:
     """
     Get the network interfaces on the system
     """
+    if netifaces is None:
+        return []
+
     interfaces = netifaces.interfaces()
     return interfaces

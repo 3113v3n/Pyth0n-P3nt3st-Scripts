@@ -11,12 +11,20 @@ import os
 import re
 import sys
 import time
-import psutil
 import asyncio
-import aioping
 import platform
 import subprocess
 from typing import Optional
+
+try:
+    import psutil
+except ModuleNotFoundError:  # Optional dependency in restricted envs.
+    psutil = None
+
+try:
+    import aioping
+except ModuleNotFoundError:  # Optional dependency; fallback to system ping.
+    aioping = None
 
 
 # [Security] Characters that are meaningful to the shell and must never appear
@@ -34,6 +42,9 @@ class Commands:
     @staticmethod
     def kill_processes() -> None:
         """Terminate all child processes spawned by the current process."""
+        if psutil is None:
+            return
+
         current_process = psutil.Process()
         for child in current_process.children(recursive=True):
             try:
@@ -246,6 +257,9 @@ class Commands:
         Returns:
             True if reachable within the 500 ms timeout.
         """
+        if aioping is None:
+            return Commands.ping_hosts(ip)
+
         try:
             await aioping.ping(ip, timeout=0.5)
             return True
@@ -261,6 +275,10 @@ class Commands:
         Returns:
             True if the host responded.
         """
+        if aioping is None:
+            # Fallback for environments where aioping is not installed.
+            return self.ping_hosts(ip)
+
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

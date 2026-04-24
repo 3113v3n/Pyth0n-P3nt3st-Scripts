@@ -1,9 +1,8 @@
 """
 interaction.py — CLI argument parsing and module selection.
 
-Performance: The internal assessment argument parser previously instantiated a
-new NetworkHandler() for *every* network interface in the list comprehension.
-A single instance is now created and reused across all interface checks.
+Startup hardening: module imports for network/file handlers are now lazy so
+argument parsing can run even when optional runtime dependencies are missing.
 
 Naming: Removed the pointless os.path.basename() wrapper — os.path.basename() is
 called directly at the two call sites instead.
@@ -12,11 +11,8 @@ called directly at the two call sites instead.
 import os
 from argparse import RawTextHelpFormatter
 
-from utils.shared import Validator
-from handlers.network_handler import (NetworkHandler,
-                                      get_network_interfaces)
+from utils.shared.validators import Validator
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
-from handlers.file_handler import FileHandler
 
 
 class InteractionHandler:
@@ -28,7 +24,7 @@ class InteractionHandler:
         self.argument_mode = False
         self.arguments = {}
         self.validator = Validator()
-        self.filehandler = FileHandler()
+        self.filehandler = None
 
     def main(self):
         """Main Program"""
@@ -243,18 +239,22 @@ class InteractionHandler:
             required=True,
             help="Mode of the internal PT (scan | resume)",
         )
-        # [Performance] Create a single NetworkHandler instance and reuse it for
-        # all interface checks instead of instantiating a new one per interface.
-        _nh = NetworkHandler()
+        # Keep parser import-light by querying interfaces directly from netifaces.
         interface_choices = []
         interface_help = "Interface to use with the script e.g (eth0, wlan0)"
         try:
+            import netifaces
+
             interface_choices = [
                 iface
-                for iface in get_network_interfaces()
-                if _nh._is_interface_active(iface)
-                and not iface.startswith(("br-", "docker", "veth", "lo"))
+                for iface in netifaces.interfaces()
+                if not iface.startswith(("br-", "docker", "veth", "lo"))
             ]
+        except ModuleNotFoundError as error:
+            interface_help = (
+                "Interface to use with the script e.g (eth0, wlan0). "
+                f"Interface auto-discovery disabled (missing dependency: {error.name})."
+            )
         except Exception as error:
             # Some restricted environments raise EPERM when listing interfaces.
             # Keep parser construction alive so unrelated modules (e.g. mobile)
@@ -305,6 +305,10 @@ class InteractionHandler:
 
         # CLI behavior: if directory is provided, scan all APK/IPA files by default.
         if self.validator.check_folder_exists(path):
+            if self.filehandler is None:
+                from handlers.file_handler import FileHandler  # Lazy import
+                self.filehandler = FileHandler()
+
             self.filehandler.files = []
             self.filehandler.find_files(path)
             file_collection = self.filehandler._get_file_collections()
@@ -382,6 +386,10 @@ class InteractionHandler:
             raise ValueError(
                 f"Path {path} is not a valid directory. Ensure it exists and is a directory"
             )
+        if self.filehandler is None:
+            from handlers.file_handler import FileHandler  # Lazy import
+            self.filehandler = FileHandler()
+
         # ENSURE THE FILES ARE OF VALID FILETYPES [.CSV,.XLSX,.XLX]
         self.filehandler.find_files(path)  # generates a list of all files
         file_collection = self.filehandler._get_file_collections()

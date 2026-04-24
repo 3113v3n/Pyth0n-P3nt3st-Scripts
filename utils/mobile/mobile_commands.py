@@ -33,6 +33,7 @@ import re
 import shutil
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 import zipfile
 
 from handlers import FileHandler, ScreenHandler
@@ -70,8 +71,21 @@ class MobileCommands(
     IP_RE = re.compile(
         r"(?<!\d\.)(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?!\.\d)"
     )
+    URL_TRAILING_JUNK_RE = re.compile(r"[.,;:)\]}>\"']+$")
+    URL_PLACEHOLDER_RE = re.compile(r"%[a-zA-Z]")
+    HOSTNAME_RE = re.compile(
+        r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$",
+        re.IGNORECASE,
+    )
+    IPV4_EXACT_RE = re.compile(
+        r"^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$"
+    )
+    IP_CONTEXT_RE = re.compile(
+        r"(?i)\b(?:ip|host|addr|address|src|source|dst|dest|destination|from|to|endpoint|server|dns)\b"
+    )
     BASE64_TOKEN_RE = re.compile(r"\b(?:[A-Za-z0-9+/]{24,}={0,2})\b")
     BASE64_MAX_DECODE_DEPTH = 5
+    MAX_BASE64_DECODE_BYTES = 8 * 1024 * 1024
 
     # Useful extensions for direct text decode
     TEXT_EXTENSIONS = {
@@ -91,6 +105,7 @@ class MobileCommands(
         "android.googlesource.com",
         "www.w3.org",
     }
+    REPO_REFERENCE_HOSTS = {"github.com", "www.github.com", "gitlab.com", "bitbucket.org"}
     NETWORK_CONTEXT_HINTS = (
         "http://", "https://", "wss://", "host", "ip", "endpoint",
         "server", "socket", "connect", "address", "dns",
@@ -469,42 +484,170 @@ class MobileCommands(
     @classmethod
     def _is_valuable_url(cls, url: str) -> bool:
         """Filter framework/library/documentation URLs that are typically noise."""
+        cleaned = cls._sanitize_url_candidate(url)
+        if not cleaned:
+            return False
         try:
-            parsed = urlparse(url)
+            parsed = urlparse(cleaned)
         except ValueError:
             return False
         if parsed.scheme.lower() not in {"http", "https", "wss"}:
             return False
-        host = (parsed.netloc or "").lower().split(":")[0]
-        if not host or host in cls.URL_NOISE_HOSTS:
+        host = (parsed.hostname or "").lower()
+        if not cls._is_valid_url_host(host):
             return False
-        if cls.URL_IGNORE_RE.search(url):
+        if host in cls.URL_NOISE_HOSTS:
+            return False
+        if cls._is_source_repo_reference_url(host, parsed.path or ""):
+            return False
+        if cls.URL_PLACEHOLDER_RE.search(cleaned):
+            return False
+        if cls.URL_IGNORE_RE.search(cleaned):
             return False
         return True
 
-    @staticmethod
-    def _canonicalize_url(url: str) -> str:
+    @classmethod
+    def _canonicalize_url(cls, url: str) -> str:
         """Canonical URL for reporting: drop query/fragment and normalize root slash."""
-        parsed = urlparse(url)
+        cleaned = cls._sanitize_url_candidate(url)
+        if not cleaned:
+            return ""
+        parsed = urlparse(cleaned)
+        host = (parsed.hostname or "").lower()
+        if not cls._is_valid_url_host(host):
+            return ""
+        netloc = host
+        if parsed.port:
+            netloc = f"{host}:{parsed.port}"
         path = parsed.path or ""
         if path == "/":
             path = ""
         elif path:
             path = path.rstrip("/")
-        return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{path}"
-
-    @staticmethod
-    def _collapse_urls_to_common_bases(urls: set[str]) -> list[str]:
-        """Keep only common base URLs when deeper paths are subsets of a base."""
-        kept: list[str] = []
-        for url in sorted(urls, key=len):
-            if any(url == base or url.startswith(f"{base}/") for base in kept):
-                continue
-            kept.append(url)
-        return kept
+        return f"{parsed.scheme.lower()}://{netloc}{path}"
 
     @classmethod
-    def _is_probable_version_ip(cls, ip_text: str, searchable_text: str) -> bool:
+    def _sanitize_url_candidate(cls, url: str) -> str:
+        if not url:
+            return ""
+        cleaned = cls.URL_TRAILING_JUNK_RE.sub("", str(url).strip())
+        if (
+            not cleaned
+            or "\\" in cleaned
+            or cleaned.endswith("://")
+            or cleaned.endswith("://.")
+            or cleaned.endswith("://-")
+        ):
+            return ""
+        return cleaned
+
+    @classmethod
+    def _is_valid_url_host(cls, host: str) -> bool:
+        if not host:
+            return False
+        if cls.URL_PLACEHOLDER_RE.search(host):
+            return False
+        if host == "localhost":
+            return True
+        if cls.IPV4_EXACT_RE.fullmatch(host):
+            return True
+        return bool(cls.HOSTNAME_RE.fullmatch(host))
+
+    @classmethod
+    def _is_source_repo_reference_url(cls, host: str, path: str) -> bool:
+        if host not in cls.REPO_REFERENCE_HOSTS:
+            return False
+
+        path_parts = [segment for segment in path.strip("/").split("/") if segment]
+        if not path_parts:
+            return False
+
+        # GitHub repository references:
+        # /<owner>/<repo>/(issues|pull|pulls|blob|tree|commit|commits|compare|wiki|releases)/...
+        if host in {"github.com", "www.github.com"}:
+            if len(path_parts) >= 3 and path_parts[2] in {
+                "issues",
+                "issue",
+                "pull",
+                "pulls",
+                "blob",
+                "tree",
+                "commit",
+                "commits",
+                "compare",
+                "wiki",
+                "releases",
+            }:
+                return True
+            return False
+
+        # GitLab references:
+        # /<group>/<project>/-/(issues|merge_requests|blob|tree|commit|commits|releases)/...
+        if host == "gitlab.com":
+            if len(path_parts) >= 4 and path_parts[2] == "-" and path_parts[3] in {
+                "issues",
+                "merge_requests",
+                "blob",
+                "tree",
+                "commit",
+                "commits",
+                "releases",
+            }:
+                return True
+            return False
+
+        # Bitbucket references:
+        # /<workspace>/<repo>/(issues|pull-requests|src|commits|branches)/...
+        if host == "bitbucket.org":
+            if len(path_parts) >= 3 and path_parts[2] in {
+                "issues",
+                "pull-requests",
+                "src",
+                "commits",
+                "branches",
+            }:
+                return True
+            return False
+
+        return False
+
+    @staticmethod
+    def _to_base_url(url: str) -> str:
+        """Return URL origin as scheme://host[:port], dropping path/query/fragment."""
+        try:
+            parsed = urlparse(str(url).strip())
+        except ValueError:
+            return ""
+
+        scheme = (parsed.scheme or "").lower()
+        host = (parsed.hostname or "").lower()
+        if not scheme or not host:
+            return ""
+
+        netloc = host
+        default_ports = {"http": 80, "https": 443, "ws": 80, "wss": 443}
+        if parsed.port and parsed.port != default_ports.get(scheme):
+            netloc = f"{host}:{parsed.port}"
+        return f"{scheme}://{netloc}"
+
+    @classmethod
+    def _collapse_urls_to_common_bases(cls, urls: set[str]) -> list[str]:
+        """Normalize to base URLs first, then keep unique origins only."""
+        unique_bases = {
+            base
+            for base in (cls._to_base_url(url) for url in urls)
+            if base
+        }
+        return sorted(unique_bases)
+
+    @staticmethod
+    def _snippet_at_index(text: str, index: int, radius: int = 50) -> str:
+        start = max(0, index - radius)
+        end = min(len(text), index + radius)
+        return text[start:end]
+
+    @classmethod
+    def _is_probable_version_ip(cls, ip_text: str, searchable_text: str, match_start: int) -> bool:
         """Heuristic guard against dotted-version false positives (e.g. 1.1.1.1)."""
         try:
             parts = [int(part) for part in ip_text.split(".")]
@@ -520,16 +663,35 @@ class MobileCommands(
         if parts[0] == 0:
             return True
 
-        snippet = cls._snippet_around(searchable_text.lower(), ip_text.lower(), radius=50)
+        lowered = searchable_text.lower()
+        ip_lower = ip_text.lower()
+        snippet = cls._snippet_at_index(lowered, match_start, radius=60)
         if any(hint in snippet for hint in cls.OID_CONTEXT_HINTS):
             return True
         if any(hint in snippet for hint in cls.VERSION_CONTEXT_HINTS):
             return True
         if any(hint in snippet for hint in cls.NETWORK_CONTEXT_HINTS):
             return False
+        if cls.IP_CONTEXT_RE.search(snippet):
+            return False
+
+        before = lowered[max(0, match_start - 16):match_start]
+        if re.search(r"(?:\bversion\b|\bver\b)\s*$", before):
+            return True
+        if match_start > 0 and lowered[match_start - 1] in {"/", "v"}:
+            return True
+
+        match_end = match_start + len(ip_text)
+        if match_end < len(lowered):
+            trailing = lowered[match_end]
+            if trailing in {"-", "_"} or trailing.isalnum():
+                return True
+
+        if all(part < 10 for part in parts) and ip_text not in cls.KNOWN_PUBLIC_SERVICE_IPS:
+            return True
         if all(part <= 20 for part in parts):
             return True
-        return bool(re.search(rf"{re.escape(ip_text.lower())}[a-z]", snippet))
+        return bool(re.search(rf"{re.escape(ip_lower)}[a-z]", snippet))
 
     @classmethod
     def _is_valuable_secret_evidence(cls, title: str, evidence: str) -> bool:
@@ -590,8 +752,34 @@ class MobileCommands(
         except OSError:
             return ""
 
+    @staticmethod
+    def _beautify_decoded_payload(payload: str) -> tuple[str, str]:
+        text = str(payload)
+        stripped = text.strip()
+        if not stripped:
+            return text, "text"
+
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, (dict, list)):
+                return json.dumps(parsed, indent=2, ensure_ascii=False), "json"
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+        if stripped.startswith("<") and stripped.endswith(">"):
+            try:
+                root = ET.fromstring(stripped)
+                tree = ET.ElementTree(root)
+                if hasattr(ET, "indent"):
+                    ET.indent(tree, space="  ")
+                return ET.tostring(root, encoding="unicode"), "xml"
+            except ET.ParseError:
+                pass
+
+        return text, "text"
+
     @classmethod
-    def _decode_base64_if_interesting(cls, token: str) -> str | None:
+    def _decode_base64_if_interesting(cls, token: str) -> tuple[str, str] | None:
         if len(token) < 24:
             return None
         # Quick reject: low diversity tokens are mostly noise
@@ -607,10 +795,10 @@ class MobileCommands(
                 decoded_bytes = base64.b64decode(padded, validate=True)
             except (ValueError, base64.binascii.Error):
                 return None
-            if len(decoded_bytes) < 4 or len(decoded_bytes) > 600:
+            if len(decoded_bytes) < 4 or len(decoded_bytes) > cls.MAX_BASE64_DECODE_BYTES:
                 return None
-            decoded_text_ = decoded_bytes.decode("utf-8", errors="ignore").strip()
-            if len(decoded_text_) < 4:
+            decoded_text_ = decoded_bytes.decode("utf-8", errors="ignore")
+            if len(decoded_text_.strip()) < 4:
                 return None
             if any(ord(ch) < 32 and ch not in "\t\r\n" for ch in decoded_text_):
                 return None
@@ -630,18 +818,20 @@ class MobileCommands(
                 break
             decoded_text = next_decoded
 
-        printable_ratio = sum(ch.isprintable() for ch in decoded_text) / max(len(decoded_text), 1)
+        analysis_text = decoded_text.strip()
+        printable_ratio = sum(ch.isprintable() for ch in analysis_text) / max(len(analysis_text), 1)
         if printable_ratio < 0.9:
             return None
-        ascii_ratio = sum(ord(ch) < 128 for ch in decoded_text) / max(len(decoded_text), 1)
+        ascii_ratio = sum(ord(ch) < 128 for ch in analysis_text) / max(len(analysis_text), 1)
         if ascii_ratio < 0.85:
             return None
-        if not re.search(r"[A-Za-z]{4,}", decoded_text):
+        if not re.search(r"[A-Za-z]{4,}", analysis_text):
             return None
-        if cls._entropy(decoded_text) < 2.6:
+        if cls._entropy(analysis_text) < 2.6:
             return None
 
-        lowered = decoded_text.lower()
+        lowered = analysis_text.lower()
+        formatted_text, text_format = cls._beautify_decoded_payload(analysis_text)
 
         # Strong indicators of valuable decoded artifacts.
         sensitive_markers = (
@@ -662,11 +852,11 @@ class MobileCommands(
             "jwt",
         )
         if any(marker in lowered for marker in sensitive_markers):
-            return cls.clean_line(decoded_text, max_len=260)
+            return formatted_text, text_format
 
         # JSON blobs are useful only when they include sensitive key names.
         try:
-            parsed = json.loads(decoded_text)
+            parsed = json.loads(analysis_text)
             if isinstance(parsed, dict):
                 keys = {str(k).lower() for k in parsed.keys()}
                 interesting_keys = {
@@ -674,11 +864,20 @@ class MobileCommands(
                     "apikey", "password", "client_secret", "private_key",
                 }
                 if keys & interesting_keys:
-                    return cls.clean_line(decoded_text, max_len=260)
+                    return formatted_text, text_format
         except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
         return None
+
+    @staticmethod
+    def _build_base64_entry(rel_file: str, encoded_token: str, decoded_text: str, decoded_format: str) -> dict:
+        return {
+            "file": rel_file,
+            "format": decoded_format or "text",
+            "encoded": encoded_token,
+            "decoded": decoded_text,
+        }
 
     @staticmethod
     def _snippet_around(text: str, needle: str, radius: int = 80) -> str:
@@ -688,6 +887,10 @@ class MobileCommands(
         start = max(0, index - radius)
         end = min(len(text), index + len(needle) + radius)
         return " ".join(text[start:end].split())
+
+    @staticmethod
+    def _normalize_line_no_truncate(text: str) -> str:
+        return " ".join(str(text).strip().split())
 
     @classmethod
     def _extract_unique_api_keys(cls, findings: list[Finding]) -> dict[str, dict[str, set[str]]]:
@@ -758,28 +961,108 @@ class MobileCommands(
         except (URLError, TimeoutError, OSError) as error:
             return 0, {}, str(error)
 
-    def _assess_google_api_keys(self, google_keys: dict[str, set[str]]) -> tuple[list[Finding], list[str]]:
+    @staticmethod
+    def _init_api_report_record(key: str) -> dict:
+        return {
+            "key": key,
+            "checklist": "hardcoded-key-exposure",
+            "failed_checks": set(),
+            "accessible_apis": set(),
+            "tests": [],
+            "poc_cmd": "",
+            "poc_response": "",
+        }
+
+    @classmethod
+    def _get_api_report_record(cls, records: dict[str, dict], key: str) -> dict:
+        return records.setdefault(key, cls._init_api_report_record(key))
+
+    @staticmethod
+    def _append_unique(items: list[str], value: str) -> None:
+        normalized = str(value).strip()
+        if normalized and normalized not in items:
+            items.append(normalized)
+
+    @staticmethod
+    def _json_preview(payload: dict, fallback: str = "no response body", max_len: int = 260) -> str:
+        if isinstance(payload, dict) and payload:
+            text = json.dumps(payload, ensure_ascii=True)
+            return text if len(text) <= max_len else text[: max_len - 3] + "..."
+        return fallback
+
+    @classmethod
+    def _render_api_key_report_blocks(cls, records: dict[str, dict]) -> list[str]:
+        blocks: list[str] = []
+        block_index = 0
+
+        for key in sorted(records):
+            record = records[key]
+            tests = [test for test in record.get("tests", []) if str(test).strip()]
+            # Show only entries where at least one vulnerability check succeeded.
+            if not tests:
+                continue
+
+            block_index += 1
+            failed_checks = sorted(record.get("failed_checks", set()))
+            accessible_apis = sorted(record.get("accessible_apis", set()))
+            poc_cmd = record.get("poc_cmd") or "N/A"
+            poc_response = record.get("poc_response") or "N/A"
+
+            lines = [
+                f"******************** API_KEY {block_index} *********************************",
+                f"KEY: {record.get('key', key)}",
+                "VULNERABLE_STATUS: Vulnerable",
+                f"CHECKLIST: {record.get('checklist', 'hardcoded-key-exposure')}",
+                "FAILED_CHECKS:",
+            ]
+
+            if failed_checks:
+                for failed_check in failed_checks:
+                    lines.append(f"        - {failed_check}")
+            else:
+                lines.append("        - none")
+
+            lines.append("ACCESSIBLE_APIS:")
+            if accessible_apis:
+                for api in accessible_apis:
+                    lines.append(f"        - {api}")
+            else:
+                lines.append("        - none")
+
+            lines.append("TEST_CONDUCTED:")
+            for test_name in tests:
+                lines.append(f"        - {test_name}")
+
+            lines.append(f"POC: {poc_cmd}")
+            lines.append(f"     {poc_response}")
+            lines.append("************************************************************************")
+            blocks.append("\n".join(lines))
+
+        return blocks
+
+    def _assess_google_api_keys(
+        self,
+        google_keys: dict[str, set[str]],
+        report_records: dict[str, dict],
+    ) -> list[Finding]:
         if not google_keys:
-            return [], []
+            return []
 
         findings: list[Finding] = []
-        report_lines: list[str] = []
         restriction_meta = self._api_key_check_meta("restriction-controls")
         scope_meta = self._api_key_check_meta("least-privilege-api-scope")
         quota_meta = self._api_key_check_meta("quota-and-billing-abuse")
 
         for key in sorted(google_keys):
-            source_files = google_keys.get(key, set())
             masked_key = self.mask_secret(key)
             accessible_apis: list[str] = []
             restriction_detected = False
             invalid_key = False
-            test_lines: list[str] = []
+            successful_tests: list[dict] = []
             test_cases = [
                 {"name": name, "url": template.format(key=key), "method": "GET", "payload": None}
                 for name, template in self.GOOGLE_API_TEST_ENDPOINTS
             ]
-            # Cloud-oriented probes (Firebase / Google Cloud APIs).
             test_cases.extend(
                 [
                     {
@@ -818,39 +1101,41 @@ class MobileCommands(
                 if test_name == "maps_geocoding":
                     api_status = str(payload.get("status", "")).upper() if isinstance(payload, dict) else ""
                     success = api_status in {"OK", "ZERO_RESULTS"}
-                    status_label = api_status or ("ERROR" if error_message else "UNKNOWN")
                 elif test_name == "youtube_data":
                     success = isinstance(payload, dict) and "error" not in payload and "kind" in payload
-                    status_label = "OK" if success else "ERROR"
                 elif test_name == "firebase_identitytoolkit_lookup":
                     firebase_markers = ("invalid_id_token", "missing_id_token", "user_not_found")
                     success = any(marker in normalized_error for marker in firebase_markers) or bool(
                         isinstance(payload, dict) and payload.get("users")
                     )
-                    status_label = "OK" if success else "ERROR"
                 elif test_name == "cloud_translate_languages":
                     success = (
                         isinstance(payload, dict)
                         and isinstance(payload.get("data"), dict)
                         and isinstance(payload.get("data", {}).get("languages"), list)
                     )
-                    status_label = "OK" if success else "ERROR"
                 else:
                     success = False
-                    status_label = "UNKNOWN"
 
                 if success:
                     accessible_apis.append(test_name)
-
-                test_lines.append(
-                    f"{test_name}:{method}[HTTP={http_code},STATUS={status_label},"
-                    f"MESSAGE={self.clean_line(error_message or 'none', max_len=160)}]"
-                )
+                    successful_tests.append(
+                        {
+                            "name": test_name,
+                            "url": url,
+                            "method": method,
+                            "request_payload": payload_body if isinstance(payload_body, dict) else None,
+                            "response_payload": payload if isinstance(payload, dict) else {},
+                            "http_code": http_code,
+                        }
+                    )
 
             vulnerable = False
+            failed_checks: set[str] = set()
             if not invalid_key and accessible_apis:
                 if not restriction_detected:
                     vulnerable = True
+                    failed_checks.update({"restriction-controls", "quota-and-billing-abuse"})
                     findings.append(
                         Finding(
                             category="api_key_exposure",
@@ -865,24 +1150,6 @@ class MobileCommands(
                             ),
                         )
                     )
-                if len(accessible_apis) > 1:
-                    vulnerable = True
-                    findings.append(
-                        Finding(
-                            category="api_key_exposure",
-                            title="Google API Key Overly Broad API Scope",
-                            severity="medium",
-                            file="google_api_key_check",
-                            evidence=(
-                                f"key={masked_key} accessible_apis={','.join(accessible_apis)} "
-                                "checklist=least-privilege-api-scope "
-                                f"CWE={scope_meta['cwe']} CVE={scope_meta['cve']} "
-                                f"CVSS={scope_meta['cvss']}"
-                            ),
-                        )
-                    )
-                if not restriction_detected:
-                    vulnerable = True
                     findings.append(
                         Finding(
                             category="api_key_exposure",
@@ -898,26 +1165,59 @@ class MobileCommands(
                         )
                     )
 
-            if vulnerable:
-                failed_checks: list[str] = []
-                if not restriction_detected:
-                    failed_checks.append("restriction-controls:FAIL")
-                    failed_checks.append("quota-and-billing-abuse:FAIL")
                 if len(accessible_apis) > 1:
-                    failed_checks.append("least-privilege-api-scope:FAIL")
+                    vulnerable = True
+                    failed_checks.add("least-privilege-api-scope")
+                    findings.append(
+                        Finding(
+                            category="api_key_exposure",
+                            title="Google API Key Overly Broad API Scope",
+                            severity="medium",
+                            file="google_api_key_check",
+                            evidence=(
+                                f"key={masked_key} accessible_apis={','.join(accessible_apis)} "
+                                "checklist=least-privilege-api-scope "
+                                f"CWE={scope_meta['cwe']} CVE={scope_meta['cve']} "
+                                f"CVSS={scope_meta['cvss']}"
+                            ),
+                        )
+                    )
 
-                report_lines.append(
-                    f"KEY={masked_key} TYPE=Google API Key SOURCES={len(source_files)} "
-                    "VERDICT=VULNERABLE "
-                    f"FAILED_CHECKS={','.join(failed_checks) or 'none'} "
-                    f"ACCESSIBLE_APIS={','.join(accessible_apis) or 'none'}"
-                )
-                report_lines.append(
-                    f"TEST_CONDUCTED=google-live-api-validation KEY={masked_key} "
-                    + " ; ".join(test_lines)
+            if not vulnerable:
+                continue
+
+            record = self._get_api_report_record(report_records, key)
+            record["failed_checks"].update(failed_checks)
+            record["accessible_apis"].update(accessible_apis)
+
+            for test_result in successful_tests:
+                self._append_unique(
+                    record["tests"],
+                    f"google-live-api-validation::{test_result['name']}",
                 )
 
-        return self._dedupe_findings(findings), report_lines
+            if successful_tests:
+                first_success = successful_tests[0]
+                method = str(first_success["method"]).upper()
+                url = str(first_success["url"])
+                request_payload = first_success.get("request_payload")
+                if method == "POST" and isinstance(request_payload, dict):
+                    payload_preview = json.dumps(request_payload, ensure_ascii=True)
+                    poc_cmd = (
+                        f"curl -s -X POST \"{url}\" "
+                        f"-H \"Content-Type: application/json\" -d '{payload_preview}'"
+                    )
+                else:
+                    poc_cmd = f"curl -s \"{url}\""
+                poc_response = self._json_preview(
+                    first_success.get("response_payload", {}),
+                    fallback=f"HTTP {first_success.get('http_code', 0)}",
+                )
+                if not record["poc_cmd"] or str(record["poc_cmd"]).startswith("grep -R"):
+                    record["poc_cmd"] = poc_cmd
+                    record["poc_response"] = poc_response
+
+        return self._dedupe_findings(findings)
 
     def _assess_cloud_tokens(
         self,
@@ -928,9 +1228,9 @@ class MobileCommands(
         success_predicate: callable,
         title: str,
         test_label: str,
-    ) -> tuple[list[Finding], list[str]]:
+        report_records: dict[str, dict],
+    ) -> list[Finding]:
         findings: list[Finding] = []
-        report_lines: list[str] = []
         exposure_meta = self._api_key_check_meta("hardcoded-key-exposure")
 
         for key in sorted(keys):
@@ -958,16 +1258,24 @@ class MobileCommands(
                     ),
                 )
             )
-            report_lines.append(
-                f"KEY={masked_key} TYPE={key_type} SOURCES={len(source_files)} "
-                "VERDICT=VULNERABLE FAILED_CHECKS=cloud-token-validation:FAIL"
-            )
-            report_lines.append(
-                f"TEST_CONDUCTED={test_label} KEY={masked_key} "
-                f"HTTP={http_code} STATUS=OK MESSAGE={self.clean_line(error_message or 'none', max_len=160)}"
-            )
+            record = self._get_api_report_record(report_records, key)
+            record["failed_checks"].add("cloud-token-validation")
+            record["accessible_apis"].add(test_label)
+            self._append_unique(record["tests"], test_label)
 
-        return findings, report_lines
+            poc_cmd = (
+                f"curl -s \"{endpoint}\" "
+                f"-H \"Authorization: {auth_header} {key}\""
+            )
+            poc_response = self._json_preview(
+                payload,
+                fallback=self.clean_line(error_message or f"HTTP {http_code}", max_len=220),
+            )
+            if not record["poc_cmd"] or str(record["poc_cmd"]).startswith("grep -R"):
+                record["poc_cmd"] = poc_cmd
+                record["poc_response"] = poc_response
+
+        return findings
 
     def _assess_discovered_api_keys(self, hardcoded_findings: list[Finding]) -> tuple[list[Finding], list[str]]:
         discovered_keys = self._extract_unique_api_keys(hardcoded_findings)
@@ -975,7 +1283,7 @@ class MobileCommands(
             return [], []
 
         findings: list[Finding] = []
-        report_lines: list[str] = []
+        report_records: dict[str, dict] = {}
         exposure_meta = self._api_key_check_meta("hardcoded-key-exposure")
 
         for key_type in sorted(discovered_keys):
@@ -998,23 +1306,33 @@ class MobileCommands(
                         ),
                     )
                 )
-                report_lines.append(
-                    f"KEY={masked_key} TYPE={key_type} SOURCES={len(source_files)} "
-                    "VERDICT=VULNERABLE CHECKLIST=hardcoded-key-exposure:FAIL "
-                    f"CWE={exposure_meta['cwe']} CVE={exposure_meta['cve']} CVSS={exposure_meta['cvss']}"
+                record = self._get_api_report_record(report_records, key_value)
+                record["failed_checks"].add("hardcoded-key-exposure")
+                self._append_unique(
+                    record["tests"],
+                    "static-hardcoded-key-detection",
                 )
-                report_lines.append(
-                    "TEST_CONDUCTED=static-hardcoded-key-detection "
-                    f"KEY={masked_key} RULE={key_type} source_occurrences={len(source_files)}"
+                first_file = sorted(source_files)[0] if source_files else "source_file_unknown"
+                source_preview = ", ".join(sorted(source_files)[:3]) if source_files else "none"
+                record["poc_cmd"] = (
+                    f"grep -R --line-number \"{key_value}\" \"{first_file}\""
+                    if not record["poc_cmd"]
+                    else record["poc_cmd"]
+                )
+                record["poc_response"] = (
+                    f"key_type={key_type}; source_occurrences={len(source_files)}; "
+                    f"sources={source_preview}"
+                    if not record["poc_response"]
+                    else record["poc_response"]
                 )
 
-        google_findings, google_report_lines = self._assess_google_api_keys(
-            discovered_keys.get("Google API Key", {})
+        google_findings = self._assess_google_api_keys(
+            discovered_keys.get("Google API Key", {}),
+            report_records,
         )
         findings.extend(google_findings)
-        report_lines.extend(google_report_lines)
 
-        github_findings, github_report_lines = self._assess_cloud_tokens(
+        github_findings = self._assess_cloud_tokens(
             key_type="GitHub Token",
             keys=discovered_keys.get("GitHub Token", {}),
             endpoint="https://api.github.com/user",
@@ -1024,11 +1342,11 @@ class MobileCommands(
             ),
             title="GitHub Token Grants Cloud API Access",
             test_label="github-user-api-validation",
+            report_records=report_records,
         )
         findings.extend(github_findings)
-        report_lines.extend(github_report_lines)
 
-        stripe_findings, stripe_report_lines = self._assess_cloud_tokens(
+        stripe_findings = self._assess_cloud_tokens(
             key_type="Stripe Live Key",
             keys=discovered_keys.get("Stripe Live Key", {}),
             endpoint="https://api.stripe.com/v1/account",
@@ -1038,9 +1356,10 @@ class MobileCommands(
             ),
             title="Stripe Live Key Grants Cloud API Access",
             test_label="stripe-account-api-validation",
+            report_records=report_records,
         )
         findings.extend(stripe_findings)
-        report_lines.extend(stripe_report_lines)
+        report_lines = self._render_api_key_report_blocks(report_records)
 
         return self._dedupe_findings(findings), report_lines
 
@@ -1172,7 +1491,7 @@ class MobileCommands(
                     and not ip_obj.is_unspecified
                     and not ip_obj.is_reserved
                 ):
-                    if self._is_probable_version_ip(match, searchable):
+                    if self._is_probable_version_ip(match, searchable, match_obj.start()):
                         continue
                     result["ips"].add(match)
             except ValueError:
@@ -1181,7 +1500,7 @@ class MobileCommands(
         # Hardcoded secret patterns are reported with contextual evidence.
         for title, severity, pattern in self.SECRET_PATTERNS:
             for m in pattern.finditer(searchable):
-                evidence = self.clean_line(m.group(0))
+                evidence = self._normalize_line_no_truncate(m.group(0))
                 if not self._is_valuable_secret_evidence(title, evidence):
                     continue
                 result["hardcoded"].append(
@@ -1200,11 +1519,11 @@ class MobileCommands(
             if token in seen_b64:
                 continue
             seen_b64.add(token)
-            decoded = self._decode_base64_if_interesting(token)
-            if decoded:
-                encoded_display = self.clean_line(token, max_len=260)
+            decoded_payload = self._decode_base64_if_interesting(token)
+            if decoded_payload:
+                decoded_text, decoded_format = decoded_payload
                 result["base64"].append(
-                    f"[{rel_file}] ENCODED: {encoded_display} | DECODED: {decoded}"
+                    self._build_base64_entry(rel_file, token, decoded_text, decoded_format)
                 )
 
         # Any cleartext backend endpoint found in source is a high-value network risk signal.
@@ -1216,7 +1535,7 @@ class MobileCommands(
                         title="Potential Cleartext Backend Endpoint",
                         severity="medium",
                         file=rel_file,
-                        evidence=self.clean_line(url, max_len=260),
+                        evidence=self._normalize_line_no_truncate(url),
                     )
                 )
 
@@ -1259,7 +1578,7 @@ class MobileCommands(
             re.IGNORECASE,
         )
         for m in exported_pattern.finditer(text):
-            snippet = self.clean_line(m.group(0))
+            snippet = self._normalize_line_no_truncate(m.group(0))
             sev = "high" if "android:permission" not in snippet.lower() else "medium"
             title = "Exported Component Without Permission" if sev == "high" else "Exported Component"
             risks.append(Finding("component_exposure", title, sev, rel, snippet))
@@ -1319,7 +1638,7 @@ class MobileCommands(
 
     @staticmethod
     def _write_lines(path: Path, lines: Iterable[str]) -> int:
-        filtered_lines = [str(line).strip() for line in lines if str(line).strip()]
+        filtered_lines = [str(line).rstrip("\n") for line in lines if str(line).strip()]
         if not filtered_lines:
             return 0
 
@@ -1348,21 +1667,67 @@ class MobileCommands(
 
     @staticmethod
     def _write_api_check_report(path: Path, lines: Iterable[str]) -> int:
-        """Write API check lines and add spacing after each successful test line."""
-        filtered_lines = [str(line).strip() for line in lines if str(line).strip()]
-        if not filtered_lines:
+        """Write API key checklist blocks in report format."""
+        blocks = [str(line).strip("\n") for line in lines if str(line).strip()]
+        if not blocks:
             return 0
 
-        unique_lines = list(dict.fromkeys(filtered_lines))
+        unique_blocks = list(dict.fromkeys(blocks))
 
-        count = 0
         with path.open("w", encoding="utf-8") as fh:
-            for line in unique_lines:
-                fh.write(f"{line}\n")
-                count += 1
-                if line.startswith("TEST_CONDUCTED="):
+            for index, block in enumerate(unique_blocks, 1):
+                fh.write(f"{block}\n")
+                if index < len(unique_blocks):
                     fh.write("\n")
-        return count
+        return len(unique_blocks)
+
+    @staticmethod
+    def _write_base64_report(path: Path, entries: Iterable[dict]) -> int:
+        grouped: dict[tuple[str, str, str], set[str]] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            encoded_text = str(entry.get("encoded", "")).strip()
+            decoded_text = str(entry.get("decoded", "")).strip("\n")
+            decoded_format = str(entry.get("format", "text") or "text").strip()
+            source_file = str(entry.get("file", "")).strip()
+            if not encoded_text or not decoded_text or not source_file:
+                continue
+            key = (encoded_text, decoded_text, decoded_format)
+            grouped.setdefault(key, set()).add(source_file)
+
+        if not grouped:
+            return 0
+
+        sorted_entries = sorted(
+            grouped.items(),
+            key=lambda item: (
+                min(item[1]) if item[1] else "",
+                item[0][2],
+                item[0][0][:40],
+            ),
+        )
+
+        with path.open("w", encoding="utf-8") as fh:
+            for encoded_decoded, files in sorted_entries:
+                encoded_text, decoded_text, decoded_format = encoded_decoded
+                ordered_files = sorted(files)
+
+                fh.write("===== BASE64 FINDING START =====\n\n")
+                fh.write("FILE:\n")
+                for file_name in ordered_files:
+                    fh.write(f"  - {file_name}\n")
+                fh.write(f"FILE COUNT: {len(ordered_files)}\n")
+                fh.write(f"FORMAT: {decoded_format}\n")
+                fh.write("ENCODED:\n")
+                fh.write(f"  {encoded_text}\n")
+                fh.write("DECODED:\n")
+                decoded_lines = decoded_text.splitlines() or [decoded_text]
+                for line in decoded_lines:
+                    fh.write(f"  {line}\n")
+                fh.write("\n")
+                fh.write("===== BASE64 FINDING END =====\n\n")
+        return len(sorted_entries)
 
     @classmethod
     def _build_severity_score(cls, findings: list[Finding]) -> dict:
@@ -1653,7 +2018,7 @@ class MobileCommands(
             urls: set[str] = set()
             ips: set[str] = set()
             hardcoded: list[Finding] = []
-            base64_lines: set[str] = set()
+            base64_entries: list[dict] = []
             risk_findings: list[Finding] = []
             control_findings: list[Finding] = []
 
@@ -1674,7 +2039,7 @@ class MobileCommands(
                     urls.update(scanned["urls"])
                     ips.update(scanned["ips"])
                     hardcoded.extend(scanned["hardcoded"])
-                    base64_lines.update(scanned["base64"])
+                    base64_entries.extend(scanned["base64"])
                     risk_findings.extend(scanned["risk_findings"])
                     control_findings.extend(scanned["control_findings"])
 
@@ -1738,7 +2103,7 @@ class MobileCommands(
             api_key_assessment_count = self._write_api_check_report(
                 api_key_report_file, api_key_report_lines
             )
-            base64_count = self._write_lines(base64_file, sorted(base64_lines))
+            base64_count = self._write_base64_report(base64_file, base64_entries)
             risk_count = self._write_findings_report(risk_file, risk_findings)
             control_count = self._write_findings_report(control_file, control_findings)
             reports = {}

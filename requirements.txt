@@ -5,8 +5,11 @@ fqdn==1.5.1
 isoduration==20.11.0
 jsonpointer==3.0.0
 openpyxl==3.1.5         # For Excel file handling
-numpy==2.0.1            # For numerical operations
-pandas==2.2.2           # For data manipulation
+# Python 3.13+ needs newer wheels for these two scientific deps.
+numpy==2.0.1; python_version < "3.13"   # For numerical operations
+numpy==2.1.0; python_version >= "3.13"
+pandas==2.2.2; python_version < "3.13"  # For data manipulation
+pandas==2.2.3; python_version >= "3.13"
 pyarrow==19.0.1         # For efficient data handling with pandas/dask
 scapy==2.6.1            # For network packet manipulation
 tqdm==4.66.4            # For progress bars
