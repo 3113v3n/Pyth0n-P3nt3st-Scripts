@@ -11,12 +11,14 @@ Naming: do_analysis() → select_and_analyze_file(); flat_content → deduplicat
 """
 
 import os
+import errno
 from typing import Any
 import pandas
 from datetime import datetime
 from pathlib import Path
 import json
 import xml.etree.ElementTree as ET
+import shutil
 from handlers.messages import DisplayHandler
 from utils.shared import Validator
 import ipaddress
@@ -24,6 +26,9 @@ import ipaddress
 
 class FileHandler(Validator, DisplayHandler):
     """Handle file I/O, CSV/Excel operations, and output-directory management."""
+    BYTES_PER_MB = 1024 * 1024
+    DEFAULT_XLSX_MIN_FREE_MB = 256
+    XLSX_HEADROOM_MULTIPLIER = 3.0
     FONT_NAME = "Calibri Light"
     FONT_SIZE = 12
     FONT_COLOR = "white"
@@ -42,6 +47,8 @@ class FileHandler(Validator, DisplayHandler):
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
         self.existing_unresponsive_ips = set()
+        self._csv_cache: dict[str, set[str]] = {}
+        self._csv_cache_loaded: set[str] = set()
 
     def reset_state(self) -> None:
         """Reset instance state to defaults between runs."""
@@ -51,6 +58,8 @@ class FileHandler(Validator, DisplayHandler):
         self.files = []
         self.live_hosts_file = ""
         self.unresponsive_hosts_file = ""
+        self._csv_cache = {}
+        self._csv_cache_loaded = set()
 
     @classmethod
     def reset_class_states(cls):
@@ -144,6 +153,8 @@ class FileHandler(Validator, DisplayHandler):
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
         self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename, extension='xlsx')}"
+        excel_tmpdir = self._get_excel_tmpdir()
+        self._warn_if_low_excel_space(dataframe_objects, excel_tmpdir)
 
         # Define formats
         header_formats = {
@@ -159,38 +170,51 @@ class FileHandler(Validator, DisplayHandler):
             "font_size": self.FONT_SIZE,
         }
 
-        with pandas.ExcelWriter(self.filepath, engine="xlsxwriter") as writer:
-            for dataframe in dataframe_objects:
-                if not dataframe["dataframe"].empty:
-                    sheetname = dataframe["sheetname"]
-                    df = dataframe["dataframe"].copy()
+        try:
+            with pandas.ExcelWriter(
+                self.filepath,
+                engine="xlsxwriter",
+                engine_kwargs={
+                    "options": {
+                        # Avoid /tmp exhaustion on systems with tiny tmpfs.
+                        "tmpdir": excel_tmpdir,
+                        # Disable auto URL conversion to reduce processing overhead.
+                        "strings_to_urls": False,
+                    }
+                },
+            ) as writer:
+                for dataframe in dataframe_objects:
+                    if not dataframe["dataframe"].empty:
+                        sheetname = dataframe["sheetname"]
+                        df = dataframe["dataframe"]
 
-                    url_column_name = "See Also"
+                        df.to_excel(writer, sheet_name=sheetname, index=False)
 
-                    if url_column_name in df.columns:
-                        # Convert URLs to strings and add leading space
-                        # to prevent hyperlink detection
-                        df[url_column_name] = df[url_column_name].astype(str).apply(
-                            lambda x: ' ' + x if pandas.notnull(x) else x)
+                        workbook = writer.book
+                        worksheet = writer.sheets[sheetname]
 
-                    df.to_excel(writer, sheet_name=sheetname, index=False)
+                        # format workbook headers
+                        formatted_headers = workbook.add_format(header_formats)
+                        # format cell
+                        formatted_cell = workbook.add_format(cell_formats)
 
-                    # TODO: handle URLs in See Also to prevent errors
+                        # Apply a header format to the first row (A1: G1)
+                        for col_num, value in enumerate(df.columns.values):
+                            worksheet.write(0, col_num, value, formatted_headers)
 
-                    workbook = writer.book
-                    worksheet = writer.sheets[sheetname]
-
-                    # format workbook headers
-                    formatted_headers = workbook.add_format(header_formats)
-                    # format cell
-                    formatted_cell = workbook.add_format(cell_formats)
-
-                    # Apply a header format to the first row (A1: G1)
-                    for col_num, value in enumerate(df.columns.values):
-                        worksheet.write(0, col_num, value, formatted_headers)
-
-                    # Apply a cell format to data rows
-                    worksheet.set_column('A:ZZ', 15, formatted_cell)
+                        # Apply a cell format to data rows
+                        worksheet.set_column('A:ZZ', 15, formatted_cell)
+        except OSError as error:
+            if getattr(error, "errno", None) == errno.ENOSPC:
+                tmp_free = shutil.disk_usage(excel_tmpdir).free
+                raise OSError(
+                    errno.ENOSPC,
+                    (
+                        "No space left while writing XLSX report. "
+                        f"Configured temp dir: '{excel_tmpdir}' (free={tmp_free} bytes)."
+                    ),
+                ) from error
+            raise
 
         self.print_info_message(
             message="Analyzed Vulnerabilities have been written to :",
@@ -227,25 +251,40 @@ class FileHandler(Validator, DisplayHandler):
             content = [content]
 
         # Flatten nested lists if present.
-        # [Naming] Renamed flat_content → deduplicated_ips to reflect actual purpose.
         deduplicated_ips = [
-            item if not isinstance(item, (list, tuple)) else item[0]
+            str(item if not isinstance(item, (list, tuple)) else item[0]).strip()
             for item in content
+            if item is not None and str(item).strip()
         ]
-        data = pandas.DataFrame(deduplicated_ips, columns=None)
+        if not deduplicated_ips:
+            return
 
-        if self.file_exists(f"{file_path}"):
-            existing_df = self.read_csv(f"{file_path}", ip_list=True)
-            # remove duplicates by converting to set and back to dataFrame
-            existing_ips = set(existing_df[0].to_list())
-            new_ips = set(deduplicated_ips)
-            combined_ips = existing_ips | new_ips
-            updated_df = pandas.DataFrame(list(combined_ips), columns=None)
-        else:
-            updated_df = data
+        # Load existing file content once, then keep an in-memory cache.
+        cache = self._csv_cache.setdefault(file_path, set())
+        if file_path not in self._csv_cache_loaded and self.file_exists(file_path):
+            try:
+                existing_df = self.read_csv(file_path, ip_list=True)
+                cache.update(
+                    str(ip).strip()
+                    for ip in existing_df[0].to_list()
+                    if ip is not None and str(ip).strip()
+                )
+            except Exception:
+                # If the file is malformed/unreadable, keep going with append-only writes.
+                pass
+            self._csv_cache_loaded.add(file_path)
+        elif file_path not in self._csv_cache_loaded:
+            self._csv_cache_loaded.add(file_path)
 
-        updated_df.to_csv(f"{file_path}", header=False, index=False,
-                          lineterminator='\n')  # save without header
+        new_ips = [ip for ip in deduplicated_ips if ip not in cache]
+        if not new_ips:
+            return
+
+        with open(file_path, "a", encoding="utf-8") as csv_file:
+            for ip in new_ips:
+                csv_file.write(f"{ip}\n")
+
+        cache.update(new_ips)
 
     def get_file_paths(self) -> dict:
         """Return stored file paths for live and unresponsive hosts"""
@@ -508,17 +547,70 @@ class FileHandler(Validator, DisplayHandler):
     def append_to_sheets(data_frame: object, file: str):
         """Appends data to existing Workbook"""
         with pandas.ExcelWriter(
-                file, engine="openpyxl", mode="a", if_sheet_exists="overlay"
+                file, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            # Copy existing sheets to a writer
-            for sheet_name in writer.book.sheetnames:
-                df = pandas.read_excel(
-                    file, sheet_name=sheet_name, engine="openpyxl")
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
             # Write new data frame to a new sheet
             data_frame["dataframe"].to_excel(
                 writer, sheet_name=data_frame["sheetname"], index=False
             )
+
+    def _get_excel_tmpdir(self) -> str:
+        """Return a writable temp directory on the project filesystem.
+
+        xlsxwriter uses a temp directory during workbook creation. Defaulting to
+        system /tmp can fail when /tmp is a small tmpfs.
+        """
+        temp_dir = Path(self.working_dir) / ".tmp" / "xlsxwriter"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        return str(temp_dir)
+
+    def _estimate_excel_write_bytes(self, dataframe_objects: list) -> int:
+        """Estimate bytes needed for XLSX temp/output writes.
+
+        The estimate intentionally uses headroom because xlsxwriter creates
+        temporary files before finalizing the workbook.
+        """
+        estimated_df_bytes = 0
+        for dataframe in dataframe_objects:
+            df = dataframe.get("dataframe")
+            if df is None or df.empty:
+                continue
+            estimated_df_bytes += int(df.memory_usage(index=True, deep=True).sum())
+
+        # Keep a sane floor so tiny reports still require a minimal free-space check.
+        floor_bytes = 64 * self.BYTES_PER_MB
+        return max(floor_bytes, int(estimated_df_bytes * self.XLSX_HEADROOM_MULTIPLIER))
+
+    def _warn_if_low_excel_space(self, dataframe_objects: list, excel_tmpdir: str) -> None:
+        """Warn before XLSX generation when available space looks risky."""
+        min_free_mb = self.DEFAULT_XLSX_MIN_FREE_MB
+        env_override = os.getenv("PENTEST_XLSX_MIN_FREE_MB")
+        if env_override:
+            try:
+                min_free_mb = max(1, int(env_override))
+            except ValueError:
+                pass
+
+        estimated_required = self._estimate_excel_write_bytes(dataframe_objects)
+        threshold = max(estimated_required, min_free_mb * self.BYTES_PER_MB)
+
+        tmp_free = shutil.disk_usage(excel_tmpdir).free
+        output_free = shutil.disk_usage(self.output_directory).free
+
+        if tmp_free >= threshold and output_free >= threshold:
+            return
+
+        self.print_warning_message(
+            (
+                "Low disk space detected before XLSX export. "
+                f"Estimated required ~{estimated_required // self.BYTES_PER_MB}MB, "
+                f"threshold={threshold // self.BYTES_PER_MB}MB."
+            ),
+            file_path=(
+                f"tmp_dir='{excel_tmpdir}' free={tmp_free // self.BYTES_PER_MB}MB | "
+                f"output_dir='{self.output_directory}' free={output_free // self.BYTES_PER_MB}MB"
+            ),
+        )
 
     def get_last_unresponsive_ip(self, unresponsive_file):
         """
