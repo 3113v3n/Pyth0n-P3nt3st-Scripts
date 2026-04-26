@@ -45,7 +45,8 @@ class ExternalConfigs:
                 "assetfinder", "findomain",
                 "brutespray", "subfinder",
                 "amass", "dnsx",
-                "s3scanner", "ffuf", "ruby"
+                "s3scanner", "ffuf", "ruby",
+                "nmap", "nuclei",
             ],
             "command": "sudo apt install",
         },
@@ -102,10 +103,24 @@ class ExternalConfigs:
 
     HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
     EXTERNAL_HELPER_STRING = f"""{HEADLINE}
-Module scans the targets domain [domain.xy.z] and uses different techniques
-    to try and enumerate information on the target.
+Module performs an end-to-end external assessment of the supplied domain by
+running a series of phases that are chained together. Each phase produces its
+own artifact directory inside [output_directory/External/<domain>_<timestamp>/].
+
+{color.OKCYAN}{color.UNDERLINE}Phases (run in order){color.ENDC}:
+    {color.OKGREEN}1. recon       {color.ENDC} subdomain enumeration (subfinder, assetfinder, amass, findomain) + dnsx resolution
+    {color.OKGREEN}2. probe       {color.ENDC} HTTP probing of resolved hosts via httpx-toolkit (status, title, tech)
+    {color.OKGREEN}3. ports       {color.ENDC} top-1000 nmap service/version scan against alive hosts
+    {color.OKGREEN}4. screenshots {color.ENDC} gowitness screenshots of every alive web service
+    {color.OKGREEN}5. takeover    {color.ENDC} subdomain takeover detection (subzy / subjack)
+    {color.OKGREEN}6. urls        {color.ENDC} historical URL collection (gauplus / waybackurls) + sensitive-file filter
+    {color.OKGREEN}7. vulns       {color.ENDC} nuclei templated vulnerability scan against alive hosts
 
 {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
-        {color.OKGREEN}domain {color.ENDC}  Target domain to scan
+        {color.OKGREEN}domain {color.ENDC}      Target domain (e.g. example.com)
+        {color.OKGREEN}phases {color.ENDC}      Optional comma-separated subset of phases to execute
+
+A consolidated [external_report.md] is written into the run directory at the
+end of every assessment; it lists each phase's artifacts and counts.
 
 {HEADLINE}"""

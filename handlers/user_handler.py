@@ -197,15 +197,35 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def external_ui_handler(self):
         self.start_domain_helper(self.helper_.external_helper)
+        from utils.external.external_constants import DEFAULT_PHASES
+
         try:
-            website_domain = (
-                self.get_user_input(
-                    "Enter domain to enumerate (example.domain.com)")
+            while True:
+                raw = self.get_user_input(
+                    "Enter domain to enumerate (example.domain.com)"
+                )
+                domain = raw.replace("https://", "").replace("http://", "").strip("/")
+                if self.validate_domain(domain):
+                    break
+                self.print_warning_message(
+                    f"'{raw}' is not a valid domain. Try again.")
+
+            phase_text = (
+                f"\n[+] Phases to run (comma-separated). "
+                f"Press Enter for ALL.\n    Available: {', '.join(DEFAULT_PHASES)}\n"
             )
+            raw_phases = self.prompt_format(phase_text).strip()
+            phases = tuple(
+                p.strip().lower() for p in raw_phases.split(",") if p.strip()
+            ) or DEFAULT_PHASES
+            unknown = [p for p in phases if p not in DEFAULT_PHASES]
+            if unknown:
+                self.print_warning_message(
+                    f"Ignoring unknown phase(s): {unknown}. Falling back to ALL."
+                )
+                phases = DEFAULT_PHASES
 
-            # TODO: strip https://
-
-            return {"target_domain": website_domain}
+            return {"target_domain": domain, "phases": phases}
         except Exception as error:
             self.print_error_message(error)
 

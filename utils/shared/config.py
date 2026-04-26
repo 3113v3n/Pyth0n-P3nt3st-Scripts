@@ -74,7 +74,9 @@ This is a custom CLI tool for Penetration Testing.
         -P, --path                  FOLDER              : Path to your scanned files
 
     {self.color.OKCYAN}[external]{self.color.ENDC}
-        -d, --domain                DOMAIN              : Domain to test
+        -d, --domain                DOMAIN              : Target domain (e.g., example.com)
+            --phases                PHASES              : Optional comma-separated phases (default: all)
+                                                          Available: recon, probe, ports, screenshots, takeover, urls, vulns
 
 {self.color.BOLD}EXAMPLES:{self.color.ENDC}==> 
         [{self.color.OKGREEN}Run script interactively{self.color.ENDC}]
@@ -99,7 +101,11 @@ This is a custom CLI tool for Penetration Testing.
         
         4.{self.color.WARNING}Vulnerability Analysis:{self.color.ENDC}
                 main.py -M cli_args va -s nessus -o report.txt -P /path/to/scanned-files
-        
+
+        5.{self.color.WARNING}External:{self.color.ENDC}
+                main.py -M cli_args external -d example.com
+                main.py -M cli_args external -d example.com --phases recon,probe,vulns
+
  -h, --help  Show this custom help"""
         self.PROGRAM_HELPER_STRING = self.SUMMARY_HELPER_TEXT + self.EXTRA_HELPER_TEXT
 

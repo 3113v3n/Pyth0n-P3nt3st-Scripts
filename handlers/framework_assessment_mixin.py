@@ -154,9 +154,37 @@ class FrameworkAssessmentMixin:
         mobile.print_total_time(f"Total analysis time for {mobile.package_name}:")
         mobile.reset_total_time()
 
-    def handle_external_assessment(self, user):
-        """Handle external assessment."""
-        pass
+    def handle_external_assessment(self, user, external, **kwargs):
+        """Handle external penetration testing assessment."""
+        from pathlib import Path
+
+        if kwargs.get("user_data"):
+            variables = kwargs["user_data"]
+            target_domain = variables.get("target_domain")
+            phases = variables.get("phases")
+        else:
+            variables = user.domain_variables or {}
+            target_domain = variables.get("target_domain")
+            phases = variables.get("phases")
+
+        if not target_domain:
+            self.print_error_message("No target domain provided for external assessment")
+            return
+
+        # Output directory was created by user.update_output_directory("external").
+        base_dir = Path(user.output_directory) / "External"
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        external.initialize_variables({
+            "target_domain": target_domain,
+            "phases": phases,
+            "base_dir": base_dir,
+        })
+        external.decorator.reset_total_time()
+        try:
+            external.run()
+        finally:
+            external.decorator.reset_total_time()
 
     def process_domain(self, user_test_domain: str, **kwargs) -> None:
         """Process the selected testing domain."""
@@ -200,7 +228,14 @@ class FrameworkAssessmentMixin:
             return
 
         if user_test_domain == "external":
-            print("External assessment not implemented yet")
+            external = self._load_domain("external")
+            if external is None:
+                return
+            self.handle_external_assessment(
+                self.classes["user"],
+                external,
+                user_data=user_data,
+            )
             return
 
         if user_test_domain == "password":

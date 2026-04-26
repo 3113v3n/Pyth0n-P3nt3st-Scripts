@@ -275,6 +275,58 @@ class PentestAI:
         return self._ask(system_prompt, user_content)
 
     # ------------------------------------------------------------------
+    # External PT module integration
+    # ------------------------------------------------------------------
+
+    def analyze_external_findings(self, target_domain: str, phase_results: dict) -> str:
+        """Summarise external assessment phase results into a narrative report.
+
+        [AI-HOOK] Called from external_module.py after the pipeline completes.
+
+        Args:
+            target_domain: The root domain that was assessed.
+            phase_results: Mapping of phase name → result dict produced by
+                           ExternalPipeline.run().
+
+        Returns:
+            Plain-text narrative covering attack surface, key risks, and
+            recommended next steps.
+        """
+        if not phase_results:
+            return "[No external phase results to analyze]"
+
+        # Build a compact stats block — avoid sending raw URLs / hostnames in bulk.
+        stats_lines: list[str] = [f"Target domain: {target_domain}"]
+        for phase, result in phase_results.items():
+            if not result:
+                continue
+            if result.get("missing"):
+                stats_lines.append(f"{phase}: skipped (missing {result['missing']})")
+                continue
+
+            counts = {
+                key: value
+                for key, value in result.items()
+                if isinstance(value, (int, dict)) and value
+            }
+            if counts:
+                stats_lines.append(f"{phase}: {counts}")
+
+        system_prompt = textwrap.dedent("""
+            You are a senior external penetration testing consultant. Read the
+            phase summary statistics and produce: (1) a one-paragraph attack
+            surface overview, (2) the top three risks worth investigating
+            manually, and (3) the recommended next steps. Be concrete but
+            concise (under 250 words). Plain text — no markdown.
+        """)
+
+        user_content = (
+            "Summarise the following external assessment statistics for "
+            "an engagement debrief:\n\n" + "\n".join(stats_lines)
+        )
+        return self._ask(system_prompt, user_content)
+
+    # ------------------------------------------------------------------
     # Internal PT module integration
     # ------------------------------------------------------------------
 

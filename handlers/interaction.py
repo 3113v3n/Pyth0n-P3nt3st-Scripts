@@ -117,6 +117,8 @@ class InteractionHandler:
     @staticmethod
     def _add_external_arguments(subparsers):
         """Handle External PT Arguments"""
+        from utils.external.external_constants import DEFAULT_PHASES
+
         parser = subparsers.add_parser(
             "external", help="External Assessment Arguments")
         parser.add_argument(
@@ -124,7 +126,17 @@ class InteractionHandler:
             "--domain",
             required=True,
             type=str,
-            help="Domain to test",
+            help="Domain to test (e.g., example.com)",
+        )
+        parser.add_argument(
+            "--phases",
+            type=str,
+            default=",".join(DEFAULT_PHASES),
+            help=(
+                "Comma-separated list of phases to run, in order. "
+                f"Available: {', '.join(DEFAULT_PHASES)}. "
+                "Default runs every phase."
+            ),
         )
 
     @staticmethod
@@ -367,13 +379,29 @@ class InteractionHandler:
 
     def handle_external_arguments(self, args, module):
         """Handle External arguments"""
+        from utils.external.external_constants import DEFAULT_PHASES
 
-        if not self.validator.validate_domain(args.domain):
+        domain = args.domain.replace("https://", "").replace("http://", "").strip("/")
+        if not self.validator.validate_domain(domain):
             raise ValueError(
                 f"Domain {args.domain} is not valid. Ensure it is a valid domain name"
             )
-        print(f"\n[-] Running External Assessment on {args.domain} domain")
-        return {"module": module, "domain": args.domain}
+
+        requested_phases = tuple(
+            phase.strip().lower() for phase in (args.phases or "").split(",") if phase.strip()
+        ) or DEFAULT_PHASES
+        unknown = [phase for phase in requested_phases if phase not in DEFAULT_PHASES]
+        if unknown:
+            raise ValueError(
+                f"Unknown phase(s): {unknown}. Valid phases: {', '.join(DEFAULT_PHASES)}"
+            )
+
+        print(f"\n[-] Running External Assessment on {domain} domain (phases: {', '.join(requested_phases)})")
+        return {
+            "module": module,
+            "target_domain": domain,
+            "phases": requested_phases,
+        }
 
     def handle_va_arguments(self, args, module):
         """Handle Vulnerability Assessment arguments"""

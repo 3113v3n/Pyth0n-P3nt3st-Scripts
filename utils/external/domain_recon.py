@@ -1,148 +1,167 @@
 """
-domain_recon.py — External subdomain enumeration using subfinder, assetfinder,
-findomain, amass, and dnsx.
+domain_recon.py — Subdomain enumeration via subfinder, assetfinder, findomain,
+amass, and DNS resolution via dnsx.
 
-Fixes applied:
-  1. Removed the duplicate file_exists() function that copied logic already
-     present in Validator.file_exists(). Now uses the shared Validator instead.
+Each external tool is wrapped as a small static method. The public
+enumerate_subdomain() returns a result dict so the orchestrator can include
+its artifacts in the consolidated report.
 """
 
+from __future__ import annotations
+
+import re
+import shutil
 import subprocess
 from pathlib import Path
-from pprint import pprint
-import re
+
 from utils.shared.validators import Validator
 
-# [Redundancy] Use the shared Validator.file_exists() — no local copy needed.
-_validator = Validator()
-file_exists = _validator.file_exists
 
-def is_valid_subdomain(subdomain, root_domain):
-    pattern =rf"^(?:[\w-]+\.)+{re.escape(root_domain)}$"
+_VALIDATOR = Validator()
+_SUPPORTED_TOOLS = ("subfinder", "assetfinder", "findomain", "amass", "dnsx")
+
+
+def is_valid_subdomain(subdomain: str, root_domain: str) -> bool:
+    """Return True if *subdomain* is a host under *root_domain*."""
+    pattern = rf"^(?:[\w-]+\.)+{re.escape(root_domain)}$"
     return re.match(pattern, subdomain.strip()) is not None
 
-def filter_subdomain(subdomains,root_domain):
-    return {sub.strip() for sub in subdomains if is_valid_subdomain(sub,root_domain)}
 
-def shell_command(command, tool,debug):
-    try:
-        print(f"\nExecuting command: {' '.join(command)}")
-        result = subprocess.run(command, check=True,capture_output=True,text=True)
+def filter_subdomain(subdomains, root_domain: str) -> set[str]:
+    """Filter a sequence of strings to those that look like valid subdomains."""
+    return {sub.strip() for sub in subdomains if is_valid_subdomain(sub, root_domain)}
+
+
+def shell_command(command: list[str], tool: str, debug: bool = False) -> list[str]:
+    """Run *command* and return its stdout split into lines.
+
+    Returns an empty list when the binary is missing or the command fails so
+    downstream callers can keep operating on whatever results exist.
+    """
+    if shutil.which(command[0]) is None:
         if debug:
-            pprint(result.stdout.splitlines())
+            print(f"[!] {tool} not installed; skipping.")
+        return []
+    try:
+        if debug:
+            print(f"\nExecuting: {' '.join(command)}")
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
         return result.stdout.splitlines()
-    except subprocess.CalledProcessError as e:
-        print(f"An error occured while running {tool.title()}: {e}")
+    except subprocess.CalledProcessError as error:
+        print(f"[!] {tool} failed: {error}")
+        return []
 
 
 class DomainRecon:
-    def __init__(self):
-        #self.validators = Validator()
-        self.debug = True
+    """Coordinate subdomain enumeration and DNS resolution for a target domain."""
 
-    # Enumeration
-    
-    def enumerate_subdomain(self,domain: str, output_dir: Path):
-        """Enumerate subdomains using the following tools: subfinder, assetfinder, amass, findomain, dnsx
-        :param domain: Target domain
-        :param output_dir: the output directory
+    def __init__(self, debug: bool = False) -> None:
+        self.debug = debug
+
+    def enumerate_subdomain(self, domain: str, output_dir: Path) -> dict:
+        """Enumerate subdomains for *domain* and resolve them via dnsx.
+
+        Args:
+            domain:     Target domain. URL prefixes (http/https) are stripped.
+            output_dir: Directory where subdomain files are written.
+
+        Returns:
+            Dict with keys:
+                subdomains_file:  Path to all-discovered subdomains.
+                resolved_file:    Path to dnsx-resolved subdomains.
+                subdomain_count:  Total unique subdomains discovered.
+                resolved_count:   Resolved subdomain count.
+                missing:          List of tools that were unavailable.
         """
-        def format_domain(domain_):
-            # Remove http:// or https:// if present
-            return domain_.replace("https://","").replace("http://","").strip("/")
-        
-        formatted_domain = format_domain(domain)
-        subdomain_file=f"{output_dir}/{formatted_domain}_subdomains.txt"
-        resolved_subdomains = f"{output_dir}/resolved_{formatted_domain}_subdomains.txt"
+        formatted_domain = self._format_domain(domain)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        if not file_exists(subdomain_file):
-            print(f"Running recon on :{formatted_domain}")
-            #subfinder
-            sublister_result =self.run_sublister(formatted_domain, self.debug)
-            #assetfinder
-            assetfinder_result =self.run_assetfinder(formatted_domain,self.debug)
-            #Findomain
-            findomain_result =self.run_findomain(formatted_domain, self.debug)
-            #Amass
-            amass_result =self.run_amass(formatted_domain, self.debug)
+        subdomain_file = output_dir / f"{formatted_domain}_subdomains.txt"
+        resolved_file = output_dir / f"resolved_{formatted_domain}_subdomains.txt"
 
-            #filter subdomains
-            all_subs = filter_subdomain(
-                sublister_result + assetfinder_result  + findomain_result + amass_result, 
-                formatted_domain)
-            
-            if self.debug:
-                print(f"\nWritting {len(all_subs)} unique subdomains to {subdomain_file}")
+        missing = [tool for tool in _SUPPORTED_TOOLS if shutil.which(tool) is None]
 
-            with open(subdomain_file, "w") as f:
-                for subdomain in sorted(all_subs):
-                    f.write(f"{subdomain}\n")
+        if not _VALIDATOR.file_exists(str(subdomain_file)):
+            collected = (
+                self.run_subfinder(formatted_domain, self.debug)
+                + self.run_assetfinder(formatted_domain, self.debug)
+                + self.run_findomain(formatted_domain, self.debug)
+                + self.run_amass(formatted_domain, self.debug)
+            )
+            unique_subs = filter_subdomain(collected, formatted_domain)
+            if unique_subs:
+                subdomain_file.write_text(
+                    "\n".join(sorted(unique_subs)) + "\n",
+                    encoding="utf-8",
+                )
 
-        if not file_exists(resolved_subdomains):
-            #Dnsx
-            print(f"\n[+] Resolving subdomains with dnsx and writing results to {resolved_subdomains}")
-            self.run_dnsx(subdomain_file, resolved_subdomains)
-        
-    @staticmethod
-    def run_sublister(target:str,debug_mode:bool):
-        sub_command = [
-            "subfinder",
-            "-d",
-            target,
-            "-all",
-            "-recursive"
-            ]
-        return shell_command(sub_command,"subfinder",debug_mode)
+        subdomain_count = self._line_count(subdomain_file)
+        if subdomain_count and not _VALIDATOR.file_exists(str(resolved_file)):
+            self.run_dnsx(subdomain_file, resolved_file)
+
+        resolved_count = self._line_count(resolved_file)
+        return {
+            "subdomains_file": subdomain_file if subdomain_file.exists() else None,
+            "resolved_file": resolved_file if resolved_file.exists() else None,
+            "subdomain_count": subdomain_count,
+            "resolved_count": resolved_count,
+            "missing": missing,
+        }
 
     @staticmethod
-    def run_assetfinder(target:str, debug_mode:bool):
-        command = [
-            "assetfinder",
-            "--subs-only",
-            target
-        ] 
-        return shell_command(command, "assetfinder",debug_mode)
+    def _format_domain(domain: str) -> str:
+        return domain.replace("https://", "").replace("http://", "").strip("/")
 
     @staticmethod
-    def run_amass(target,debug_mode:bool):
-        command=[
-            "amass",
-            "enum",
-            "-passive",
-            "-d",
-            target          
-        ]
-        return shell_command(command, "amass",debug_mode)
+    def _line_count(path: Path) -> int:
+        if not path.exists():
+            return 0
+        try:
+            return sum(
+                1
+                for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+                if line.strip()
+            )
+        except OSError:
+            return 0
+
+    # ------------------------------------------------------------------
+    # Tool wrappers
+    # ------------------------------------------------------------------
 
     @staticmethod
-    def run_findomain(target,debug_mode:bool):
-        command=[
-        "findomain",
-        "-t",
-        target
-        ]
-        return shell_command(command, "findomain",debug_mode)
-    
+    def run_subfinder(target: str, debug: bool) -> list[str]:
+        return shell_command(["subfinder", "-d", target, "-all", "-recursive", "-silent"], "subfinder", debug)
+
     @staticmethod
-    def run_dnsx(input_file, output_file):
-        command = [
-            "dnsx",
-            "-a",
-            "-resp",
-            "-silent",
-            "-l",
-            input_file
-        ]
-        with open(output_file , "w") as file:
-            subprocess.run(command, stdout=file,check=True)
-            
-        
-        
+    def run_assetfinder(target: str, debug: bool) -> list[str]:
+        return shell_command(["assetfinder", "--subs-only", target], "assetfinder", debug)
+
+    @staticmethod
+    def run_amass(target: str, debug: bool) -> list[str]:
+        return shell_command(["amass", "enum", "-passive", "-d", target], "amass", debug)
+
+    @staticmethod
+    def run_findomain(target: str, debug: bool) -> list[str]:
+        return shell_command(["findomain", "-t", target, "-q"], "findomain", debug)
+
+    @staticmethod
+    def run_dnsx(input_file: Path, output_file: Path) -> None:
+        if shutil.which("dnsx") is None:
+            return
+        cmd = ["dnsx", "-a", "-resp", "-silent", "-l", str(input_file)]
+        try:
+            with output_file.open("w", encoding="utf-8") as fh:
+                subprocess.run(cmd, stdout=fh, check=True)
+        except subprocess.CalledProcessError as error:
+            print(f"[!] dnsx failed: {error}")
+
+
+# Backwards-compatible legacy alias used previously in tests / scripts.
+file_exists = _VALIDATOR.file_exists
+
 
 if __name__ == "__main__":
-    # Example usage — update paths before running directly.
-    recon = DomainRecon()
-    recon.enumerate_subdomain(
-        "https://example.com",
-        "./output_directory/External",
+    DomainRecon(debug=True).enumerate_subdomain(
+        "example.com", Path("./output_directory/External")
     )
