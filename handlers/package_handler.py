@@ -459,10 +459,13 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
             if tool in self._PIPX_PACKAGES:
                 package_ref = self._PIPX_PACKAGES[tool]
+                # pipx is its own CLI managing isolated envs; invoke the binary
+                # directly rather than `python -m pipx`, which would require pipx
+                # to be importable from the (often venv-bound) interpreter.
                 actions.append(
                     self._action(
                         f"pipx:{tool}",
-                        [[sys.executable, "-m", "pipx", "install", package_ref]],
+                        [["pipx", "install", package_ref]],
                         [tool],
                     )
                 )
@@ -481,10 +484,12 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
             if tool in self._GEM_PACKAGES:
                 gem_name = self._GEM_PACKAGES[tool]
+                # System gem dirs (e.g. /Library/Ruby/Gems on macOS) need sudo;
+                # `_with_privilege` is a no-op when already root or on Windows.
                 actions.append(
                     self._action(
                         f"gem:{tool}",
-                        [["gem", "install", gem_name]],
+                        [self._with_privilege(["gem", "install", gem_name])],
                         [tool],
                     )
                 )
