@@ -34,7 +34,9 @@ class PackageHandler(Config, DisplayHandler, Commands):
     _TOOLS_DIR_NAME = "tools"
     _TOOLS_SUBDIRS = ("bin", "go", "gems", "pipx")
     _MACPORTS_BIN_DIRS = ("/opt/local/bin", "/opt/local/sbin")
-    _HOMEBREW_ONLY_MACOS_TOOLS = {"findomain"}
+    # Tools only available via Homebrew on macOS (not in MacPorts).
+    # Note: findomain is intentionally absent — we download its prebuilt binary.
+    _HOMEBREW_ONLY_MACOS_TOOLS: set[str] = set()
 
     # Commands can differ from dependency identifiers; aliases reduce false positives.
     _COMMAND_ALIASES = {
@@ -99,6 +101,18 @@ class PackageHandler(Config, DisplayHandler, Commands):
         "aquatone-scan": "aquatone",
     }
 
+    # Prebuilt binary downloads — preferred over system package managers for tools
+    # that are expensive to compile (e.g. findomain requires LLVM + Rust via brew).
+    # Keys are "<os_family>-<arch>"; arch is "arm64" or "x86_64".
+    _DIRECT_DOWNLOADS: dict[str, dict[str, str]] = {
+        "findomain": {
+            "macos-x86_64": "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-osx",
+            "macos-arm64":  "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-osx",
+            "debian-x86_64":  "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux",
+            "debian-arm64":   "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-aarch64-unknown-linux-gnu",
+        },
+    }
+
     # OS-specific package aliases for system package managers.
     _SYSTEM_PACKAGE_ALIASES = {
         "debian": {
@@ -118,7 +132,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
             "automake": "automake",
             "sqlitebrowser": "db-browser-for-sqlite",
             "exiftool": "exiftool",
-            "findomain": "findomain",
+            # findomain omitted — installed via prebuilt binary download, not brew
             "java": "openjdk",
             "d2j-dex2jar": "dex2jar",
             "pkg-config": "pkg-config",
@@ -478,6 +492,42 @@ class PackageHandler(Config, DisplayHandler, Commands):
         ])
         return env
 
+    def _direct_download_url(self, tool_name: str) -> str | None:
+        """Return a prebuilt-binary URL for ``tool_name`` on the current OS/arch.
+
+        Returns ``None`` when no download entry exists, falling through to the
+        system package manager instead.
+        """
+        entries = self._DIRECT_DOWNLOADS.get(tool_name)
+        if not entries:
+            return None
+        machine = platform.machine().lower()
+        arch = "arm64" if machine in ("arm64", "aarch64") else "x86_64"
+        key = f"{self.os_family}-{arch}"
+        return entries.get(key) or entries.get(f"{self.os_family}-x86_64")
+
+    def _build_download_action(self, tool_name: str, url: str) -> Dict[str, object]:
+        """Return an action that fetches a prebuilt binary into ``tools/bin/``.
+
+        Uses ``curl`` when available (most macOS/Linux setups); falls back to
+        Python's ``urllib`` so the handler has no extra runtime dependency.
+        """
+        dest = str(self._tools_bin_dir() / tool_name)
+        if shutil.which("curl"):
+            commands: list[list[str]] = [
+                ["curl", "-fsSL", "--output", dest, url],
+                ["chmod", "+x", dest],
+            ]
+        else:
+            # Pure-Python fallback — no curl dependency required.
+            commands = [
+                [
+                    sys.executable, "-c",
+                    f"import urllib.request, os; urllib.request.urlretrieve({url!r}, {dest!r}); os.chmod({dest!r}, 0o755)",
+                ]
+            ]
+        return self._action(f"download:{tool_name}", commands, [tool_name])
+
     def _system_install_env(self, package_manager: str | None = None) -> dict[str, str]:
         """Env vars for non-language system package managers."""
         manager = package_manager or self.package_manager
@@ -746,9 +796,10 @@ class PackageHandler(Config, DisplayHandler, Commands):
         needs_pipx = any(tool in self._PIPX_PACKAGES for tool in missing_tools)
         needs_go = any(tool in self._GO_MODULES for tool in missing_tools)
         needs_gem = any(tool in self._GEM_PACKAGES for tool in missing_tools)
+        needs_download = any(self._direct_download_url(t) for t in missing_tools)
 
         # Materialize <repo>/tools/* once if any install will land there.
-        if needs_pipx or needs_go or needs_gem:
+        if needs_pipx or needs_go or needs_gem or needs_download:
             self._ensure_tools_dirs()
 
         if needs_pipx and not self._pipx_available():
@@ -854,6 +905,14 @@ class PackageHandler(Config, DisplayHandler, Commands):
                         env=self._tool_install_env(),
                     )
                 )
+                continue
+
+            # Prefer a prebuilt binary download over the system package manager
+            # for tools where compilation would be required (e.g. findomain pulls
+            # in LLVM + Rust when installed via brew — a multi-hour build).
+            download_url = self._direct_download_url(tool)
+            if download_url:
+                actions.append(self._build_download_action(tool, download_url))
                 continue
 
             manager = self._system_manager_for_tool(tool)
