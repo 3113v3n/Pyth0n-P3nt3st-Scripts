@@ -149,6 +149,9 @@ CLI mode:
 - `-P` accepts either a single APK/IPA file or a directory.
 - If a directory is provided, the module scans all APK/IPA files in that directory by default.
 - Use `--scan-mode single|all` to explicitly control directory behavior.
+- Use `--taxonomy none|masvs|mastg|both` to generate optional MASVS/MASTG mapping output for static findings.
+- Use `--taxonomy-profile strict|balanced|aggressive` to tune taxonomy mapping strictness.
+- Runtime-only mobile artifacts (decompiled folders and template clones) are cleaned automatically after each run.
 
 ```sh
 # Scan a single app file
@@ -159,6 +162,12 @@ python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps"
 
 # Explicit directory scan mode
 python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all
+
+# Include MASVS + MASTG tags in static report artifacts
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all --taxonomy both
+
+# High-precision taxonomy mapping
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all --taxonomy both --taxonomy-profile strict
 ```
 
 ### Start script
@@ -237,3 +246,4 @@ python main.py -M cli_args external -d example.com --phases recon,probe,vulns
   report records each skipped phase along with the missing binary.
 - AI summaries are appended to the report when `ANTHROPIC_API_KEY` is set
   (use `--no-ai` to disable globally).
+- Temporary chaining artifacts used between external phases are cleaned automatically; only final phase outputs remain in the run directory.
