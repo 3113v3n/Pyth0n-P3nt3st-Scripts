@@ -10,15 +10,16 @@ its artifacts in the consolidated report.
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 from pathlib import Path
 
+from utils.shared.commands import Commands
 from utils.shared.validators import Validator
+from .tooling import available_name, which_tool
 
 
 _VALIDATOR = Validator()
 _SUPPORTED_TOOLS = ("subfinder", "assetfinder", "findomain", "amass", "dnsx")
+_COMMANDS = Commands()
 
 
 def is_valid_subdomain(subdomain: str, root_domain: str) -> bool:
@@ -38,16 +39,21 @@ def shell_command(command: list[str], tool: str, debug: bool = False) -> list[st
     Returns an empty list when the binary is missing or the command fails so
     downstream callers can keep operating on whatever results exist.
     """
-    if shutil.which(command[0]) is None:
+    executable = which_tool(command[0])
+    if executable is None:
         if debug:
             print(f"[!] {tool} not installed; skipping.")
         return []
+    command = [executable, *command[1:]]
     try:
         if debug:
             print(f"\nExecuting: {' '.join(command)}")
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        result = _COMMANDS.stream_command(command, prefix=f"[{tool}] ")
+        if result.returncode != 0:
+            print(f"[!] {tool} failed with exit code {result.returncode}")
+            return []
         return result.stdout.splitlines()
-    except subprocess.CalledProcessError as error:
+    except OSError as error:
         print(f"[!] {tool} failed: {error}")
         return []
 
@@ -79,7 +85,7 @@ class DomainRecon:
         subdomain_file = output_dir / f"{formatted_domain}_subdomains.txt"
         resolved_file = output_dir / f"resolved_{formatted_domain}_subdomains.txt"
 
-        missing = [tool for tool in _SUPPORTED_TOOLS if shutil.which(tool) is None]
+        missing = [tool for tool in _SUPPORTED_TOOLS if which_tool(tool) is None]
 
         if not _VALIDATOR.file_exists(str(subdomain_file)):
             collected = (
@@ -105,7 +111,7 @@ class DomainRecon:
             "resolved_file": resolved_file if resolved_file.exists() else None,
             "subdomain_count": subdomain_count,
             "resolved_count": resolved_count,
-            "missing": missing,
+            "missing_optional": missing,
         }
 
     @staticmethod
@@ -147,14 +153,14 @@ class DomainRecon:
 
     @staticmethod
     def run_dnsx(input_file: Path, output_file: Path) -> None:
-        if shutil.which("dnsx") is None:
+        dnsx = available_name("dnsx")
+        if dnsx is None:
             return
-        cmd = ["dnsx", "-a", "-resp", "-silent", "-l", str(input_file)]
-        try:
-            with output_file.open("w", encoding="utf-8") as fh:
-                subprocess.run(cmd, stdout=fh, check=True)
-        except subprocess.CalledProcessError as error:
-            print(f"[!] dnsx failed: {error}")
+        cmd = [dnsx, "-a", "-resp", "-silent", "-l", str(input_file)]
+        result = _COMMANDS.stream_command(cmd, output_file=output_file, prefix="[dnsx] ")
+        if result.returncode != 0:
+            output_file.unlink(missing_ok=True)
+            print(f"[!] dnsx failed with exit code {result.returncode}")
 
 
 # Backwards-compatible legacy alias used previously in tests / scripts.

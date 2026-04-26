@@ -5,15 +5,15 @@ out URLs that point at sensitive file extensions for follow-up review.
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from utils.shared.commands import Commands
 from .external_constants import GAUPLUS_THREADS, SENSITIVE_EXTENSION_RE
+from .tooling import available_name
 
 
 # Tool order: gauplus first (more sources), waybackurls as fallback.
-URL_TOOL_PRIORITY = ("gauplus", "waybackurls")
+URL_TOOL_PRIORITY = (("gauplus", "gau"), ("waybackurls",))
 
 
 class UrlCollector:
@@ -35,22 +35,32 @@ class UrlCollector:
         if not hosts_file or not hosts_file.exists():
             return {"urls": None, "sensitive": None, "url_count": 0, "sensitive_count": 0}
 
-        tool = next((bin_ for bin_ in URL_TOOL_PRIORITY if shutil.which(bin_)), None)
-        if tool is None:
+        tool = None
+        executable = None
+        for aliases in URL_TOOL_PRIORITY:
+            resolved = available_name(*aliases)
+            if resolved:
+                tool = Path(resolved).name
+                if tool not in {"gauplus", "gau", "waybackurls"}:
+                    tool = aliases[0]
+                executable = resolved
+                break
+
+        if tool is None or executable is None:
             return {
                 "urls": None,
                 "sensitive": None,
                 "url_count": 0,
                 "sensitive_count": 0,
                 "missing": "gauplus/waybackurls",
+                "skipped": True,
             }
 
         urls_path = output_dir / "historical_urls.txt"
         sensitive_path = output_dir / "sensitive_urls.txt"
 
-        cmd = self._build_command(tool, hosts_file)
-        with urls_path.open("w", encoding="utf-8") as out:
-            self.command.run_os_commands(cmd, stdout=out)
+        cmd = self._build_command(tool, executable, hosts_file)
+        self.command.stream_command(cmd, output_file=urls_path, prefix=f"[{tool}] ")
 
         sensitive = self._filter_sensitive(urls_path)
         if sensitive:
@@ -66,10 +76,12 @@ class UrlCollector:
         }
 
     @staticmethod
-    def _build_command(tool: str, hosts_file: Path) -> list[str]:
+    def _build_command(tool: str, executable: str, hosts_file: Path) -> list[str]:
         if tool == "gauplus":
-            return ["gauplus", "-t", str(GAUPLUS_THREADS), "-subs", "-random-agent", str(hosts_file)]
-        return ["waybackurls", str(hosts_file)]
+            return [executable, "-t", str(GAUPLUS_THREADS), "-subs", "-random-agent", str(hosts_file)]
+        if tool == "gau":
+            return [executable, "--threads", str(GAUPLUS_THREADS), "--subs", str(hosts_file)]
+        return [executable, str(hosts_file)]
 
     @staticmethod
     def _filter_sensitive(urls_path: Path) -> list[str]:

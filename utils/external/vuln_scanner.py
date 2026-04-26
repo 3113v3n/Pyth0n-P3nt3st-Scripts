@@ -8,11 +8,11 @@ wrapper only runs the scan and counts findings by severity.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 
 from utils.shared.commands import Commands
 from .external_constants import NUCLEI_CONCURRENCY
+from .tooling import available_name
 
 
 NUCLEI_BIN = "nuclei"
@@ -40,19 +40,19 @@ class VulnerabilityScanner:
         if not alive_urls_file or not alive_urls_file.exists():
             return {"output": None, "total": 0, "severities": {}}
 
-        if shutil.which(NUCLEI_BIN) is None:
-            return {"output": None, "total": 0, "severities": {}, "missing": NUCLEI_BIN}
+        nuclei = available_name(NUCLEI_BIN)
+        if nuclei is None:
+            return {"output": None, "total": 0, "severities": {}, "missing": NUCLEI_BIN, "skipped": True}
 
         report = output_dir / "nuclei_results.txt"
         cmd = [
-            NUCLEI_BIN,
+            nuclei,
             "-l", str(alive_urls_file),
             "-c", str(NUCLEI_CONCURRENCY),
             "-severity", ",".join(SEVERITY_LEVELS),
             "-silent",
-            "-o", str(report),
         ]
-        self.command.execute_command(cmd)
+        self.command.stream_command(cmd, output_file=report, prefix="[nuclei] ")
 
         severities = self._severity_counts(report) if report.exists() else {}
         total = sum(severities.values())

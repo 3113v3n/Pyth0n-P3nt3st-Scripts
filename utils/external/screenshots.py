@@ -7,10 +7,10 @@ running without the screenshots artifact.
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from utils.shared.commands import Commands
+from .tooling import available_name
 
 
 GOWITNESS_BIN = "gowitness"
@@ -36,20 +36,21 @@ class Screenshotter:
         if not alive_urls_file or not alive_urls_file.exists():
             return {"directory": None, "count": 0}
 
-        if shutil.which(GOWITNESS_BIN) is None:
-            return {"directory": None, "count": 0, "missing": GOWITNESS_BIN}
+        gowitness = available_name(GOWITNESS_BIN)
+        if gowitness is None:
+            return {"directory": None, "count": 0, "missing": GOWITNESS_BIN, "skipped": True}
 
         screenshots_dir = output_dir / "screenshots"
         screenshots_dir.mkdir(parents=True, exist_ok=True)
 
         cmd = [
-            GOWITNESS_BIN,
+            gowitness,
             "file",
             "-f", str(alive_urls_file),
             "-P", str(screenshots_dir),
             "--disable-db",
         ]
-        self.command.execute_command(cmd)
+        self.command.stream_command(cmd, prefix="[gowitness] ")
 
         images = list(screenshots_dir.glob("*.png"))
         return {

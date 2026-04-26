@@ -9,14 +9,16 @@ Falls back to a plain text list of alive URLs when httpx is unavailable.
 from __future__ import annotations
 
 import json
-import shutil
+import subprocess
 from pathlib import Path
 
 from utils.shared.commands import Commands
 from .external_constants import HTTP_PROBE_PORTS, HTTPX_THREADS
+from .tooling import TOOLS_BIN, available_name
 
 
 HTTPX_BIN = "httpx-toolkit"
+HTTPX_ALIASES = (HTTPX_BIN, "httpx")
 
 
 class HttpProbe:
@@ -44,11 +46,12 @@ class HttpProbe:
         if not hosts_file.exists() or hosts_file.stat().st_size == 0:
             return {"json_path": None, "txt_path": None, "count": 0}
 
-        if shutil.which(HTTPX_BIN) is None:
-            return {"json_path": None, "txt_path": None, "count": 0, "missing": HTTPX_BIN}
+        httpx = self._resolve_httpx()
+        if httpx is None:
+            return {"json_path": None, "txt_path": None, "count": 0, "missing": "/".join(HTTPX_ALIASES), "skipped": True}
 
         cmd = [
-            HTTPX_BIN,
+            httpx,
             "-l", str(hosts_file),
             "-ports", HTTP_PROBE_PORTS,
             "-threads", str(HTTPX_THREADS),
@@ -59,9 +62,8 @@ class HttpProbe:
             "-random-agent",
             "-json",
             "-silent",
-            "-o", str(json_path),
         ]
-        self.command.execute_command(cmd)
+        self.command.stream_command(cmd, output_file=json_path, prefix="[httpx] ")
 
         urls = self._extract_urls(json_path)
         if urls:
@@ -72,6 +74,35 @@ class HttpProbe:
             "txt_path": txt_path if txt_path.exists() else None,
             "count": len(urls),
         }
+
+    @staticmethod
+    def _resolve_httpx() -> str | None:
+        """Resolve ProjectDiscovery httpx without accepting Python's httpx CLI."""
+        explicit = available_name(HTTPX_BIN)
+        if explicit:
+            return explicit
+
+        local_httpx = TOOLS_BIN / "httpx"
+        if local_httpx.exists():
+            return str(local_httpx)
+
+        candidate = available_name("httpx")
+        if not candidate:
+            return None
+
+        try:
+            result = subprocess.run(
+                [candidate, "-version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except Exception:
+            return None
+
+        return candidate if "projectdiscovery" in result.stdout.lower() else None
 
     @staticmethod
     def _extract_urls(json_path: Path) -> list[str]:

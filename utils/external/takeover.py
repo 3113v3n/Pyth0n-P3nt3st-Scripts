@@ -8,11 +8,11 @@ stdout and persist it untouched so manual verification stays easy.
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from utils.shared.commands import Commands
 from .external_constants import TAKEOVER_TOOL_PRIORITY
+from .tooling import available_name
 
 
 class TakeoverChecker:
@@ -35,13 +35,21 @@ class TakeoverChecker:
         if not hosts_file or not hosts_file.exists():
             return {"output": None, "tool": None, "count": 0}
 
-        tool = next((bin_ for bin_ in TAKEOVER_TOOL_PRIORITY if shutil.which(bin_)), None)
-        if tool is None:
-            return {"output": None, "tool": None, "count": 0, "missing": "subzy/subjack"}
+        selected_name = None
+        selected_path = None
+        for candidate in TAKEOVER_TOOL_PRIORITY:
+            resolved = available_name(candidate)
+            if resolved:
+                selected_name = candidate
+                selected_path = resolved
+                break
 
-        report = output_dir / f"takeover_{tool}.txt"
-        cmd = self._build_command(tool, hosts_file, report)
-        result = self.command.execute_command(cmd)
+        if selected_name is None or selected_path is None:
+            return {"output": None, "tool": None, "count": 0, "missing": "subzy/subjack", "skipped": True}
+
+        report = output_dir / f"takeover_{selected_name}.txt"
+        cmd = self._build_command(selected_name, selected_path, hosts_file, report)
+        result = self.command.stream_command(cmd, prefix=f"[{selected_name}] ")
 
         # subzy prints results to stdout; persist the run output as-is.
         if result.stdout and not report.exists():
@@ -50,22 +58,22 @@ class TakeoverChecker:
         findings = self._count_findings(report) if report.exists() else 0
         return {
             "output": report if report.exists() else None,
-            "tool": tool,
+            "tool": selected_name,
             "count": findings,
         }
 
     @staticmethod
-    def _build_command(tool: str, hosts_file: Path, report: Path) -> list[str]:
+    def _build_command(tool: str, executable: str, hosts_file: Path, report: Path) -> list[str]:
         if tool == "subzy":
             return [
-                "subzy", "run",
+                executable, "run",
                 "--targets", str(hosts_file),
                 "--hide_fails",
                 "--output", str(report),
             ]
         # subjack
         return [
-            "subjack",
+            executable,
             "-w", str(hosts_file),
             "-t", "50",
             "-timeout", "30",

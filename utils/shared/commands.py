@@ -15,7 +15,8 @@ import asyncio
 import threading
 import platform
 import subprocess
-from typing import Optional
+from pathlib import Path
+from typing import Optional, TextIO
 
 try:
     import psutil
@@ -93,6 +94,62 @@ class Commands:
             **kwargs,
         )
         return result
+
+    @staticmethod
+    def stream_command(
+        cmd: list[str],
+        *,
+        output_file: str | Path | None = None,
+        append: bool = False,
+        prefix: str | None = None,
+        **kwargs,
+    ) -> subprocess.CompletedProcess:
+        """Run a command and stream combined stdout/stderr while optionally saving it.
+
+        Uses shell=False and list-form commands only. The returned
+        CompletedProcess contains the streamed output in stdout so callers that
+        previously inspected captured stdout can keep doing so.
+        """
+        if not isinstance(cmd, list):
+            raise ValueError("stream_command() requires a list, not a string.")
+
+        user_stdout = kwargs.pop("stdout", None)
+        user_stderr = kwargs.pop("stderr", None)
+        if user_stdout is not None or user_stderr is not None:
+            raise ValueError("stream_command() manages stdout/stderr internally.")
+
+        file_handle: TextIO | None = None
+        if output_file is not None:
+            file_path = Path(output_file)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_handle = file_path.open("a" if append else "w", encoding="utf-8")
+
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            shell=False,
+            text=True,
+            bufsize=1,
+            **kwargs,
+        )
+
+        captured: list[str] = []
+        try:
+            assert process.stdout is not None
+            for line in process.stdout:
+                captured.append(line)
+                text = f"{prefix}{line}" if prefix else line
+                print(text, end="", flush=True)
+                if file_handle is not None:
+                    file_handle.write(line)
+                    file_handle.flush()
+            returncode = process.wait()
+        finally:
+            if file_handle is not None:
+                file_handle.close()
+
+        return subprocess.CompletedProcess(cmd, returncode, stdout="".join(captured), stderr="")
 
     @staticmethod
     def _execute_shell_string(command: str, **kwargs) -> subprocess.CompletedProcess:

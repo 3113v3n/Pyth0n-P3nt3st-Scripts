@@ -29,6 +29,11 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     _SUPPORTED_OS = {"debian", "macos", "windows"}
 
+    # Project-local tool root. Tools installed here avoid macOS SIP-protected
+    # paths (`/usr/bin`, system Ruby gem dirs) and never require sudo.
+    _TOOLS_DIR_NAME = "tools"
+    _TOOLS_SUBDIRS = ("bin", "go", "gems", "pipx")
+
     # Commands can differ from dependency identifiers; aliases reduce false positives.
     _COMMAND_ALIASES = {
         "netexec": ("nxc", "netexec"),
@@ -47,6 +52,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
         "go": {"args": ["version"], "contains": ("go version",)},
         "java": {"args": ["-version"], "contains": ("version",)},
         "pipx": {"args": ["--version"], "contains": ("pipx",)},
+        "httpx-toolkit": {"args": ["-version"], "contains": ("projectdiscovery",)},
     }
 
     # Tools installed via pipx (package name may differ from command id).
@@ -58,6 +64,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
         "bbot": "bbot",
         "uro": "uro",
         "snallygaster": "snallygaster",
+        "parsero": "parsero",
+        "s3scanner": "s3scanner",
     }
 
     # Tools installed via `go install <module>@latest`.
@@ -74,6 +82,13 @@ class PackageHandler(Config, DisplayHandler, Commands):
         "subjack": "github.com/haccer/subjack",
         "nuclei": "github.com/projectdiscovery/nuclei/v3/cmd/nuclei",
         "dalfox": "github.com/hahwul/dalfox/v2",
+        "assetfinder": "github.com/tomnomnom/assetfinder",
+        "dnsx": "github.com/projectdiscovery/dnsx/cmd/dnsx",
+        "ffuf": "github.com/ffuf/ffuf/v2",
+        "getallurls": "github.com/lc/gau/v2/cmd/gau",
+        "httpx-toolkit": "github.com/projectdiscovery/httpx/cmd/httpx",
+        "subfinder": "github.com/projectdiscovery/subfinder/v2/cmd/subfinder",
+        "brutespray": "github.com/x90skysn3k/brutespray/v2",
     }
 
     # Tools installed via RubyGems.
@@ -90,12 +105,42 @@ class PackageHandler(Config, DisplayHandler, Commands):
             "d2j-dex2jar": "dex2jar",
             "exiftool": "libimage-exiftool-perl",
             "snap": "snapd",
+            "apksigner": "apksigner",
+            "zipalign": "zipalign",
         },
         "macos": {
             "adb": "android-platform-tools",
+            "apktool": "apktool",
+            "amass": "amass",
+            "autoconf": "autoconf",
+            "automake": "automake",
             "sqlitebrowser": "db-browser-for-sqlite",
+            "exiftool": "exiftool",
+            "findomain": "findomain",
             "java": "openjdk",
             "d2j-dex2jar": "dex2jar",
+            "pkg-config": "pkg-config",
+            "radare2": "radare2",
+            "sqlite3": "sqlite",
+            "usbmuxd": "libusbmuxd",
+        },
+        "macports": {
+            "adb": "android-platform-tools",
+            "apktool": "apktool",
+            "amass": "amass",
+            "autoconf": "autoconf",
+            "automake": "automake",
+            "d2j-dex2jar": "dex2jar",
+            "exiftool": "p5-image-exiftool",
+            "findomain": "findomain",
+            "java": "openjdk21",
+            "nmap": "nmap",
+            "pkg-config": "pkgconfig",
+            "radare2": "radare2",
+            "sqlite3": "sqlite3",
+            "sqlitebrowser": "sqlitebrowser",
+            "usbmuxd": "libusbmuxd",
+            "xmlstarlet": "xmlstarlet",
         },
         "windows-winget": {
             "go": "GoLang.Go",
@@ -117,12 +162,21 @@ class PackageHandler(Config, DisplayHandler, Commands):
         },
     }
 
+    _OS_LIMITED_TOOLS = {
+        "apksigner": {"debian"},
+        "snap": {"debian"},
+        "checkinstall": {"debian"},
+        "zipalign": {"debian"},
+    }
+
     def __init__(self) -> None:
         super().__init__()
         self.operating_system = platform.system().lower()
         self.os_family = self._detect_os_family()
         self.package_manager = self._detect_system_package_manager()
         self.is_supported_os = None
+        self.tools_root = self._resolve_tools_root()
+        self._prepend_tools_bin_to_path()
         self._which_cache: dict[str, str | None] = {}
         self._probe_cache: dict[tuple[str, tuple[str, ...]], bool] = {}
         self._search_path = self._build_search_path()
@@ -133,6 +187,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
         self.os_family = self._detect_os_family()
         self.package_manager = self._detect_system_package_manager()
         self.is_supported_os = None
+        self.tools_root = self._resolve_tools_root()
+        self._prepend_tools_bin_to_path()
         self._which_cache = {}
         self._probe_cache = {}
         self._search_path = self._build_search_path()
@@ -212,6 +268,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if self.os_family == "debian":
             return "apt" if shutil.which("apt-get") else None
         if self.os_family == "macos":
+            if shutil.which("port"):
+                return "port"
             return "brew" if shutil.which("brew") else None
         if self.os_family == "windows":
             if shutil.which("winget"):
@@ -249,6 +307,11 @@ class PackageHandler(Config, DisplayHandler, Commands):
     def _build_search_path(self) -> str:
         path_entries = os.environ.get("PATH", "").split(os.pathsep)
         extras = [
+            str(Path(sys.executable).resolve().parent),
+            str(self._tools_bin_dir()),
+            "/opt/local/bin",
+            "/opt/local/sbin",
+            *self._homebrew_ruby_bin_dirs(),
             str(Path.home() / ".local" / "bin"),
             str(Path.home() / "go" / "bin"),
             str(Path.home() / "AppData" / "Roaming" / "Python" / "Scripts"),
@@ -263,6 +326,204 @@ class PackageHandler(Config, DisplayHandler, Commands):
             seen.add(cleaned)
             merged.append(cleaned)
         return os.pathsep.join(merged)
+
+    # ------------------------------------------------------------------
+    # Project-local tool directory (avoids sudo / SIP issues on macOS)
+    # ------------------------------------------------------------------
+
+    def _resolve_tools_root(self) -> Path:
+        """Return <repo>/tools/. Created lazily before installs run."""
+        return Path(__file__).resolve().parents[1] / self._TOOLS_DIR_NAME
+
+    def _tools_bin_dir(self) -> Path:
+        return self.tools_root / "bin"
+
+    def _homebrew_ruby_bin_dirs(self) -> list[str]:
+        """Likely Homebrew Ruby bin dirs.
+
+        macOS ships an old system Ruby whose SDK headers can be incomplete for
+        native extensions. Homebrew's Ruby is preferred for gem-based tools.
+        """
+        if self.os_family != "macos":
+            return []
+
+        dirs: list[str] = []
+        try:
+            brew = shutil.which("brew")
+            if brew:
+                result = self.execute_command([brew, "--prefix", "ruby"], timeout=5)
+                if result.returncode == 0:
+                    prefix = result.stdout.strip()
+                    if prefix:
+                        dirs.append(str(Path(prefix) / "bin"))
+        except Exception:
+            pass
+
+        dirs.extend([
+            "/opt/homebrew/opt/ruby/bin",
+            "/usr/local/opt/ruby/bin",
+        ])
+        return dirs
+
+    @staticmethod
+    def _is_macos_system_ruby_path(path: str | None) -> bool:
+        if not path:
+            return False
+        resolved = str(Path(path).resolve())
+        return resolved.startswith("/usr/bin/") or resolved.startswith("/System/Library/Frameworks/Ruby.framework/")
+
+    def _preferred_gem_executable(self) -> str | None:
+        """Return a usable gem executable, preferring Homebrew Ruby on macOS."""
+        candidates: list[str] = []
+
+        configured = os.environ.get("PENTEST_GEM")
+        if configured:
+            candidates.append(configured)
+
+        if self.os_family == "macos":
+            for bin_dir in self._homebrew_ruby_bin_dirs():
+                candidates.append(str(Path(bin_dir) / "gem"))
+
+        resolved = shutil.which("gem", path=self._search_path)
+        if resolved:
+            candidates.append(resolved)
+
+        seen: set[str] = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            if self.os_family == "macos" and self._is_macos_system_ruby_path(candidate):
+                continue
+            try:
+                result = self.execute_command([candidate, "--version"], timeout=5)
+            except Exception:
+                continue
+            if result.returncode == 0:
+                return candidate
+
+        if self.os_family != "macos":
+            return resolved
+        return None
+
+    def _pipx_command(self) -> list[str]:
+        """Return a pipx invocation that works before and after bootstrap."""
+        resolved = shutil.which("pipx", path=self._search_path)
+        if resolved:
+            return [resolved]
+        return [sys.executable, "-m", "pipx"]
+
+    def _pipx_available(self) -> bool:
+        try:
+            result = self.execute_command([*self._pipx_command(), "--version"], timeout=5)
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _prepend_tools_bin_to_path(self) -> None:
+        """Ensure subprocesses spawned by the framework see project-local tools.
+
+        The framework looks tools up by bare name (e.g. ``["nuclei", ...]``),
+        which goes through ``subprocess.run`` and inherits the parent's PATH.
+        Prepending ``tools/bin`` here makes every subsequent invocation — and
+        every ``shutil.which`` check — pick up tools we installed locally.
+        """
+        bin_paths = [
+            str(Path(sys.executable).resolve().parent),
+            str(self._tools_bin_dir()),
+            "/opt/local/bin",
+            "/opt/local/sbin",
+            *self._homebrew_ruby_bin_dirs(),
+        ]
+        current = os.environ.get("PATH", "")
+        path_entries = current.split(os.pathsep) if current else []
+        for bin_path in reversed(bin_paths):
+            if bin_path and bin_path not in path_entries:
+                path_entries.insert(0, bin_path)
+        os.environ["PATH"] = os.pathsep.join(path_entries)
+
+        gems_dir = str(self.tools_root / "gems")
+        os.environ.setdefault("GEM_HOME", gems_dir)
+        gem_path_entries = os.environ.get("GEM_PATH", "").split(os.pathsep)
+        if gems_dir not in gem_path_entries:
+            os.environ["GEM_PATH"] = os.pathsep.join([gems_dir, *[entry for entry in gem_path_entries if entry]])
+
+    def _ensure_tools_dirs(self) -> None:
+        """Create the per-toolchain subdirectories. Called before installs."""
+        for sub in self._TOOLS_SUBDIRS:
+            (self.tools_root / sub).mkdir(parents=True, exist_ok=True)
+
+    def _tool_install_env(self) -> dict[str, str]:
+        """Env vars that redirect go/gem/pipx installs into ``<repo>/tools/``."""
+        env = os.environ.copy()
+        bin_dir = str(self._tools_bin_dir())
+        gems_dir = str(self.tools_root / "gems")
+        env["GOBIN"] = bin_dir
+        env["GOPATH"] = str(self.tools_root / "go")
+        env["GEM_HOME"] = gems_dir
+        env["GEM_PATH"] = gems_dir
+        env["PIPX_HOME"] = str(self.tools_root / "pipx")
+        env["PIPX_BIN_DIR"] = bin_dir
+        # Make sure bindir is on PATH for any post-install hook (e.g. pipx ensurepath).
+        env["PATH"] = os.pathsep.join([
+            bin_dir,
+            *self._homebrew_ruby_bin_dirs(),
+            env.get("PATH", ""),
+        ])
+        return env
+
+    def _system_install_env(self) -> dict[str, str]:
+        """Env vars for non-language system package managers."""
+        env = os.environ.copy()
+        if self.package_manager == "brew":
+            # Avoid long, implicit update steps and make brew output deterministic
+            # inside non-interactive framework runs.
+            env.setdefault("HOMEBREW_NO_AUTO_UPDATE", "1")
+            env.setdefault("HOMEBREW_NO_INSTALL_CLEANUP", "1")
+            env.setdefault("HOMEBREW_NO_ENV_HINTS", "1")
+        return env
+
+    def _patch_project_gem_binstubs(self, executable_names: list[str]) -> None:
+        """Make generated RubyGems binstubs find repo-local gems at runtime."""
+        gems_dir = str(self.tools_root / "gems")
+        marker = "# Pyth0n-P3nt3st-Scripts local gem path"
+
+        for executable in executable_names:
+            script_path = self._tools_bin_dir() / executable
+            if not script_path.exists():
+                continue
+
+            try:
+                text = script_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+
+            if "Gem.activate_bin_path" not in text:
+                continue
+
+            changed = False
+            if marker not in text:
+                lines = text.splitlines()
+                insert_at = 1 if lines and lines[0].startswith("#!") else 0
+                snippet = [
+                    marker,
+                    f"ENV['GEM_HOME'] ||= {gems_dir!r}",
+                    "ENV['GEM_PATH'] = [ENV['GEM_HOME'], ENV['GEM_PATH']].compact.join(File::PATH_SEPARATOR)",
+                ]
+                lines[insert_at:insert_at] = snippet
+                text = "\n".join(lines) + "\n"
+                changed = True
+
+            if "Gem.use_paths(" not in text:
+                gem_paths = (
+                    "require 'rubygems'\n"
+                    "Gem.use_paths(ENV['GEM_HOME'], ENV['GEM_PATH'].split(File::PATH_SEPARATOR))\n"
+                )
+                text = text.replace("require 'rubygems'\n", gem_paths, 1)
+                changed = True
+
+            if changed:
+                script_path.write_text(text, encoding="utf-8")
 
     def _which_cached(self, executable: str) -> str | None:
         if executable in self._which_cache:
@@ -293,6 +554,9 @@ class PackageHandler(Config, DisplayHandler, Commands):
         return (package_name,)
 
     def _binary_missing(self, package_name: str) -> bool:
+        if package_name == "pipx":
+            return not self._pipx_available()
+
         candidates = self._command_candidates(package_name)
         probe = self._VERSION_PROBES.get(package_name)
 
@@ -307,14 +571,20 @@ class PackageHandler(Config, DisplayHandler, Commands):
                     tuple(probe.get("contains", (candidate,))),
                 ):
                     return False
-                # If probe fails unexpectedly but command exists, treat as present.
-                return False
+                continue
             return False
 
         return True
 
+    def _is_tool_supported_on_current_os(self, tool_name: str) -> bool:
+        supported_os = self._OS_LIMITED_TOOLS.get(tool_name)
+        return not supported_os or self.os_family in supported_os
+
     def _is_package_missing(self, package_name: str) -> bool:
         if not self.is_supported_os:
+            return False
+
+        if not self._is_tool_supported_on_current_os(package_name):
             return False
 
         if package_name == "anthropic":
@@ -350,6 +620,16 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if not required_tools:
             return []
 
+        skipped_tools = [
+            tool for tool in required_tools
+            if not self._is_tool_supported_on_current_os(tool)
+        ]
+        if skipped_tools:
+            self.print_warning_message(
+                "Skipping OS-specific dependency item(s) on this platform: "
+                + ", ".join(sorted(skipped_tools))
+            )
+
         missing_tools = [tool for tool in required_tools if self._is_package_missing(tool)]
         if not missing_tools:
             return []
@@ -367,6 +647,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     def _system_package_alias_key(self) -> str:
         if self.os_family != "windows":
+            if self.os_family == "macos" and self.package_manager == "port":
+                return "macports"
             return self.os_family
         return "windows-winget" if self.package_manager == "winget" else "windows-choco"
 
@@ -383,7 +665,10 @@ class PackageHandler(Config, DisplayHandler, Commands):
             return [self._with_privilege(["apt-get", "install", "-y", *package_names])]
 
         if self.package_manager == "brew":
-            return [["brew", "install", *package_names]]
+            return [["brew", "install", package_name] for package_name in package_names]
+
+        if self.package_manager == "port":
+            return [self._with_privilege(["port", "install", package_name]) for package_name in package_names]
 
         if self.package_manager == "choco":
             return [["choco", "install", "-y", *package_names]]
@@ -403,11 +688,18 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
         return []
 
-    def _action(self, name: str, commands: list[list[str]], verify_names: list[str]) -> Dict[str, object]:
+    def _action(
+        self,
+        name: str,
+        commands: list[list[str]],
+        verify_names: list[str],
+        env: dict[str, str] | None = None,
+    ) -> Dict[str, object]:
         return {
             "name": name,
             "commands": commands,
             "verify_names": verify_names,
+            "env": env,
         }
 
     def _build_install_plan(self, missing_tools: list[str]) -> list[Dict[str, object]]:
@@ -419,15 +711,19 @@ class PackageHandler(Config, DisplayHandler, Commands):
         needs_go = any(tool in self._GO_MODULES for tool in missing_tools)
         needs_gem = any(tool in self._GEM_PACKAGES for tool in missing_tools)
 
-        if needs_pipx and self._binary_missing("pipx"):
+        # Materialize <repo>/tools/* once if any install will land there.
+        if needs_pipx or needs_go or needs_gem:
+            self._ensure_tools_dirs()
+
+        if needs_pipx and not self._pipx_available():
             actions.append(
                 self._action(
                     "pipx",
                     [
-                        [sys.executable, "-m", "pip", "install", "--user", "pipx"],
-                        [sys.executable, "-m", "pipx", "ensurepath"],
+                        [sys.executable, "-m", "pip", "install", "pipx"],
                     ],
                     ["pipx"],
+                    env=self._tool_install_env(),
                 )
             )
 
@@ -438,7 +734,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
             else:
                 self.print_warning_message("'go' is missing and no package manager is available to install it.")
 
-        if needs_gem and self._binary_missing("gem"):
+        if needs_gem and not self._preferred_gem_executable():
             ruby_cmds = self._build_system_install_commands([self._system_package_name("ruby")])
             if ruby_cmds:
                 actions.append(self._action("ruby", ruby_cmds, ["ruby", "gem"]))
@@ -446,6 +742,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
                 self.print_warning_message("'ruby/gem' is missing and no package manager is available to install it.")
 
         # Fine-grained installers (python/pipx/go/gem), then system package fallback.
+        planned_gems: set[str] = set()
         for tool in missing_tools:
             if tool == "anthropic":
                 actions.append(
@@ -460,44 +757,57 @@ class PackageHandler(Config, DisplayHandler, Commands):
             if tool in self._PIPX_PACKAGES:
                 package_ref = self._PIPX_PACKAGES[tool]
                 # pipx is its own CLI managing isolated envs; invoke the binary
-                # directly rather than `python -m pipx`, which would require pipx
-                # to be importable from the (often venv-bound) interpreter.
+                # directly rather than `python -m pipx`. PIPX_HOME / PIPX_BIN_DIR
+                # in the env redirect the install into <repo>/tools/, so no
+                # global state is touched and no sudo is required.
                 actions.append(
                     self._action(
                         f"pipx:{tool}",
-                        [["pipx", "install", package_ref]],
+                        [[*self._pipx_command(), "install", package_ref]],
                         [tool],
+                        env=self._tool_install_env(),
                     )
                 )
                 continue
 
             if tool in self._GO_MODULES:
                 module = self._GO_MODULES[tool]
+                # GOBIN in the env makes `go install` drop the binary into
+                # <repo>/tools/bin/ instead of ~/go/bin.
                 actions.append(
                     self._action(
                         f"go:{tool}",
                         [["go", "install", f"{module}@latest"]],
                         [tool],
+                        env=self._tool_install_env(),
                     )
                 )
                 continue
 
             if tool in self._GEM_PACKAGES:
                 gem_name = self._GEM_PACKAGES[tool]
-                # System gem dirs (e.g. /Library/Ruby/Gems on macOS) need sudo,
-                # and on macOS SIP also blocks the default binstub dir
-                # (/usr/bin). Redirect binstubs to /usr/local/bin so the install
-                # succeeds and the resulting CLI ends up on a PATH most setups
-                # already pick up. `_with_privilege` is a no-op on root/Windows.
-                gem_cmd = ["gem", "install"]
-                if self.os_family == "macos":
-                    gem_cmd += ["-n", "/usr/local/bin"]
-                gem_cmd.append(gem_name)
+                if gem_name in planned_gems:
+                    continue
+                planned_gems.add(gem_name)
+                verify_tools = sorted(
+                    item for item in missing_tools
+                    if self._GEM_PACKAGES.get(item) == gem_name
+                )
+                # --install-dir + --bindir keep both the gem files and the
+                # binstubs inside <repo>/tools/, sidestepping macOS SIP and
+                # avoiding a sudo prompt entirely.
+                gems_dir = str(self.tools_root / "gems")
+                bin_dir = str(self._tools_bin_dir())
+                gem_executable = self._preferred_gem_executable() or "gem"
                 actions.append(
                     self._action(
-                        f"gem:{tool}",
-                        [self._with_privilege(gem_cmd)],
-                        [tool],
+                        f"gem:{gem_name}",
+                        [[gem_executable, "install",
+                          "--install-dir", gems_dir,
+                          "--bindir", bin_dir,
+                          gem_name]],
+                        verify_tools,
+                        env=self._tool_install_env(),
                     )
                 )
                 continue
@@ -523,6 +833,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
                         f"system:{self.package_manager}",
                         commands,
                         verify_names,
+                        env=self._system_install_env(),
                     )
                 )
 
@@ -553,7 +864,12 @@ class PackageHandler(Config, DisplayHandler, Commands):
                     break
 
                 try:
-                    result = self.execute_command(command)
+                    action_env = action.get("env")
+                    result = (
+                        self.execute_command(command, env=action_env, timeout=900)
+                        if action_env
+                        else self.execute_command(command, timeout=900)
+                    )
                 except Exception as error:
                     self.print_error_message(
                         message=f"Failed to execute install command for {action_name}",
@@ -574,6 +890,9 @@ class PackageHandler(Config, DisplayHandler, Commands):
             # Clear lookup/probe cache after attempted install.
             self._which_cache.clear()
             self._probe_cache.clear()
+
+            if action_ok and action_name.startswith("gem:"):
+                self._patch_project_gem_binstubs(verify_names)
 
             if action_ok and all(self._verify_installation(name) for name in verify_names):
                 installed_tools.update(verify_names)

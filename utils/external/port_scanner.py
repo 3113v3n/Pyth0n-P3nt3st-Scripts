@@ -9,12 +9,12 @@ phase to keep the surface area small and avoid rescanning dead targets.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 from urllib.parse import urlparse
 
 from utils.shared.commands import Commands
 from .external_constants import NMAP_DEFAULT_TOP_PORTS
+from .tooling import available_name
 
 
 NMAP_BIN = "nmap"
@@ -46,8 +46,9 @@ class PortScanner:
         if not alive_urls_file or not alive_urls_file.exists():
             return {"normal": None, "grepable": None, "count": 0}
 
-        if shutil.which(NMAP_BIN) is None:
-            return {"normal": None, "grepable": None, "count": 0, "missing": NMAP_BIN}
+        nmap = available_name(NMAP_BIN)
+        if nmap is None:
+            return {"normal": None, "grepable": None, "count": 0, "missing": NMAP_BIN, "skipped": True}
 
         hosts = self._unique_hosts(alive_urls_file)
         if not hosts:
@@ -60,7 +61,7 @@ class PortScanner:
         grepable = output_dir / "nmap_results.gnmap"
 
         cmd = [
-            NMAP_BIN,
+            nmap,
             "-sV",
             "-sC",
             "-Pn",
@@ -69,7 +70,7 @@ class PortScanner:
             "-oN", str(normal),
             "-oG", str(grepable),
         ]
-        self.command.execute_command(cmd)
+        self.command.stream_command(cmd, prefix="[nmap] ")
 
         return {
             "normal": normal if normal.exists() else None,

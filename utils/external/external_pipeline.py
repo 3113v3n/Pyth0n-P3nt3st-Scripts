@@ -166,11 +166,15 @@ class ExternalPipeline(DisplayHandler):
         return recon_result.get("subdomains_file")
 
     def _print_phase_summary(self, phase: str, result: dict) -> None:
-        if result.get("missing"):
+        if result.get("missing") and result.get("skipped"):
             self.print_warning_message(
                 f"Phase '{phase}' skipped — missing tool: {result['missing']}"
             )
             return
+        if result.get("missing_optional"):
+            self.print_warning_message(
+                f"Phase '{phase}' partial — missing optional tool(s): {result['missing_optional']}"
+            )
         # Compact one-line summary so the operator can monitor progress.
         keys_of_interest = ("count", "total", "url_count", "sensitive_count", "resolved_count")
         snippet = ", ".join(
