@@ -484,12 +484,19 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
             if tool in self._GEM_PACKAGES:
                 gem_name = self._GEM_PACKAGES[tool]
-                # System gem dirs (e.g. /Library/Ruby/Gems on macOS) need sudo;
-                # `_with_privilege` is a no-op when already root or on Windows.
+                # System gem dirs (e.g. /Library/Ruby/Gems on macOS) need sudo,
+                # and on macOS SIP also blocks the default binstub dir
+                # (/usr/bin). Redirect binstubs to /usr/local/bin so the install
+                # succeeds and the resulting CLI ends up on a PATH most setups
+                # already pick up. `_with_privilege` is a no-op on root/Windows.
+                gem_cmd = ["gem", "install"]
+                if self.os_family == "macos":
+                    gem_cmd += ["-n", "/usr/local/bin"]
+                gem_cmd.append(gem_name)
                 actions.append(
                     self._action(
                         f"gem:{tool}",
-                        [self._with_privilege(["gem", "install", gem_name])],
+                        [self._with_privilege(gem_cmd)],
                         [tool],
                     )
                 )
