@@ -1,5 +1,6 @@
 import sys
 
+from handlers.package_handler import PackageHandler
 from handlers.framework_assessment_mixin import FrameworkAssessmentMixin
 from handlers.framework_core_mixin import FrameworkCoreMixin
 from handlers.framework_runtime_mixin import FrameworkRuntimeMixin
@@ -29,6 +30,8 @@ class PentestFramework(
 def main():
     """Entry point of the program."""
     from handlers.interaction import InteractionHandler
+
+    PackageHandler.ensure_project_virtualenv()
 
     _interaction = InteractionHandler()
     try:
