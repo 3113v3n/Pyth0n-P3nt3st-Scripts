@@ -9,6 +9,7 @@ its artifacts in the consolidated report.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -20,6 +21,54 @@ from .tooling import available_name, which_tool
 _VALIDATOR = Validator()
 _SUPPORTED_TOOLS = ("subfinder", "assetfinder", "findomain", "amass", "dnsx")
 _COMMANDS = Commands()
+_AMASS_NATIVE_BIN = Path("/usr/lib/amass/amass")
+_LIBPOSTAL_SHARE_DIR = Path("/usr/share/libpostal")
+_LIBPOSTAL_VAR_DIR = Path("/var/lib/libpostal")
+
+
+def _resolve_amass_executable() -> str | None:
+    """Prefer the real amass binary over wrapper scripts when available."""
+    if _AMASS_NATIVE_BIN.exists() and os.access(_AMASS_NATIVE_BIN, os.X_OK):
+        return str(_AMASS_NATIVE_BIN)
+    return which_tool("amass")
+
+
+def _amass_libpostal_fix_message() -> str:
+    """Return actionable remediation for libpostal data-dir mismatches."""
+    has_var_data = (_LIBPOSTAL_VAR_DIR / "transliteration").exists()
+    if has_var_data:
+        return (
+            "[!] amass preflight failed: libpostal data found in /var/lib/libpostal "
+            "but missing in /usr/share/libpostal.\n"
+            "[!] Fix: sudo mkdir -p /usr/share/libpostal && "
+            "sudo cp -a /var/lib/libpostal/. /usr/share/libpostal/"
+        )
+    return (
+        "[!] amass preflight failed: libpostal data missing in /usr/share/libpostal.\n"
+        "[!] Fix: sudo libpostal_data download all /usr/share/libpostal"
+    )
+
+
+def _amass_preflight(executable: str) -> bool:
+    """Validate amass runtime prerequisites before long-running enumeration."""
+    try:
+        resolved = Path(executable).resolve()
+    except OSError:
+        return False
+
+    # Debian/Kali amass builds can link libpostal with hard-coded
+    # /usr/share/libpostal paths; fail early with a clear fix message.
+    if resolved == _AMASS_NATIVE_BIN and not (_LIBPOSTAL_SHARE_DIR / "transliteration").exists():
+        print(_amass_libpostal_fix_message())
+        return False
+    return True
+
+
+def _tool_available(tool: str) -> bool:
+    """Tool availability with amass-specific resolver."""
+    if tool == "amass":
+        return _resolve_amass_executable() is not None
+    return which_tool(tool) is not None
 
 
 def is_valid_subdomain(subdomain: str, root_domain: str) -> bool:
@@ -39,7 +88,12 @@ def shell_command(command: list[str], tool: str, debug: bool = False) -> list[st
     Returns an empty list when the binary is missing or the command fails so
     downstream callers can keep operating on whatever results exist.
     """
-    executable = which_tool(command[0])
+    raw_executable = str(command[0]).strip()
+    if "/" in raw_executable:
+        path = Path(raw_executable)
+        executable = str(path) if path.exists() and os.access(path, os.X_OK) else None
+    else:
+        executable = which_tool(raw_executable)
     if executable is None:
         if debug:
             print(f"[!] {tool} not installed; skipping.")
@@ -50,6 +104,10 @@ def shell_command(command: list[str], tool: str, debug: bool = False) -> list[st
             print(f"\nExecuting: {' '.join(command)}")
         result = _COMMANDS.stream_command(command, prefix=f"[{tool}] ")
         if result.returncode != 0:
+            if tool == "amass":
+                output = str(result.stdout)
+                if "Error loading transliteration module" in output or "libpostal_setup_datadir" in output:
+                    print(_amass_libpostal_fix_message())
             print(f"[!] {tool} failed with exit code {result.returncode}")
             return []
         return result.stdout.splitlines()
@@ -85,7 +143,7 @@ class DomainRecon:
         subdomain_file = output_dir / f"{formatted_domain}_subdomains.txt"
         resolved_file = output_dir / f"resolved_{formatted_domain}_subdomains.txt"
 
-        missing = [tool for tool in _SUPPORTED_TOOLS if which_tool(tool) is None]
+        missing = [tool for tool in _SUPPORTED_TOOLS if not _tool_available(tool)]
 
         if not _VALIDATOR.file_exists(str(subdomain_file)):
             collected = (
@@ -145,7 +203,14 @@ class DomainRecon:
 
     @staticmethod
     def run_amass(target: str, debug: bool) -> list[str]:
-        return shell_command(["amass", "enum", "-passive", "-d", target], "amass", debug)
+        executable = _resolve_amass_executable()
+        if executable is None:
+            if debug:
+                print("[!] amass not installed; skipping.")
+            return []
+        if not _amass_preflight(executable):
+            return []
+        return shell_command([executable, "enum", "-passive", "-d", target], "amass", debug)
 
     @staticmethod
     def run_findomain(target: str, debug: bool) -> list[str]:

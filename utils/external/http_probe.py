@@ -98,6 +98,7 @@ class HttpProbe:
                 text=True,
                 timeout=5,
                 check=False,
+                env=Commands._with_project_tmp_env(),
             )
         except Exception:
             return None

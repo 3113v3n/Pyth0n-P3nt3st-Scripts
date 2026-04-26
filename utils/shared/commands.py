@@ -15,6 +15,7 @@ import asyncio
 import threading
 import platform
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional, TextIO
 
@@ -32,11 +33,53 @@ except ModuleNotFoundError:  # Optional dependency; fallback to system ping.
 # [Security] Characters that are meaningful to the shell and must never appear
 # in inputs passed to _execute_shell_string().
 _SHELL_METACHARACTERS = re.compile(r'[;&|`$<>\\!{}()\[\]]')
+_ANSI_ESCAPE_RE = re.compile(
+    r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+)
 _THREAD_LOCAL = threading.local()
 
 
 class Commands:
     """Shared command-execution helpers used across all framework modules."""
+
+    @staticmethod
+    def strip_ansi(text: str) -> str:
+        """Remove ANSI escape sequences from text for clean file persistence."""
+        return _ANSI_ESCAPE_RE.sub("", text)
+
+    @staticmethod
+    def _with_project_tmp_env(env: dict | None = None) -> dict:
+        """Return subprocess env forcing temporary files into project-local .tmp."""
+        merged_env = os.environ.copy()
+        if env:
+            merged_env.update(env)
+
+        tmp_root = Path.cwd() / ".tmp" / "runtime"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        tmp_path = str(tmp_root)
+        merged_env["TMPDIR"] = tmp_path
+        merged_env["TMP"] = tmp_path
+        merged_env["TEMP"] = tmp_path
+        return merged_env
+
+    @staticmethod
+    def cleanup_runtime_tmp() -> None:
+        """Best-effort cleanup of project-local subprocess temp artifacts."""
+        tmp_root = Path.cwd() / ".tmp" / "runtime"
+        if not tmp_root.exists():
+            return
+        for child in tmp_root.iterdir():
+            try:
+                if child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    child.unlink(missing_ok=True)
+            except OSError:
+                continue
+        try:
+            tmp_root.rmdir()
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------
     # Process management
@@ -85,12 +128,14 @@ class Commands:
                 "execute_command() requires a list, not a string. "
                 "Use _execute_shell_string() only for internal pipelines."
             )
+        env = Commands._with_project_tmp_env(kwargs.pop("env", None))
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=False,
             text=True,
+            env=env,
             **kwargs,
         )
         return result
@@ -124,6 +169,7 @@ class Commands:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_handle = file_path.open("a" if append else "w", encoding="utf-8")
 
+        env = Commands._with_project_tmp_env(kwargs.pop("env", None))
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -131,6 +177,7 @@ class Commands:
             shell=False,
             text=True,
             bufsize=1,
+            env=env,
             **kwargs,
         )
 
@@ -142,7 +189,7 @@ class Commands:
                 text = f"{prefix}{line}" if prefix else line
                 print(text, end="", flush=True)
                 if file_handle is not None:
-                    file_handle.write(line)
+                    file_handle.write(Commands.strip_ansi(line))
                     file_handle.flush()
             returncode = process.wait()
         finally:
@@ -169,12 +216,14 @@ class Commands:
         """
         # [Security] Kept for internal shell pipelines (rabin2|grep, apktool, etc.)
         # Callers are responsible for validating all embedded paths/values.
+        env = Commands._with_project_tmp_env(kwargs.pop("env", None))
         result = subprocess.run(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             shell=True,
             text=True,
+            env=env,
             **kwargs,
         )
         return result
@@ -207,12 +256,14 @@ class Commands:
             Popen instance with stdout available for line-by-line reading.
         """
         # [Security] List form — no shell expansion.
+        env = Commands._with_project_tmp_env()
         return subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             shell=False,
             text=True,
+            env=env,
         )
 
     @staticmethod
@@ -227,7 +278,12 @@ class Commands:
         """
         try:
             print(f"Running command:\n{' '.join(git_command)}\n")
-            subprocess.run(git_command, check=True, shell=False)
+            subprocess.run(
+                git_command,
+                check=True,
+                shell=False,
+                env=Commands._with_project_tmp_env(),
+            )
             print("Command completed successfully.")
             return True
         except subprocess.CalledProcessError as error:
@@ -251,6 +307,7 @@ class Commands:
             stderr=subprocess.STDOUT,
             shell=False,
             text=True,
+            env=Commands._with_project_tmp_env(),
         )
         return result.stdout
 
@@ -269,6 +326,7 @@ class Commands:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 shell=False,
+                env=Commands._with_project_tmp_env(),
             )
             proc.communicate(b"\n")  # Simulate pressing Enter
         except (TypeError, OSError) as error:

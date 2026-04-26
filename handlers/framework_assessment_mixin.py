@@ -128,31 +128,38 @@ class FrameworkAssessmentMixin:
             if isinstance(mobile_testing_vars, dict)
             else None
         )
-
-        mobile.reset_total_time()
-        if applications:
-            total = len(applications)
-            self.print_info_message(f"Running mobile assessment on {total} application(s)")
-            for index, app in enumerate(applications, 1):
-                filename = app.get("filename", "unknown")
-                self.print_info_message(
-                    message=f"Scanning application [{index}/{total}]",
-                    file=filename,
-                )
-                app_vars = {
-                    "filename": filename,
-                    "full_path": app.get("full_path"),
-                }
-                mobile.initialize_variables(app_vars)
-                mobile._inspect_files(test_domain, self.os)
-            mobile.print_total_time("Total analysis time for all applications:")
+        try:
             mobile.reset_total_time()
-            return
+            if applications:
+                total = len(applications)
+                self.print_info_message(f"Running mobile assessment on {total} application(s)")
+                for index, app in enumerate(applications, 1):
+                    filename = app.get("filename", "unknown")
+                    self.print_info_message(
+                        message=f"Scanning application [{index}/{total}]",
+                        file=filename,
+                    )
+                    app_vars = {
+                        "filename": filename,
+                        "full_path": app.get("full_path"),
+                        "taxonomy": mobile_testing_vars.get("taxonomy", "both"),
+                        "taxonomy_profile": mobile_testing_vars.get("taxonomy_profile", "balanced"),
+                    }
+                    mobile.initialize_variables(app_vars)
+                    mobile._inspect_files(test_domain, self.os)
+                mobile.print_total_time("Total analysis time for all applications:")
+                mobile.reset_total_time()
+                return
 
-        mobile.initialize_variables(mobile_testing_vars)
-        mobile._inspect_files(test_domain, self.os)
-        mobile.print_total_time(f"Total analysis time for {mobile.package_name}:")
-        mobile.reset_total_time()
+            mobile.initialize_variables(mobile_testing_vars)
+            mobile._inspect_files(test_domain, self.os)
+            mobile.print_total_time(f"Total analysis time for {mobile.package_name}:")
+            mobile.reset_total_time()
+        finally:
+            if hasattr(mobile, "cleanup_runtime_artifacts"):
+                # Keep reusable template/tool caches between runs for efficiency.
+                # Only runtime artifacts (e.g., extracted app folders) are cleaned.
+                mobile.cleanup_runtime_artifacts(remove_templates=False)
 
     def handle_external_assessment(self, user, external, **kwargs):
         """Handle external penetration testing assessment."""

@@ -225,7 +225,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 )
                 phases = DEFAULT_PHASES
 
-            return {"target_domain": domain, "phases": phases}
+            return {
+                "target_domain": domain,
+                "phases": phases,
+            }
         except Exception as error:
             self.print_error_message(error)
 

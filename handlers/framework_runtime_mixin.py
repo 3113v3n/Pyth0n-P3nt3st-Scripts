@@ -81,6 +81,10 @@ class FrameworkRuntimeMixin:
                     message="An error in Main Program occurred",
                     exception_error=error,
                 )
+            finally:
+                command = self.classes.get("command") if isinstance(self.classes, dict) else None
+                if command:
+                    command.cleanup_runtime_tmp()
 
     def run_program_interactively(self, user_data: dict) -> None:
         """Run an Interactive version of the program."""
@@ -110,3 +114,7 @@ class FrameworkRuntimeMixin:
                 message="An error in Main Program occurred",
                 exception_error=error,
             )
+        finally:
+            command = self.classes.get("command") if isinstance(self.classes, dict) else None
+            if command:
+                command.cleanup_runtime_tmp()

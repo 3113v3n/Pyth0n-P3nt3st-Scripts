@@ -77,14 +77,18 @@ class ExternalPipeline(DisplayHandler):
             PHASE_VULNS: self._run_vulns,
         }
 
-        for phase in phases:
-            handler = dispatch.get(phase)
-            if handler is None:
-                self.print_warning_message(f"Unknown phase '{phase}' — skipping.")
-                continue
-            self.print_info_message(f"Running phase: {phase}")
-            results[phase] = handler(target_domain, run_dir, results)
-            self._print_phase_summary(phase, results[phase])
+        try:
+            for phase in phases:
+                handler = dispatch.get(phase)
+                if handler is None:
+                    self.print_warning_message(f"Unknown phase '{phase}' — skipping.")
+                    continue
+                self.print_info_message(f"Running phase: {phase}")
+                results[phase] = handler(target_domain, run_dir, results)
+                self._print_phase_summary(phase, results[phase])
+        finally:
+            # Keep only final phase artifacts; remove helper files used during orchestration.
+            self._cleanup_runtime_artifacts(run_dir, results)
 
         return run_dir, results
 
@@ -114,10 +118,19 @@ class ExternalPipeline(DisplayHandler):
             return {"json_path": None, "txt_path": None, "count": 0}
         return self._http.probe(hosts, run_dir)
 
-    def _run_ports(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_ports(
+        self,
+        _domain: str,
+        run_dir: Path,
+        results: dict,
+    ) -> dict:
         probe = results.get(PHASE_PROBE) or {}
         alive = probe.get("txt_path")
-        return self._ports.scan(alive, run_dir) if alive else {"normal": None, "grepable": None, "count": 0}
+        return (
+            self._ports.scan(alive, run_dir)
+            if alive
+            else {"normal": None, "grepable": None, "count": 0}
+        )
 
     def _run_screenshots(self, _domain: str, run_dir: Path, results: dict) -> dict:
         probe = results.get(PHASE_PROBE) or {}
@@ -184,3 +197,71 @@ class ExternalPipeline(DisplayHandler):
             self.print_success_message(f"Phase '{phase}' done — {snippet}")
         else:
             self.print_success_message(f"Phase '{phase}' done.")
+
+    def _cleanup_runtime_artifacts(self, run_dir: Path, results: dict) -> None:
+        """Delete temporary files generated during phase chaining."""
+        preserve_files: set[Path] = set()
+        preserve_dir_roots: set[Path] = set()
+
+        def collect_paths(node) -> None:
+            if isinstance(node, dict):
+                for value in node.values():
+                    collect_paths(value)
+                return
+            if isinstance(node, (list, tuple, set)):
+                for value in node:
+                    collect_paths(value)
+                return
+            if isinstance(node, Path):
+                candidate = node
+            elif isinstance(node, str) and node.strip():
+                candidate = Path(node)
+            else:
+                return
+
+            if not candidate.exists():
+                return
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                return
+            try:
+                resolved.relative_to(run_dir.resolve())
+            except ValueError:
+                return
+
+            if resolved.is_dir():
+                preserve_dir_roots.add(resolved)
+            else:
+                preserve_files.add(resolved)
+
+        collect_paths(results)
+
+        for file_path in run_dir.rglob("*"):
+            if not file_path.is_file():
+                continue
+            try:
+                resolved = file_path.resolve()
+            except OSError:
+                continue
+            if resolved in preserve_files:
+                continue
+            if any(root in resolved.parents for root in preserve_dir_roots):
+                continue
+            file_path.unlink(missing_ok=True)
+
+        for dir_path in sorted(run_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if not dir_path.is_dir():
+                continue
+            try:
+                resolved_dir = dir_path.resolve()
+            except OSError:
+                continue
+            if resolved_dir in preserve_dir_roots:
+                continue
+            if any(resolved_dir in kept.parents for kept in preserve_files):
+                continue
+            try:
+                dir_path.rmdir()
+            except OSError:
+                continue

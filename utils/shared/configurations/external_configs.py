@@ -110,11 +110,11 @@ own artifact directory inside [output_directory/External/<domain>_<timestamp>/].
 {color.OKCYAN}{color.UNDERLINE}Phases (run in order){color.ENDC}:
     {color.OKGREEN}1. recon       {color.ENDC} subdomain enumeration (subfinder, assetfinder, amass, findomain) + dnsx resolution
     {color.OKGREEN}2. probe       {color.ENDC} HTTP probing of resolved hosts via httpx-toolkit (status, title, tech)
-    {color.OKGREEN}3. ports       {color.ENDC} top-1000 nmap service/version scan against alive hosts
-    {color.OKGREEN}4. screenshots {color.ENDC} gowitness screenshots of every alive web service
-    {color.OKGREEN}5. takeover    {color.ENDC} subdomain takeover detection (subzy / subjack)
-    {color.OKGREEN}6. urls        {color.ENDC} historical URL collection (gauplus / waybackurls) + sensitive-file filter
-    {color.OKGREEN}7. vulns       {color.ENDC} nuclei templated vulnerability scan against alive hosts
+    {color.OKGREEN}3. screenshots {color.ENDC} gowitness screenshots of every alive web service
+    {color.OKGREEN}4. takeover    {color.ENDC} subdomain takeover detection (subzy / subjack)
+    {color.OKGREEN}5. urls        {color.ENDC} historical URL collection (gauplus / waybackurls) + sensitive-file filter
+    {color.OKGREEN}6. vulns       {color.ENDC} nuclei templated vulnerability scan against alive hosts
+    {color.OKGREEN}7. ports       {color.ENDC} all-ports nmap scan with vuln scripts; open ports only, no ping discovery (final step)
 
 {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
         {color.OKGREEN}domain {color.ENDC}      Target domain (e.g. example.com)

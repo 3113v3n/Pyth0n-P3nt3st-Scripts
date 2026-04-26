@@ -20,18 +20,15 @@ PHASE_VULNS = "vulns"
 DEFAULT_PHASES = (
     PHASE_RECON,
     PHASE_PROBE,
-    PHASE_PORTS,
     PHASE_SCREENSHOTS,
     PHASE_TAKEOVER,
     PHASE_URLS,
     PHASE_VULNS,
+    PHASE_PORTS,
 )
 
 # httpx default web ports — covers common dev / admin / API ports.
 HTTP_PROBE_PORTS = "80,443,8080,8443,3000,5000,7001,8000,8888,9000,9090"
-
-# Default nmap behaviour: top 1000 ports + service version + default scripts.
-NMAP_DEFAULT_TOP_PORTS = 1000
 
 # Concurrency caps — kept conservative so the tool runs cleanly in CI/limited boxes.
 HTTPX_THREADS = 100

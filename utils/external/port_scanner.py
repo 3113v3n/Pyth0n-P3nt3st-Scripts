@@ -13,7 +13,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from utils.shared.commands import Commands
-from .external_constants import NMAP_DEFAULT_TOP_PORTS
 from .tooling import available_name
 
 
@@ -30,14 +29,12 @@ class PortScanner:
         self,
         alive_urls_file: Path,
         output_dir: Path,
-        top_ports: int = NMAP_DEFAULT_TOP_PORTS,
     ) -> dict:
         """Run nmap against unique hosts from *alive_urls_file*.
 
         Args:
             alive_urls_file: Text file containing one URL per line.
             output_dir:      Destination directory for scan output.
-            top_ports:       Number of top ports to scan.
 
         Returns:
             Dict with normal/grepable output paths and host count, plus a
@@ -62,15 +59,21 @@ class PortScanner:
 
         cmd = [
             nmap,
+            "-v",
             "-sV",
-            "-sC",
             "-Pn",
-            "--top-ports", str(top_ports),
+            "-p-",
+            "--open",
+            "--script", "vuln",
             "-iL", str(targets_file),
             "-oN", str(normal),
             "-oG", str(grepable),
         ]
-        self.command.stream_command(cmd, prefix="[nmap] ")
+        try:
+            self.command.stream_command(cmd, prefix="[nmap] ")
+        finally:
+            # Runtime helper input file; reports are written to nmap_results.* outputs.
+            targets_file.unlink(missing_ok=True)
 
         return {
             "normal": normal if normal.exists() else None,

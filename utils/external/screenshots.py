@@ -43,17 +43,52 @@ class Screenshotter:
         screenshots_dir = output_dir / "screenshots"
         screenshots_dir.mkdir(parents=True, exist_ok=True)
 
-        cmd = [
+        command_candidates = self._build_command_candidates(
+            gowitness,
+            alive_urls_file,
+            screenshots_dir,
+        )
+        for cmd in command_candidates:
+            result = self.command.stream_command(cmd, prefix="[gowitness] ")
+            if result.returncode == 0:
+                break
+
+        images = self._count_images(screenshots_dir)
+        return {
+            "directory": screenshots_dir if images else None,
+            "count": len(images),
+        }
+
+    def _build_command_candidates(
+        self,
+        gowitness: str,
+        alive_urls_file: Path,
+        screenshots_dir: Path,
+    ) -> list[list[str]]:
+        """Return gowitness command variants ordered by likely local version."""
+        modern = [
+            gowitness,
+            "scan",
+            "file",
+            "-f", str(alive_urls_file),
+            "-s", str(screenshots_dir),
+            "--screenshot-format", "png",
+        ]
+        legacy = [
             gowitness,
             "file",
             "-f", str(alive_urls_file),
             "-P", str(screenshots_dir),
             "--disable-db",
         ]
-        self.command.stream_command(cmd, prefix="[gowitness] ")
+        help_text = self.command.get_process_output([gowitness, "--help"]).lower()
+        if "scan" in help_text:
+            return [modern, legacy]
+        return [legacy, modern]
 
-        images = list(screenshots_dir.glob("*.png"))
-        return {
-            "directory": screenshots_dir if images else None,
-            "count": len(images),
-        }
+    @staticmethod
+    def _count_images(screenshots_dir: Path) -> list[Path]:
+        images: list[Path] = []
+        for ext in ("*.png", "*.jpg", "*.jpeg"):
+            images.extend(screenshots_dir.glob(ext))
+        return images

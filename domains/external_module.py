@@ -1,8 +1,8 @@
 """
 external_module.py — External assessment domain controller.
 
-Wires the ExternalPipeline (subdomain enumeration → HTTP probing → port scanning
-→ screenshots → subdomain takeover → URL collection → nuclei vulnerability scan)
+Wires the ExternalPipeline (subdomain enumeration → HTTP probing → screenshots
+→ subdomain takeover → URL collection → nuclei vulnerability scan → port scan)
 to the framework's report writer and AI assistant.
 """
 

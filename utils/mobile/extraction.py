@@ -1,23 +1,54 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import zipfile
+from pathlib import Path
 
 
 class MobileExtractionMixin:
     """Package extraction and output-folder setup helpers."""
 
     def _get_folder_name(self, platform: str, package: str) -> str:
-        self.templates_folder = f"{self.output_directory}/mobile-nuclei-templates"
+        self.templates_folder = f"{self.working_dir}/.tmp/mobile-nuclei-templates"
         platform_name = platform.title() if platform.lower() == "android" else platform
         base_dir = self.output_directory
 
         filename_without_ext = self.get_filename_without_extension(package)
         self.file_name = self.remove_spaces(filename_without_ext)
+        self._cleanup_legacy_extraction_folders(base_dir, platform_name)
 
         self.create_folder(platform_name, search_path=base_dir)
         self.mobile_output_dir = f"{base_dir}/{platform_name}"
-        return self.remove_spaces(f"{self.mobile_output_dir}/{filename_without_ext}")
+        return self._build_runtime_extraction_dir()
+
+    def _build_runtime_extraction_dir(self) -> str:
+        runtime_root = Path(self.working_dir) / ".tmp" / "mobile-extraction"
+        runtime_root.mkdir(parents=True, exist_ok=True)
+
+        # Remove abandoned extraction folders from interrupted runs.
+        for child in runtime_root.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child, ignore_errors=True)
+            else:
+                child.unlink(missing_ok=True)
+
+        folder = tempfile.mkdtemp(prefix=f"{self.file_name}_", dir=str(runtime_root))
+        return str(Path(folder))
+
+    @staticmethod
+    def _cleanup_legacy_extraction_folders(base_dir: str, platform_name: str) -> None:
+        """Delete non-output extraction folders left by older scanner versions."""
+        platform_dir = Path(base_dir) / platform_name
+        if not platform_dir.exists() or not platform_dir.is_dir():
+            return
+
+        for child in platform_dir.iterdir():
+            if not child.is_dir():
+                continue
+            if child.name.endswith("_scan_results"):
+                continue
+            shutil.rmtree(child, ignore_errors=True)
 
     def _extract_with_apktool(self, package: str, folder_name: str) -> bool:
         if not shutil.which("apktool"):
@@ -39,9 +70,6 @@ class MobileExtractionMixin:
         """Extract APK/IPA package and return extraction method used."""
         safe_package = self._validate_file_path(package)
         safe_folder = self._validate_file_path(folder_name)
-
-        if self.check_folder_exists(safe_folder):
-            return "cached"
 
         self.print_info_message(f"Decompiling/extracting {self.file_name} application...")
 
@@ -70,6 +98,38 @@ class MobileExtractionMixin:
 
     def create_subfolder(self) -> None:
         new_folder_name = f"{self.file_name}_scan_results"
-        updated_output_directory = f"{self.folder_name}_scan_results"
         self.create_folder(folder_name=new_folder_name, search_path=self.mobile_output_dir)
-        self.mobile_output_dir = updated_output_directory
+        self.mobile_output_dir = f"{self.mobile_output_dir}/{new_folder_name}"
+
+    def cleanup_extraction_folder(self, folder_name: str) -> None:
+        """Remove decompiled/extracted app directory after report generation."""
+        if not folder_name:
+            return
+        try:
+            safe_folder = self._validate_file_path(folder_name)
+        except ValueError:
+            return
+        if safe_folder.endswith("_scan_results"):
+            return
+        folder = Path(safe_folder)
+        if folder.exists() and folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+            try:
+                parent = folder.parent
+                if parent.name == "mobile-extraction":
+                    parent.rmdir()
+            except OSError:
+                pass
+
+    def cleanup_nuclei_templates(self) -> None:
+        """Remove mobile nuclei template clone (runtime cache) after assessment."""
+        template_dir = str(getattr(self, "templates_folder", "")).strip()
+        if not template_dir:
+            return
+        try:
+            safe_template = self._validate_file_path(template_dir)
+        except ValueError:
+            return
+        folder = Path(safe_template)
+        if folder.exists() and folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)

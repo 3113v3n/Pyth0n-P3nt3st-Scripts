@@ -168,7 +168,15 @@ class MobileNucleiMixin:
                 results["cached"] = True
                 return results
 
-        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8", suffix=".txt") as tmp:
+        tmp_root = Path(self.working_dir) / ".tmp" / "nuclei"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w",
+            delete=False,
+            encoding="utf-8",
+            suffix=".txt",
+            dir=str(tmp_root),
+        ) as tmp:
             tmp.write(f"{application_folder}\n")
             input_file = tmp.name
 
