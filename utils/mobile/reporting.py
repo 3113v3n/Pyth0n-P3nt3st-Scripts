@@ -84,7 +84,7 @@ class MobileReportingMixin:
                 encoded_text, decoded_text, decoded_format = encoded_decoded
                 ordered_files = sorted(files)
 
-                fh.write("===== BASE64 FINDING START =====\n\n")
+                fh.write("============================== BASE64 FINDING START ===========================================\n\n")
                 fh.write("FILE:\n")
                 for file_name in ordered_files:
                     fh.write(f"  - {file_name}\n")
@@ -97,7 +97,7 @@ class MobileReportingMixin:
                 for line in decoded_lines:
                     fh.write(f"  {line}\n")
                 fh.write("\n")
-                fh.write("===== BASE64 FINDING END =====\n\n")
+                fh.write("============================== BASE64 FINDING END ===========================================\n\n")
         return len(sorted_entries)
 
     @staticmethod
