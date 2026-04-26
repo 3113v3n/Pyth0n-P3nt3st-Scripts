@@ -40,7 +40,13 @@ Some of the Scope covered or in progress include but not limited to:
 
 | Domain                       | Script Target                                                      |
 |------------------------------|--------------------------------------------------------------------|
-| External Penetration Testing | 1. Enumerate subdomains                           [coming_soon]    |
+| External Penetration Testing | 1. Subdomain enumeration + DNS resolution         [completed]      |
+|                              | 2. HTTP probing & technology fingerprinting       [completed]      |
+|                              | 3. Port & service enumeration (nmap)              [completed]      |
+|                              | 4. Web screenshots (gowitness)                    [completed]      |
+|                              | 5. Subdomain takeover detection (subzy/subjack)   [completed]      |
+|                              | 6. Historical URL + sensitive file discovery      [completed]      |
+|                              | 7. Vulnerability scanning (nuclei)                [completed]      |
 |                              |                                                                    |
 | Internal Penetration Testing | 1. Enumerate IPs give CIDR                        [completed]      |
 |                              |                                                                    |
@@ -192,6 +198,42 @@ python main.py -M cli_args password -t --ip 10.0.0.3 --domain testdomain.co --pa
 
 ## 5. External Penetration Testing
 
-[Coming Soon]
+Performs an end-to-end external assessment of a target domain by chaining seven
+phases. Each phase produces its own artifacts inside
+`output_directory/External/<domain>_<timestamp>/`, and a consolidated
+`external_report.md` is written at the end of the run.
 
-- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
+### Phases
+
+| # | Phase        | Tools                                          | Output                                    |
+|---|--------------|------------------------------------------------|-------------------------------------------|
+| 1 | recon        | subfinder, assetfinder, amass, findomain, dnsx | `<domain>_subdomains.txt`, `resolved_*.txt` |
+| 2 | probe        | httpx-toolkit                                  | `alive_hosts.json`, `alive_hosts.txt`     |
+| 3 | ports        | nmap                                           | `nmap_results.txt`, `nmap_results.gnmap`  |
+| 4 | screenshots  | gowitness                                      | `screenshots/*.png`                       |
+| 5 | takeover     | subzy / subjack                                | `takeover_<tool>.txt`                     |
+| 6 | urls         | gauplus / waybackurls                          | `historical_urls.txt`, `sensitive_urls.txt` |
+| 7 | vulns        | nuclei                                         | `nuclei_results.txt`                      |
+
+### Interactive mode
+
+Pick the External option from the main menu, supply the target domain when
+prompted, and either press Enter to run every phase or enter a comma-separated
+subset (e.g. `recon,probe,vulns`).
+
+### CLI mode
+
+```sh
+# Full run against example.com
+python main.py -M cli_args external -d example.com
+
+# Limit to a subset of phases
+python main.py -M cli_args external -d example.com --phases recon,probe,vulns
+```
+
+### Notes
+
+- Tools that aren't installed are skipped automatically; the consolidated
+  report records each skipped phase along with the missing binary.
+- AI summaries are appended to the report when `ANTHROPIC_API_KEY` is set
+  (use `--no-ai` to disable globally).
