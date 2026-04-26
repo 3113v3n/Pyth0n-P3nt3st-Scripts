@@ -24,13 +24,13 @@ export PENTEST_SKIP_VENV_BOOTSTRAP=1
 
 The package handler is now OS-aware and supports dynamic dependency checks/installation on:
 - Debian-like Linux (`apt`)
-- macOS (`brew`)
+- macOS (`brew` or MacPorts `port`)
 - Windows (`winget` or `choco`)
 
 Dependency checks are now more accurate and avoid common false positives by:
 - checking command aliases where tools expose different binary names (e.g. `netexec` vs `nxc`)
 - probing executable identity for selected tools (`go`, `java`, `pipx`, `netexec`)
-- searching common non-default binary locations like `~/.local/bin` and `~/go/bin`
+- searching common non-default binary locations like `/opt/local/bin`, `/opt/local/sbin`, `~/.local/bin`, and `~/go/bin`
 
 Notes:
 - Some niche tools may still require manual installation depending on package-manager availability.

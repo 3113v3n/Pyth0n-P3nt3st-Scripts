@@ -33,6 +33,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
     # paths (`/usr/bin`, system Ruby gem dirs) and never require sudo.
     _TOOLS_DIR_NAME = "tools"
     _TOOLS_SUBDIRS = ("bin", "go", "gems", "pipx")
+    _MACPORTS_BIN_DIRS = ("/opt/local/bin", "/opt/local/sbin")
+    _HOMEBREW_ONLY_MACOS_TOOLS = {"findomain"}
 
     # Commands can differ from dependency identifiers; aliases reduce false positives.
     _COMMAND_ALIASES = {
@@ -268,7 +270,9 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if self.os_family == "debian":
             return "apt" if shutil.which("apt-get") else None
         if self.os_family == "macos":
-            if shutil.which("port"):
+            macos_path = os.pathsep.join([*self._MACPORTS_BIN_DIRS, os.environ.get("PATH", "")])
+            if shutil.which("port", path=macos_path):
+                self._prepend_paths_to_env(list(self._MACPORTS_BIN_DIRS))
                 return "port"
             return "brew" if shutil.which("brew") else None
         if self.os_family == "windows":
@@ -289,7 +293,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
         if not self.package_manager:
             self.print_warning_message(
-                "No system package manager detected (apt/brew/winget/choco). "
+                "No system package manager detected (apt/port/brew/winget/choco). "
                 "System-tool installation will be best-effort only."
             )
         return True
@@ -309,8 +313,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
         extras = [
             str(Path(sys.executable).resolve().parent),
             str(self._tools_bin_dir()),
-            "/opt/local/bin",
-            "/opt/local/sbin",
+            *self._MACPORTS_BIN_DIRS,
             *self._homebrew_ruby_bin_dirs(),
             str(Path.home() / ".local" / "bin"),
             str(Path.home() / "go" / "bin"),
@@ -431,22 +434,25 @@ class PackageHandler(Config, DisplayHandler, Commands):
         bin_paths = [
             str(Path(sys.executable).resolve().parent),
             str(self._tools_bin_dir()),
-            "/opt/local/bin",
-            "/opt/local/sbin",
+            *self._MACPORTS_BIN_DIRS,
             *self._homebrew_ruby_bin_dirs(),
         ]
-        current = os.environ.get("PATH", "")
-        path_entries = current.split(os.pathsep) if current else []
-        for bin_path in reversed(bin_paths):
-            if bin_path and bin_path not in path_entries:
-                path_entries.insert(0, bin_path)
-        os.environ["PATH"] = os.pathsep.join(path_entries)
+        self._prepend_paths_to_env(bin_paths)
 
         gems_dir = str(self.tools_root / "gems")
         os.environ.setdefault("GEM_HOME", gems_dir)
         gem_path_entries = os.environ.get("GEM_PATH", "").split(os.pathsep)
         if gems_dir not in gem_path_entries:
             os.environ["GEM_PATH"] = os.pathsep.join([gems_dir, *[entry for entry in gem_path_entries if entry]])
+
+    @staticmethod
+    def _prepend_paths_to_env(paths: list[str]) -> None:
+        current = os.environ.get("PATH", "")
+        path_entries = current.split(os.pathsep) if current else []
+        for bin_path in reversed(paths):
+            if bin_path and bin_path not in path_entries:
+                path_entries.insert(0, bin_path)
+        os.environ["PATH"] = os.pathsep.join(path_entries)
 
     def _ensure_tools_dirs(self) -> None:
         """Create the per-toolchain subdirectories. Called before installs."""
@@ -472,10 +478,17 @@ class PackageHandler(Config, DisplayHandler, Commands):
         ])
         return env
 
-    def _system_install_env(self) -> dict[str, str]:
+    def _system_install_env(self, package_manager: str | None = None) -> dict[str, str]:
         """Env vars for non-language system package managers."""
+        manager = package_manager or self.package_manager
         env = os.environ.copy()
-        if self.package_manager == "brew":
+        if manager == "port":
+            entries = env.get("PATH", "").split(os.pathsep) if env.get("PATH") else []
+            for bin_path in reversed(self._MACPORTS_BIN_DIRS):
+                if bin_path not in entries:
+                    entries.insert(0, bin_path)
+            env["PATH"] = os.pathsep.join(entries)
+        if manager == "brew":
             # Avoid long, implicit update steps and make brew output deterministic
             # inside non-interactive framework runs.
             env.setdefault("HOMEBREW_NO_AUTO_UPDATE", "1")
@@ -645,35 +658,41 @@ class PackageHandler(Config, DisplayHandler, Commands):
                 pass
         return command
 
-    def _system_package_alias_key(self) -> str:
+    def _system_package_alias_key(self, package_manager: str | None = None) -> str:
+        manager = package_manager or self.package_manager
         if self.os_family != "windows":
-            if self.os_family == "macos" and self.package_manager == "port":
+            if self.os_family == "macos" and manager == "port":
                 return "macports"
             return self.os_family
-        return "windows-winget" if self.package_manager == "winget" else "windows-choco"
+        return "windows-winget" if manager == "winget" else "windows-choco"
 
-    def _system_package_name(self, tool_name: str) -> str:
-        alias_key = self._system_package_alias_key()
+    def _system_package_name(self, tool_name: str, package_manager: str | None = None) -> str:
+        alias_key = self._system_package_alias_key(package_manager)
         mapping = self._SYSTEM_PACKAGE_ALIASES.get(alias_key, {})
         return mapping.get(tool_name, tool_name)
 
-    def _build_system_install_commands(self, package_names: list[str]) -> list[list[str]]:
-        if not package_names or not self.package_manager:
+    def _build_system_install_commands(
+        self,
+        package_names: list[str],
+        package_manager: str | None = None,
+    ) -> list[list[str]]:
+        manager = package_manager or self.package_manager
+        if not package_names or not manager:
             return []
 
-        if self.package_manager == "apt":
+        if manager == "apt":
             return [self._with_privilege(["apt-get", "install", "-y", *package_names])]
 
-        if self.package_manager == "brew":
+        if manager == "brew":
             return [["brew", "install", package_name] for package_name in package_names]
 
-        if self.package_manager == "port":
+        if manager == "port":
             return [self._with_privilege(["port", "install", package_name]) for package_name in package_names]
 
-        if self.package_manager == "choco":
+        if manager == "choco":
             return [["choco", "install", "-y", *package_names]]
 
-        if self.package_manager == "winget":
+        if manager == "winget":
             return [
                 [
                     "winget",
@@ -687,6 +706,22 @@ class PackageHandler(Config, DisplayHandler, Commands):
             ]
 
         return []
+
+    def _system_manager_for_tool(self, tool_name: str) -> str | None:
+        """Return the system package manager that should install a tool."""
+        if (
+            self.os_family == "macos"
+            and self.package_manager == "port"
+            and tool_name in self._HOMEBREW_ONLY_MACOS_TOOLS
+        ):
+            if shutil.which("brew", path=self._search_path):
+                return "brew"
+            self.print_warning_message(
+                f"Skipping auto-install for '{tool_name}': it is not available in MacPorts "
+                "and Homebrew was not detected."
+            )
+            return None
+        return self.package_manager
 
     def _action(
         self,
@@ -705,7 +740,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
     def _build_install_plan(self, missing_tools: list[str]) -> list[Dict[str, object]]:
         """Build normalized installation actions from missing tool identifiers."""
         actions: list[Dict[str, object]] = []
-        system_tool_to_pkg: dict[str, str] = {}
+        system_tool_to_install: dict[str, tuple[str, str]] = {}
+        skipped_system_tools: list[str] = []
 
         needs_pipx = any(tool in self._PIPX_PACKAGES for tool in missing_tools)
         needs_go = any(tool in self._GO_MODULES for tool in missing_tools)
@@ -728,14 +764,22 @@ class PackageHandler(Config, DisplayHandler, Commands):
             )
 
         if needs_go and self._binary_missing("go"):
-            go_cmds = self._build_system_install_commands([self._system_package_name("go")])
+            go_manager = self._system_manager_for_tool("go")
+            go_cmds = self._build_system_install_commands(
+                [self._system_package_name("go", go_manager)],
+                go_manager,
+            )
             if go_cmds:
                 actions.append(self._action("go", go_cmds, ["go"]))
             else:
                 self.print_warning_message("'go' is missing and no package manager is available to install it.")
 
         if needs_gem and not self._preferred_gem_executable():
-            ruby_cmds = self._build_system_install_commands([self._system_package_name("ruby")])
+            ruby_manager = self._system_manager_for_tool("ruby")
+            ruby_cmds = self._build_system_install_commands(
+                [self._system_package_name("ruby", ruby_manager)],
+                ruby_manager,
+            )
             if ruby_cmds:
                 actions.append(self._action("ruby", ruby_cmds, ["ruby", "gem"]))
             else:
@@ -812,28 +856,37 @@ class PackageHandler(Config, DisplayHandler, Commands):
                 )
                 continue
 
-            system_tool_to_pkg[tool] = self._system_package_name(tool)
-
-        if system_tool_to_pkg:
-            if not self.package_manager:
-                self.print_warning_message(
-                    "System package manager not found. Cannot auto-install: "
-                    + ", ".join(sorted(system_tool_to_pkg.keys()))
-                )
+            manager = self._system_manager_for_tool(tool)
+            if manager:
+                system_tool_to_install[tool] = (manager, self._system_package_name(tool, manager))
             else:
-                pkg_to_tools: defaultdict[str, list[str]] = defaultdict(list)
-                for tool, pkg in system_tool_to_pkg.items():
-                    pkg_to_tools[pkg].append(tool)
+                skipped_system_tools.append(tool)
 
+        if skipped_system_tools and not self.package_manager:
+            self.print_warning_message(
+                "System package manager not found. Cannot auto-install: "
+                + ", ".join(sorted(skipped_system_tools))
+            )
+
+        if system_tool_to_install:
+            manager_pkg_to_tools: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
+            for tool, (manager, pkg) in system_tool_to_install.items():
+                manager_pkg_to_tools[(manager, pkg)].append(tool)
+
+            tools_by_manager: defaultdict[str, dict[str, list[str]]] = defaultdict(dict)
+            for (manager, pkg), tools in manager_pkg_to_tools.items():
+                tools_by_manager[manager][pkg] = tools
+
+            for manager, pkg_to_tools in sorted(tools_by_manager.items()):
                 package_names = sorted(pkg_to_tools.keys())
-                commands = self._build_system_install_commands(package_names)
+                commands = self._build_system_install_commands(package_names, manager)
                 verify_names = sorted({tool for tools in pkg_to_tools.values() for tool in tools})
                 actions.append(
                     self._action(
-                        f"system:{self.package_manager}",
+                        f"system:{manager}",
                         commands,
                         verify_names,
-                        env=self._system_install_env(),
+                        env=self._system_install_env(manager),
                     )
                 )
 

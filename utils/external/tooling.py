@@ -9,15 +9,17 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_BIN = PROJECT_ROOT / "tools" / "bin"
+MACPORTS_BIN_DIRS = ("/opt/local/bin", "/opt/local/sbin")
 
 
 def ensure_tools_path() -> None:
-    """Prepend repo-local tools/bin so locally installed tools are discoverable."""
-    bin_path = str(TOOLS_BIN)
+    """Prepend repo-local and MacPorts tool dirs so binaries are discoverable."""
     current = os.environ.get("PATH", "")
     entries = current.split(os.pathsep) if current else []
-    if bin_path not in entries:
-        os.environ["PATH"] = bin_path + (os.pathsep + current if current else "")
+    for path in reversed((str(TOOLS_BIN), *MACPORTS_BIN_DIRS)):
+        if path not in entries:
+            entries.insert(0, path)
+    os.environ["PATH"] = os.pathsep.join(entries)
 
 
 def which_tool(*names: str) -> str | None:
