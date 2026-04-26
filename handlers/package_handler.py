@@ -104,12 +104,13 @@ class PackageHandler(Config, DisplayHandler, Commands):
     # Prebuilt binary downloads — preferred over system package managers for tools
     # that are expensive to compile (e.g. findomain requires LLVM + Rust via brew).
     # Keys are "<os_family>-<arch>"; arch is "arm64" or "x86_64".
+    # Zip assets are extracted automatically; bare binaries are placed directly.
     _DIRECT_DOWNLOADS: dict[str, dict[str, str]] = {
         "findomain": {
-            "macos-x86_64": "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-osx",
-            "macos-arm64":  "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-osx",
-            "debian-x86_64":  "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-linux",
-            "debian-arm64":   "https://github.com/Edu4rdSHL/findomain/releases/latest/download/findomain-aarch64-unknown-linux-gnu",
+            "macos-x86_64": "https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx-x86_64.zip",
+            "macos-arm64":  "https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx-arm64.zip",
+            "debian-x86_64":  "https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux.zip",
+            "debian-arm64":   "https://github.com/Findomain/Findomain/releases/latest/download/findomain-aarch64.zip",
         },
     }
 
@@ -509,17 +510,36 @@ class PackageHandler(Config, DisplayHandler, Commands):
     def _build_download_action(self, tool_name: str, url: str) -> Dict[str, object]:
         """Return an action that fetches a prebuilt binary into ``tools/bin/``.
 
-        Uses ``curl`` when available (most macOS/Linux setups); falls back to
-        Python's ``urllib`` so the handler has no extra runtime dependency.
+        Handles both bare binaries and ``.zip`` archives. Uses ``curl`` for the
+        download when available; always uses Python's ``zipfile`` for extraction
+        so there is no dependency on a system ``unzip``.
         """
         dest = str(self._tools_bin_dir() / tool_name)
-        if shutil.which("curl"):
-            commands: list[list[str]] = [
+        is_zip = url.lower().endswith(".zip")
+
+        if is_zip:
+            # Single Python call: download zip into a temp file, extract the
+            # binary (matched by name), place it in tools/bin/, then clean up.
+            extract_script = (
+                "import urllib.request, zipfile, tempfile, os, shutil; "
+                f"tmp = tempfile.mktemp(suffix='.zip'); "
+                f"urllib.request.urlretrieve({url!r}, tmp); "
+                f"z = zipfile.ZipFile(tmp); "
+                f"members = [m for m in z.namelist() if os.path.basename(m).split('.')[0] == {tool_name!r}]; "
+                f"src = members[0] if members else z.namelist()[0]; "
+                f"data = z.open(src).read(); "
+                f"open({dest!r}, 'wb').write(data); "
+                f"os.chmod({dest!r}, 0o755); "
+                f"os.unlink(tmp)"
+            )
+            commands: list[list[str]] = [[sys.executable, "-c", extract_script]]
+        elif shutil.which("curl"):
+            commands = [
                 ["curl", "-fsSL", "--output", dest, url],
                 ["chmod", "+x", dest],
             ]
         else:
-            # Pure-Python fallback — no curl dependency required.
+            # Pure-Python fallback for bare binaries when curl is absent.
             commands = [
                 [
                     sys.executable, "-c",
