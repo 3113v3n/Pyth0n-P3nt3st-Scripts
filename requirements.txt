@@ -11,11 +11,11 @@ numpy==2.1.0; python_version >= "3.13"
 pandas==2.2.2; python_version < "3.13"  # For data manipulation
 pandas==2.2.3; python_version >= "3.13"
 pyarrow==19.0.1         # For efficient data handling with pandas/dask
-scapy==2.6.1            # For network packet manipulation
+scapy==2.7.0            # For network packet manipulation (patched for GHSA-cq46-m9x9-j8w2)
 tqdm==4.66.4            # For progress bars
 XlsxWriter==3.2.2       # For writing Excel files
 psutil==7.0.0
 netifaces2==0.0.22      # Handle network interfaces
 dnspython==2.7.0
-urllib3==2.4.0
+urllib3==2.6.3          # Patched for multiple 2026 redirect/decompression advisories
 beautifulsoup4==4.13.4

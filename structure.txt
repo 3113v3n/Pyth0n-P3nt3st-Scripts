@@ -12,6 +12,9 @@
 │   ├── custom_parser.py										        # Custom argparse behaviors and help output
 │   ├── file_handler.py										                # File I/O, CSV/XLSX write helpers, and filesystem-safe paths
 │   ├── file_selection_mixin.py										        # Reusable file discovery/filtering and selection prompts
+│   ├── framework_assessment_mixin.py										# Domain assessment orchestration for the main framework
+│   ├── framework_core_mixin.py										        # Core lifecycle helpers (class init, package checks, domain loading)
+│   ├── framework_runtime_mixin.py										# Runtime loops and exit prompt handling for interactive/CLI modes
 │   ├── helper_handler.py										        # Interactive help/menu content for each assessment mode
 │   ├── interaction.py										                # CLI argument parsing and module dispatch preparation
 │   ├── messages.py										                # Console message formatting (info/warn/error/success)
@@ -36,7 +39,7 @@
 │   ├── va.png										                        # Vulnerability analysis screenshot asset
 │   ├── va_help.png										                # Vulnerability help screenshot asset
 │   └── va_scanner_filetype.png										        # Vulnerability scanner/file-type selection screenshot asset
-├── main.py										                        # Main program bootstrap, dependency checks, and domain execution routing
+├── main.py										                        # Thin entrypoint that composes framework mixins and launches runtime
 ├── requirements.txt										                # Python dependency list
 ├── structure.txt										                # High-level repository tree with per-file summaries
 └── utils
@@ -93,4 +96,4 @@
         ├── reporting.py										        # Vulnerability report export utilities
         └── scan_formatting.py										        # Scanner-specific row/field formatting adapters
 
-11 directories, 83 files
+11 directories, 86 files
