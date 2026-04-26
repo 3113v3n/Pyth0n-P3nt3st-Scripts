@@ -16,6 +16,7 @@ class PentestFramework(
 
     def __init__(self):
         super().__init__()
+        # Refactor note: state remains in the root class so mixins stay stateless.
         self.ai = None
         self.use_ai = True
         self.classes = self.initialize_classes()
@@ -34,6 +35,7 @@ def main():
         _interaction.main()
         framework = PentestFramework()
 
+        # Keep CLI behavior identical after refactor: --no-ai toggles the shared AI instance.
         if not _interaction.arguments.get("use_ai", True):
             framework.use_ai = False
 

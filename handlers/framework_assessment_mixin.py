@@ -31,6 +31,7 @@ class FrameworkAssessmentMixin:
                 resume_file = _vars["resume_file"]
                 subnet_mask = _vars["mask"]
                 last_ip = user.get_last_unresponsive_ip(resume_file)
+                # Resume flow now rebuilds subnet context from the persisted host file.
                 _vars["subnet"] = f"{last_ip}/{subnet_mask}"
                 _output_file = resume_file
             elif _action == "scan":
@@ -163,6 +164,7 @@ class FrameworkAssessmentMixin:
         if self.debug:
             self.print_debug_message(f"Commandline Arguments {user_data}")
 
+        # Kept as explicit branches to preserve existing per-domain side effects.
         if user_test_domain == "internal":
             internal = self._load_domain("internal")
             if internal is None:

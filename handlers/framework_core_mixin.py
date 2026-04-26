@@ -14,6 +14,7 @@ class FrameworkCoreMixin:
     def initialize_classes(self) -> dict:
         """Initialize core classes required for startup and shared flows."""
         try:
+            # Lazy imports keep startup resilient when optional deps are missing.
             from handlers.helper_handler import HelpHandler
             from handlers.network_handler import NetworkHandler
             from handlers.package_handler import PackageHandler
@@ -87,6 +88,7 @@ class FrameworkCoreMixin:
             )
             return None
 
+        # Keep AI wiring centralized so all domain handlers receive the same instance.
         domain_obj.ai = self.ai
         domain_cache[domain_key] = domain_obj
         return domain_obj
@@ -113,6 +115,7 @@ class FrameworkCoreMixin:
         _package = self.classes["package"]
         package_supported_domains = {"mobile", "internal", "external"}
 
+        # Non-system modules do not require package bootstrap.
         if user_test_domain not in package_supported_domains:
             return True
 
