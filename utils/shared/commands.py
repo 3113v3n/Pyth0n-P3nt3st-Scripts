@@ -12,6 +12,7 @@ import re
 import sys
 import time
 import asyncio
+import threading
 import platform
 import subprocess
 from typing import Optional
@@ -30,6 +31,7 @@ except ModuleNotFoundError:  # Optional dependency; fallback to system ping.
 # [Security] Characters that are meaningful to the shell and must never appear
 # in inputs passed to _execute_shell_string().
 _SHELL_METACHARACTERS = re.compile(r'[;&|`$<>\\!{}()\[\]]')
+_THREAD_LOCAL = threading.local()
 
 
 class Commands:
@@ -267,7 +269,7 @@ class Commands:
             return False
 
     def start_async_ping(self, ip: str) -> bool:
-        """Run async_host_ping() in a new event loop from a synchronous context.
+        """Run async_host_ping() from synchronous code using a thread-local event loop.
 
         Args:
             ip: Target IP address.
@@ -280,10 +282,11 @@ class Commands:
             return self.ping_hosts(ip)
 
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            loop = getattr(_THREAD_LOCAL, "event_loop", None)
+            if loop is None or loop.is_closed():
+                loop = asyncio.new_event_loop()
+                _THREAD_LOCAL.event_loop = loop
             is_alive = loop.run_until_complete(self.async_host_ping(ip))
-            loop.close()
             return is_alive
         except Exception as error:
             print(f"Async ping failed for {ip}: {error}")

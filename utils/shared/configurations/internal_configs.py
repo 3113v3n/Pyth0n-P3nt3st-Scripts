@@ -39,7 +39,17 @@ class InternalConfigs:
 
     use: '{colors.BOLD}generate{colors.ENDC}' to select module
 
-        [{colors.OKGREEN}username{colors.ENDC}]:[{colors.OKGREEN}password{colors.ENDC}]
+        Common passwords:
+            ----------------- Common Password ---------------------------------
+            PASSWORD: Passw0rd123
+            COUNT: 20
+            USERS:
+                - user1
+                - user2
+            ------------------------------------------------------------------
+
+        Unique credentials:
+            [{colors.OKGREEN}username{colors.ENDC}]:[{colors.OKGREEN}password{colors.ENDC}]
 
     {colors.UNDERLINE}Params{colors.ENDC}:
         cracked hashes format:  {colors.WARNING}7095e1b8926196214d82f7b6f276{colors.ENDC}:{colors.WARNING}S4mpl3P4ssw0rd!{colors.ENDC}
@@ -53,9 +63,9 @@ class InternalConfigs:
     {colors.UNDERLINE}Params{colors.ENDC}:
         Target:                 The ip address of the target
         domain:                 The Domain of the host being tested [{colors.WARNING}testdomain.xy.z{colors.ENDC}]
-        user_password <file>:   The file containing your username and passwords to test in the following
-                                    format
-                                    [ {colors.OKCYAN}username:password{colors.ENDC} ]
+        user_password <file>:   The file containing your username and passwords to test in either:
+                                    1. Common-password grouped blocks
+                                    2. [ {colors.OKCYAN}username:password{colors.ENDC} ] one-line entries
 
 {HEADLINE}"""
 

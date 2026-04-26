@@ -1,0 +1,167 @@
+"""Reusable file-discovery and selection workflows for CLI handlers."""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+
+class FileSelectionMixin:
+    """Mixin that encapsulates file listing/filtering and selection prompts."""
+
+    def create_folder(self, folder_name, search_path="./output_directory"):
+        self.output_directory = f"{search_path}/{folder_name}"
+
+        if not self.check_subdirectory_exists(folder_name, search_path=search_path):
+            folder_path = self.output_directory
+            os.makedirs(folder_path)
+
+    def find_files(self, search_path):
+        """Search for files in the given directory and all subdirectories."""
+        for root, _, files in os.walk(search_path):
+            for file in files:
+                file_object = {
+                    "filename": file,
+                    "full_path": os.path.join(root, file),
+                }
+                self.files.append(file_object)
+        return self.files
+
+    def display_saved_files(self, dir_to_search, **kwargs):
+        """Display to the user a list of files available."""
+        self.find_files(dir_to_search)
+        self.files = self._get_filtered_files(**kwargs)
+
+        if not self.files:
+            return None
+
+        self._display_file_options()
+        return self._handle_analysis(**kwargs)
+
+    def _get_filtered_files(self, **kwargs) -> list:
+        """Get filtered files based on selection mode flags."""
+        file_collection = self._get_file_collections()
+
+        if kwargs.get("scan_extension"):
+            return self._filter_files_by_extension(
+                file_collection,
+                kwargs["scan_extension"],
+            )
+        if kwargs.get("resume_scan"):
+            return self._filter_unresponsive_host_files(file_collection["csv"])
+        if kwargs.get("display_applications"):
+            return file_collection["applications"]
+        return self.files
+
+    def _get_file_collections(self) -> dict:
+        """Return useful file collections grouped by extension/type."""
+
+        def get_files_by_type(ext):
+            return [
+                file
+                for file in self.files
+                if self.check_filetype(file["filename"], ext)
+            ]
+
+        csv_files = get_files_by_type("csv")
+        xlsx_files = get_files_by_type("xlsx")
+        both_files = csv_files + xlsx_files
+
+        application_files = [
+            file
+            for file in self.files
+            if self.check_filetype(file["filename"], "apk")
+            or self.check_filetype(file["filename"], "ipa")
+        ]
+
+        return {
+            "csv": csv_files,
+            "xlsx": xlsx_files,
+            "both": both_files,
+            "applications": application_files,
+        }
+
+    @staticmethod
+    def _filter_unresponsive_host_files(csv_files) -> list[Any] | None:
+        """Filter to CSV files that contain unresponsive-host scan data."""
+        unresponsive_file = [
+            file
+            for file in csv_files
+            if "unresponsive_host" in file["filename"]
+        ]
+        if not unresponsive_file:
+            return None
+        return unresponsive_file
+
+    def _filter_files_by_extension(self, collections, extension) -> Any | None:
+        """Filter files by extension key (csv/xlsx/xlx/both)."""
+        if extension not in ["csv", "xlsx", "xlx", "both"]:
+            self.print_error_message(f"Invalid extension: {extension}")
+            return None
+
+        normalized_extension = "xlsx" if extension == "xlx" else extension
+        filtered_files = collections[normalized_extension]
+        if not filtered_files:
+            self.print_error_message("No files found")
+            return None
+        return filtered_files
+
+    def _display_file_options(self):
+        """Display available file options to user."""
+        for index, file in enumerate(self.files, 1):
+            self.print_selection_items(file, index)
+
+    def _handle_analysis(self, **kwargs):
+        """Route selection flow to the correct analysis action."""
+        if kwargs.get("scan_extension"):
+            return self.select_and_analyze_file("files")
+        if kwargs.get("display_applications"):
+            return self.select_and_analyze_file("applications")
+        if kwargs.get("resume_scan"):
+            return self.select_and_analyze_file()
+        return None
+
+    def index_out_of_range_display(self, input_str, data_list) -> int:
+        """Prompt for a numeric selection and return its 0-based index."""
+        while True:
+            try:
+                selected_value = int(input(f"\n{input_str}").strip())
+                if 0 < selected_value < len(data_list) + 1:
+                    break
+                self.print_error_message(
+                    "The selected number is out of range."
+                    f" Please enter a valid number between 1 & {len(data_list)}"
+                )
+            except ValueError:
+                self.print_error_message("Invalid input. Please enter a number.")
+        return selected_value - 1
+
+    def select_and_analyze_file(self, to_analyze: str = "") -> tuple | str | None:
+        """Prompt user to choose an item and return the scan context."""
+        print(f"\n{self.OKBLUE}Analyzing {to_analyze}...{self.ENDC}")
+
+        if to_analyze == "files":
+            selected_file = self.index_out_of_range_display(
+                "Please enter the file number you would like to scan first: ",
+                self.files,
+            )
+            return self.files, selected_file
+
+        if to_analyze == "applications":
+            selected_app = self.index_out_of_range_display(
+                "Select the application to scan: ",
+                self.files,
+            )
+            return self.files[selected_app]
+
+        selected_file = self.index_out_of_range_display(
+            "Please enter the file number displayed above: ",
+            self.files,
+        )
+        self.filepath = self.files[selected_file]["full_path"]
+        starting_ip = self.get_last_unresponsive_ip(self.filepath)
+        return starting_ip
+
+    def do_analysis(self, to_analyze: str = "") -> tuple | str | None:
+        """Backward-compatible alias for select_and_analyze_file()."""
+        return self.select_and_analyze_file(to_analyze)
