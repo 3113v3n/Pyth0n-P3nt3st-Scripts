@@ -45,6 +45,7 @@ class FrameworkRuntimeMixin:
         """Main program loop."""
         while not self.exit_menu:
             try:
+                # Refactor note: state reset happens once per menu iteration.
                 self.reset_class_states()
 
                 user = self.classes["user"]
@@ -84,6 +85,7 @@ class FrameworkRuntimeMixin:
     def run_program_interactively(self, user_data: dict) -> None:
         """Run an Interactive version of the program."""
         try:
+            # CLI mode uses one-shot execution with shared plumbing from interactive mode.
             self.reset_class_states()
             user = self.classes["user"]
             test_domain = user_data.get("module")
