@@ -103,14 +103,25 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     # Prebuilt binary downloads — preferred over system package managers for tools
     # that are expensive to compile (e.g. findomain requires LLVM + Rust via brew).
-    # Keys are "<os_family>-<arch>"; arch is "arm64" or "x86_64".
-    # Zip assets are extracted automatically; bare binaries are placed directly.
-    _DIRECT_DOWNLOADS: dict[str, dict[str, str]] = {
+    #
+    # Structure per tool:
+    #   "repo"           — GitHub owner/repo (only thing that needs updating if
+    #                      the project moves; no full URLs hardcoded here)
+    #   "asset_patterns" — per "<os_family>-<arch>" substring matched against
+    #                      asset names in the latest GitHub release. Substring
+    #                      matching means version numbers or minor renames in the
+    #                      filename don't break the lookup.
+    #
+    # Resolution order: GitHub API → constructed fallback URL → skip.
+    _DIRECT_DOWNLOADS: dict[str, dict] = {
         "findomain": {
-            "macos-x86_64": "https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx-x86_64.zip",
-            "macos-arm64":  "https://github.com/Findomain/Findomain/releases/latest/download/findomain-osx-arm64.zip",
-            "debian-x86_64":  "https://github.com/Findomain/Findomain/releases/latest/download/findomain-linux.zip",
-            "debian-arm64":   "https://github.com/Findomain/Findomain/releases/latest/download/findomain-aarch64.zip",
+            "repo": "Findomain/Findomain",
+            "asset_patterns": {
+                "macos-x86_64": "osx-x86_64",
+                "macos-arm64":  "osx-arm64",
+                "debian-x86_64": "linux.zip",
+                "debian-arm64":  "aarch64",
+            },
         },
     }
 
@@ -494,18 +505,71 @@ class PackageHandler(Config, DisplayHandler, Commands):
         return env
 
     def _direct_download_url(self, tool_name: str) -> str | None:
-        """Return a prebuilt-binary URL for ``tool_name`` on the current OS/arch.
+        """Resolve a prebuilt-binary download URL for ``tool_name``.
 
-        Returns ``None`` when no download entry exists, falling through to the
-        system package manager instead.
+        Looks up the tool in ``_DIRECT_DOWNLOADS``, determines the right
+        asset pattern for the current OS/arch, then asks the GitHub API for
+        the real URL of the matching asset in the latest release.
+
+        Falls back to a constructed ``releases/latest/download/<pattern>`` URL
+        when the API is unreachable (e.g. rate-limited, no network).
+
+        Returns ``None`` when no entry exists for this tool/OS combination,
+        allowing the caller to fall through to the system package manager.
         """
-        entries = self._DIRECT_DOWNLOADS.get(tool_name)
-        if not entries:
+        entry = self._DIRECT_DOWNLOADS.get(tool_name)
+        if not entry:
             return None
+
+        repo = entry.get("repo", "")
+        patterns: dict = entry.get("asset_patterns", {})
         machine = platform.machine().lower()
         arch = "arm64" if machine in ("arm64", "aarch64") else "x86_64"
         key = f"{self.os_family}-{arch}"
-        return entries.get(key) or entries.get(f"{self.os_family}-x86_64")
+        pattern = patterns.get(key) or patterns.get(f"{self.os_family}-x86_64")
+
+        if not pattern or not repo:
+            return None
+
+        # Prefer a live GitHub API lookup — resilient to filename changes.
+        resolved = self._github_latest_asset_url(repo, pattern)
+        if resolved:
+            return resolved
+
+        # Fallback: constructed URL using the stored pattern as a filename.
+        # Works as long as the project uses the standard GitHub releases path.
+        self.print_warning_message(
+            f"GitHub API lookup failed for {tool_name}; "
+            "falling back to constructed release URL."
+        )
+        return f"https://github.com/{repo}/releases/latest/download/{pattern}"
+
+    @staticmethod
+    def _github_latest_asset_url(repo: str, asset_pattern: str) -> str | None:
+        """Return the browser download URL of the latest release asset whose
+        name contains ``asset_pattern`` (case-insensitive substring match).
+
+        Substring matching tolerates version numbers, minor renames, or
+        extension changes in the asset filename without needing a code update.
+        Returns ``None`` on any network or parsing failure.
+        """
+        import json
+        import urllib.request
+
+        try:
+            api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+            req = urllib.request.Request(
+                api_url,
+                headers={"Accept": "application/vnd.github+json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+            for asset in data.get("assets", []):
+                if asset_pattern.lower() in asset["name"].lower():
+                    return asset["browser_download_url"]
+        except Exception:
+            pass
+        return None
 
     def _build_download_action(self, tool_name: str, url: str) -> Dict[str, object]:
         """Return an action that fetches a prebuilt binary into ``tools/bin/``.
