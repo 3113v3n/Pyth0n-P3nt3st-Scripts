@@ -142,6 +142,8 @@ class FrameworkAssessmentMixin:
                 app_vars = {
                     "filename": filename,
                     "full_path": app.get("full_path"),
+                    "taxonomy": mobile_testing_vars.get("taxonomy", "both"),
+                    "taxonomy_profile": mobile_testing_vars.get("taxonomy_profile", "balanced"),
                 }
                 mobile.initialize_variables(app_vars)
                 mobile._inspect_files(test_domain, self.os)

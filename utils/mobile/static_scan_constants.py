@@ -66,6 +66,26 @@ class MobileStaticScanConstants:
         "oid", "asn1", "x509", "pkcs", "objectidentifier", "object identifier",
     )
     KNOWN_PUBLIC_SERVICE_IPS = {"1.1.1.1", "8.8.8.8", "8.8.4.4", "9.9.9.9"}
+    DANGEROUS_ANDROID_PERMISSIONS = {
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.SEND_SMS",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.CALL_PHONE",
+    }
 
     SECRET_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
         ("AWS Access Key", "high", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
@@ -127,9 +147,29 @@ class MobileStaticScanConstants:
                 "hostnameverifier",
             ),
         ),
+        (
+            "deeplink",
+            "Potential Deep Link Attack Surface",
+            "low",
+            (
+                "android.intent.action.view",
+                "cfbundleurltypes",
+                "openurl(",
+                "continueuseractivity",
+            ),
+        ),
     ]
 
     ADVANCED_RISK_REGEX: list[tuple[str, str, str, re.Pattern[str]]] = [
+        (
+            "hardcoded_secret",
+            "Embedded Private Key Material",
+            "critical",
+            re.compile(
+                r"-----BEGIN(?: RSA| EC| DSA| OPENSSH)? PRIVATE KEY-----",
+                re.IGNORECASE,
+            ),
+        ),
         (
             "crypto",
             "Weak Hash Algorithm Usage",
@@ -149,6 +189,18 @@ class MobileStaticScanConstants:
             re.compile(r"(?i)cipher\.getinstance\(\"(?:des|desede|rc2|rc4)[^\"]*\"\)"),
         ),
         (
+            "webview",
+            "WebView Mixed Content Always Allow",
+            "high",
+            re.compile(r"(?i)setmixedcontentmode\s*\(\s*websettings\.mixed_content_always_allow"),
+        ),
+        (
+            "webview",
+            "WebView File URL Access Relaxed",
+            "high",
+            re.compile(r"(?i)setallowfileaccessfromfileurls\s*\(\s*true\s*\)"),
+        ),
+        (
             "crypto",
             "Potential Insecure PRNG (SHA1PRNG)",
             "medium",
@@ -165,6 +217,24 @@ class MobileStaticScanConstants:
             "Potential SQL Injection Sink (rawQuery Concatenation)",
             "high",
             re.compile(r"(?i)rawquery\s*\([^\n]*\+[^\n]*\)"),
+        ),
+        (
+            "data_access",
+            "Potential SQL Injection Sink (execSQL Concatenation)",
+            "high",
+            re.compile(r"(?i)execsql\s*\([^\n]*\+[^\n]*\)"),
+        ),
+        (
+            "storage",
+            "Legacy World-Readable/Writeable Storage Mode",
+            "high",
+            re.compile(r"(?i)\bMODE_WORLD_(?:READABLE|WRITEABLE)\b"),
+        ),
+        (
+            "logging",
+            "Sensitive Data Logged in NSLog/print",
+            "medium",
+            re.compile(r"(?i)\b(?:nslog|print)\s*\([^\n]*(?:password|token|secret|api[_-]?key)"),
         ),
         (
             "intent_security",

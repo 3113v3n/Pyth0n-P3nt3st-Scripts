@@ -88,6 +88,17 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.start_domain_helper(self.helper_.mobile_helper)
         while True:
             try:
+                taxonomy_raw = self.prompt_format(
+                    "Taxonomy tags [none | masvs | mastg | both] (default: both): "
+                ).strip().lower()
+                taxonomy = taxonomy_raw if taxonomy_raw in {"none", "masvs", "mastg", "both"} else "both"
+                profile_raw = self.prompt_format(
+                    "Taxonomy profile [strict | balanced | aggressive] (default: balanced): "
+                ).strip().lower()
+                taxonomy_profile = (
+                    profile_raw if profile_raw in {"strict", "balanced", "aggressive"} else "balanced"
+                )
+
                 package_path = self.get_file_path(
                     "Please provide the path to a directory containing your mobile application(s)\nPath to Directory:  ",
                     self.check_folder_exists
@@ -112,7 +123,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     self.print_info_message(
                         "Only one application found; scanning that app."
                     )
-                    return applications[0]
+                    app = dict(applications[0])
+                    app["taxonomy"] = taxonomy
+                    app["taxonomy_profile"] = taxonomy_profile
+                    return app
 
                 mode = self.validate_user_choice(
                     {"single", "s", "all", "a"},
@@ -123,6 +137,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 if mode in {"all", "a"}:
                     return {
                         "scan_mode": "all",
+                        "taxonomy": taxonomy,
+                        "taxonomy_profile": taxonomy_profile,
                         "source_path": package_path,
                         "applications": applications,
                     }
@@ -132,7 +148,10 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 selected_app = self.index_out_of_range_display(
                     "Select the application to scan: ", self.files
                 )
-                return self.files[selected_app]
+                app = dict(self.files[selected_app])
+                app["taxonomy"] = taxonomy
+                app["taxonomy_profile"] = taxonomy_profile
+                return app
 
             except (ValueError, FileExistsError, FileNotFoundError) as error:
                 self.print_error_message(error)

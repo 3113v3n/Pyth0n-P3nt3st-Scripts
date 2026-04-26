@@ -97,6 +97,8 @@ files for potential valuable information
                   Interactive mode prompts for {color.BOLD}single{color.ENDC} or {color.BOLD}all{color.ENDC} scans.
                   cli_args mode scans {color.BOLD}all{color.ENDC} apps by default when a directory is provided.
                   Use {color.BOLD}--scan-mode single|all{color.ENDC} for explicit CLI directory handling.
+                  Use {color.BOLD}--taxonomy none|masvs|mastg|both{color.ENDC} to emit mapped compliance tags.
+                  Use {color.BOLD}--taxonomy-profile strict|balanced|aggressive{color.ENDC} to tune mapping granularity.
 
     {color.OKCYAN}{color.UNDERLINE}:returns{color.ENDC}: 
 

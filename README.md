@@ -1,14 +1,40 @@
 # Pyth0n-P3nt3st-Scripts
 
 Python scripts that aims to automate common activities conducted during penetration testing.
-- Start by creating a virtual environment and installing all the dependencies in the requirements.txt
+
+## Quick Start
+
 ```shell
-python3 -m venv <virtual_env_name>
-source <virtual_env_name>/bin/activate
-
-pip3 install -r requirements.txt
-
+python3 main.py -M interactive
 ```
+
+### Automatic first-run bootstrap
+
+- On first run, if `.venv` does not exist, the framework now:
+1. Creates `.venv`
+2. Installs Python requirements into `.venv`
+3. Re-launches the script from the project virtual environment
+
+- This behavior can be disabled by setting:
+```shell
+export PENTEST_SKIP_VENV_BOOTSTRAP=1
+```
+
+### Dynamic OS dependency installation
+
+The package handler is now OS-aware and supports dynamic dependency checks/installation on:
+- Debian-like Linux (`apt`)
+- macOS (`brew`)
+- Windows (`winget` or `choco`)
+
+Dependency checks are now more accurate and avoid common false positives by:
+- checking command aliases where tools expose different binary names (e.g. `netexec` vs `nxc`)
+- probing executable identity for selected tools (`go`, `java`, `pipx`, `netexec`)
+- searching common non-default binary locations like `~/.local/bin` and `~/go/bin`
+
+Notes:
+- Some niche tools may still require manual installation depending on package-manager availability.
+- Auto-install flows may prompt for privilege elevation depending on the platform and tool.
   
 Some of the Scope covered or in progress include but not limited to:
 
@@ -117,6 +143,8 @@ CLI mode:
 - `-P` accepts either a single APK/IPA file or a directory.
 - If a directory is provided, the module scans all APK/IPA files in that directory by default.
 - Use `--scan-mode single|all` to explicitly control directory behavior.
+- Use `--taxonomy none|masvs|mastg|both` to generate optional MASVS/MASTG mapping output for static findings.
+- Use `--taxonomy-profile strict|balanced|aggressive` to tune taxonomy tagging strictness.
 
 ```sh
 # Scan a single app file
@@ -127,6 +155,15 @@ python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps"
 
 # Explicit directory scan mode
 python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all
+
+# Include MASVS + MASTG tags in static report artifacts
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all --taxonomy both
+
+# High-precision taxonomy mapping
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all --taxonomy both --taxonomy-profile strict
+
+# Broader inferred taxonomy mapping
+python main.py -M cli_args mobile -P "/Path/To/Directory_With_Apps" --scan-mode all --taxonomy both --taxonomy-profile aggressive
 ```
 
 ### Start script

@@ -24,6 +24,8 @@ class MobileAssessment(MobileCommands):
         # Sets user provided values
         self.package_name = data["filename"]  # application filename
         self.package_path = data["full_path"]  # fullpath to the application
+        self.taxonomy_mode = data.get("taxonomy", "both")
+        self.taxonomy_profile = data.get("taxonomy_profile", "balanced")
 
     def _inspect_files(self, test_domain: str, operating_system: str):
         """Execute the mobile application testing module

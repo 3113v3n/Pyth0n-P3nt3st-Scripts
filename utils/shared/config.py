@@ -52,6 +52,8 @@ This is a custom CLI tool for Penetration Testing.
     {self.color.OKCYAN}[mobile]{self.color.ENDC}
         -P, --path                   FILE/FOLDER        : Path to mobile app file (apk|ipa) or directory with apps
             --scan-mode              MODE               : Directory handling mode in cli_args [single|all] (default: all)
+            --taxonomy               MODE               : Report mapping mode [none|masvs|mastg|both] (default: both)
+            --taxonomy-profile       MODE               : Mapping granularity [strict|balanced|aggressive] (default: balanced)
 
     {self.color.OKCYAN}[password]{self.color.ENDC}
         -t, --test                                      : Test the password against a protocol
@@ -84,6 +86,8 @@ This is a custom CLI tool for Penetration Testing.
         1.{self.color.WARNING}Mobile:{self.color.ENDC}
                 main.py -M cli_args mobile -P /path/to/app.apk
                 main.py -M cli_args mobile -P /path/to/apps --scan-mode all
+                main.py -M cli_args mobile -P /path/to/apps --scan-mode all --taxonomy both
+                main.py -M cli_args mobile -P /path/to/apps --scan-mode all --taxonomy both --taxonomy-profile strict
         
         2.{self.color.WARNING}Internal:{self.color.ENDC}
             Scan:

@@ -151,6 +151,25 @@ class InteractionHandler:
                 "'single' scans one app (requires a single file path, or a directory with exactly one app)."
             ),
         )
+        parser.add_argument(
+            "--taxonomy",
+            choices=["none", "masvs", "mastg", "both"],
+            default="both",
+            help=(
+                "Optional static-report taxonomy tagging. "
+                "'masvs' adds MASVS tags, 'mastg' adds MASTG tags, and 'both' adds both."
+            ),
+        )
+        parser.add_argument(
+            "--taxonomy-profile",
+            choices=["strict", "balanced", "aggressive"],
+            default="balanced",
+            help=(
+                "Granularity profile for taxonomy mapping. "
+                "'strict' maps only high-confidence tags, 'balanced' blends precision/coverage, "
+                "and 'aggressive' adds broader inferred tags."
+            ),
+        )
 
     @staticmethod
     def _add_va_arguments(subparsers):
@@ -302,6 +321,8 @@ class InteractionHandler:
         """Handle Mobile arguments"""
         path = args.path
         scan_mode = args.scan_mode
+        taxonomy = args.taxonomy
+        taxonomy_profile = args.taxonomy_profile
 
         # CLI behavior: if directory is provided, scan all APK/IPA files by default.
         if self.validator.check_folder_exists(path):
@@ -332,6 +353,8 @@ class InteractionHandler:
                 return {
                     "module": module,
                     "scan_mode": "single",
+                    "taxonomy": taxonomy,
+                    "taxonomy_profile": taxonomy_profile,
                     "full_path": app["full_path"],
                     "filename": app["filename"],
                 }
@@ -343,6 +366,8 @@ class InteractionHandler:
             return {
                 "module": module,
                 "scan_mode": "all",
+                "taxonomy": taxonomy,
+                "taxonomy_profile": taxonomy_profile,
                 "source_path": path,
                 "applications": applications,
             }
@@ -361,6 +386,8 @@ class InteractionHandler:
         return {
             "module": module,
             "scan_mode": "single",
+            "taxonomy": taxonomy,
+            "taxonomy_profile": taxonomy_profile,
             "full_path": path,
             "filename": os.path.basename(path),
         }

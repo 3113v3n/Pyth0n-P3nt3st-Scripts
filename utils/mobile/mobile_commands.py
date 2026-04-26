@@ -46,6 +46,8 @@ class MobileCommands(
         self.templates_folder = ""
         self.debug = False
         self.grep_cmd = "grep"
+        self.taxonomy_mode = "both"
+        self.taxonomy_profile = "balanced"
 
         self._scan_stats: dict = {}
         self._nuclei_templates_synced = False
@@ -147,6 +149,7 @@ class MobileCommands(
             risk_file = Path(f"{basename}_integrity_findings.txt")
             control_file = Path(f"{basename}_integrity_controls.txt")
             summary_file = Path(f"{basename}_summary.json")
+            taxonomy_file = Path(f"{basename}_masvs_mastg.json")
 
             sorted_urls = self._collapse_urls_to_common_bases(urls)
             sorted_ips = sorted(ips, key=lambda x: tuple(int(part) for part in x.split(".")))
@@ -158,6 +161,21 @@ class MobileCommands(
             base64_count = self._write_base64_report(base64_file, base64_entries)
             risk_count = self._write_findings_report(risk_file, risk_findings)
             control_count = self._write_findings_report(control_file, control_findings)
+            taxonomy_report = self._build_masvs_mastg_report(
+                findings=combined_risk_findings,
+                platform=platform,
+                extraction_root=root,
+                taxonomy_mode=self.taxonomy_mode,
+                taxonomy_profile=self.taxonomy_profile,
+                application=os.path.basename(application),
+            )
+            taxonomy_tagged_count = 0
+            if taxonomy_report.get("entries"):
+                taxonomy_file.write_text(
+                    json.dumps(taxonomy_report, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                taxonomy_tagged_count = len(taxonomy_report["entries"])
             reports = {}
             if url_count:
                 reports["urls"] = str(urls_file)
@@ -173,6 +191,8 @@ class MobileCommands(
                 reports["integrity_findings"] = str(risk_file)
             if control_count:
                 reports["integrity_controls"] = str(control_file)
+            if taxonomy_tagged_count:
+                reports["masvs_mastg"] = str(taxonomy_file)
 
             risk_counter = {}
             for finding in combined_risk_findings:
@@ -210,6 +230,9 @@ class MobileCommands(
                 "top_controls": top_controls,
                 "scoring": scoring,
                 "nuclei": nuclei_meta,
+                "taxonomy_mode": self.taxonomy_mode,
+                "taxonomy_profile": self.taxonomy_profile,
+                "taxonomy_tagged_count": taxonomy_tagged_count,
                 "reports": reports,
             }
 
