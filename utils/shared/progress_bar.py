@@ -1,4 +1,5 @@
 import curses
+import time
 from .validators import Validator
 
 
@@ -13,6 +14,10 @@ class ProgressBar(Validator):
         self.total_hosts = 0  # total
         self.live_hosts = set()
         self.unresponsive_hosts = set()
+        self.display_every = 25
+        self.display_interval_seconds = 0.15
+        self._last_display_ts = 0.0
+        self._colors_initialized = False
 
     def set_total_hosts(self, total: int):
         self.total_hosts = total
@@ -55,8 +60,15 @@ class ProgressBar(Validator):
                     existing_unresponsive_ips.add(ip)  
         
         self.total_scanned += 1
-        if stdscr is not None:  # Only update UI if curses is active
+        now = time.monotonic()
+        should_render = (
+            self.total_scanned <= 5
+            or self.total_scanned % self.display_every == 0
+            or (now - self._last_display_ts) >= self.display_interval_seconds
+        )
+        if stdscr is not None and should_render:  # Only update UI if curses is active
             self.display(stdscr)
+            self._last_display_ts = now
 
     def display(self, stdscr):
         if stdscr is None:
@@ -68,11 +80,11 @@ class ProgressBar(Validator):
 
         curses.curs_set(0)
 
-        # Initialize color pairs
-        curses.start_color()
-        # Alive IPs - green text
-        curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+        if not self._colors_initialized:
+            curses.start_color()
+            curses.init_pair(1, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+            self._colors_initialized = True
 
         live_list = list(self.live_hosts)[:output_height]
         dead_list = list(self.unresponsive_hosts)[:output_height]

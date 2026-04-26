@@ -1,70 +1,62 @@
-"""
-network_handler.py — Network scanning, IP enumeration, and interface management.
+"""Network scanning orchestration for internal assessment."""
 
-Performance fixes applied:
-  1. Progress bar update in scan_network() previously called pbar.update(100)
-     both inside and outside the conditional, causing duplicate updates for
-     every 100 IPs processed. The unconditional call is removed; the remainder
-     is now tracked explicitly.
-  2. reset_class_states() converted to an instance method reset_state().
-
-Naming improvements:
-  1. network_base_address → network_base_address (field and dict key).
-"""
+from __future__ import annotations
 
 import curses
-import signal
-import threading
-import sys
-import time
-# import psutil
-import ipaddress
 import os
-from tqdm import tqdm
-from typing import Iterator, List
+import signal
+import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from handlers import FileHandler
-# from scapy.all import IP, ICMP, sr1
-from utils.shared import Commands
 
-try:
-    import netifaces
-except ModuleNotFoundError:
-    netifaces = None
+from tqdm import tqdm
+
+from handlers import FileHandler
+from utils.internal.network_constants import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_MAX_WORKER_CAP,
+    DEFAULT_PROGRESS_CHUNK,
+    DEFAULT_WORKER_MULTIPLIER,
+    INTERFACE_POLL_INTERVAL_SECONDS,
+)
+from utils.internal.network_interfaces import (
+    get_active_interface as resolve_active_interface,
+    get_interface_ip as resolve_interface_ip,
+    get_network_interfaces as resolve_network_interfaces,
+    is_interface_active,
+)
+from utils.internal.network_math import (
+    calculate_remaining_hosts as get_remaining_hosts,
+    generate_ip_batches,
+    get_network_info,
+)
+from utils.shared import Commands
 
 
 class NetworkHandler(FileHandler, Commands):
-    """Class will handle any logic necessary for network operations"""
+    """Handle internal network scanning state and orchestration."""
 
     def __init__(self) -> None:
         super().__init__()
-        # subnet range
         self.subnet = ""
-        # Number of hosts within the network
         self.hosts = 0
-        # IP to start scan from
         self.start_ip = ""
-        # CIDR value [0-32]
         self.network_mask = ""
-        # user IP addr
         self.user_ip_addr = ""
-        # remaining usable host bits
         self.host_bits = 0
         self.ip_alive = False
         self.mode = "scan"
         self.network_base_address = 0
-        # Shell commands
         self.progress_bar = None
         self.live_ip_count = 0
         self.scan_complete = False
-        # Handle Interfaces
         self.scan_thread = None
         self.monitor_thread = None
         self.interface = None
         self.is_interface_active = False
         self.initial_interface_ip = None
         self.debug = False
-        self.lock = threading.Lock()  # prevent race conditions
+        self.lock = threading.Lock()
         self.shutdown_event = threading.Event()
 
     def reset_state(self) -> None:
@@ -86,7 +78,7 @@ class NetworkHandler(FileHandler, Commands):
 
     @classmethod
     def reset_class_states(cls):
-        """Deprecated — use reset_state() on the instance instead."""
+        """Deprecated compatibility method; use reset_state() on the instance."""
         cls.subnet = ""
         cls.hosts = 0
         cls.start_ip = ""
@@ -103,10 +95,10 @@ class NetworkHandler(FileHandler, Commands):
         cls.scan_complete = False
 
     def initialize_network_variables(self, variables, test_domain, progress_bar):
-        # initialize the class variables with user variables
+        """Initialize scan variables from user/domain input."""
         self.subnet = variables["subnet"]
         self.interface = variables["interface"]
-        network_info = self.get_network_info(self.subnet)
+        network_info = get_network_info(self.subnet)
         self.hosts = network_info["hosts"]
         self.mode = variables["action"]
         self.user_ip_addr = network_info["ip_address"]
@@ -119,36 +111,14 @@ class NetworkHandler(FileHandler, Commands):
 
     @staticmethod
     def get_interface_ip(interface: str) -> str | None:
-        """Get the IPv4 address of the specified interface."""
-        if netifaces is None:
-            return None
-
-        try:
-            addresses = netifaces.ifaddresses(interface)
-            if netifaces.AF_INET in addresses:
-                for addr in addresses[netifaces.AF_INET]:
-                    ip = addr.get('addr')
-                    if ip and ip != '127.0.0.1' and not ip.startswith("169."):
-                        return ip
-            return None
-        except (ValueError, KeyError):
-            return None
+        return resolve_interface_ip(interface)
 
     def port_discovery(self):
-        # use masscan to discover open ports incase ICMP is disabled
-        # Using masscan to scan top20ports of nmap in a /24 range (less than 5min)
-        # masscan -p20,21-23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080 199.66.11.0/24
+        # use masscan to discover open ports if ICMP is blocked
         pass
 
     def generate_filename(self, mode: str, is_alive: bool, filename: str) -> str:
-        """
-        Generate a filename based on mode and host responsiveness.
-
-        :param mode: Operation mode ('scan' or 'resume')
-        :param is_alive: True if the host responsiveness
-        :param filename: Base filename to modify
-        :return: Formatted filename
-        """
+        """Generate output filename for live/unresponsive host lists."""
         basename = self.get_filename_without_extension(filename)
         extension = ".csv"
         suffix = "_unresponsive_hosts"
@@ -162,319 +132,206 @@ class NetworkHandler(FileHandler, Commands):
             return f"{basename}{suffix}{extension}"
         return f"{basename}{extension}"
 
-    def scan_network(self, stdscr, mode, output_file):
-
+    def scan_network(self, stdscr, mode: str, output_file: str):
+        """Scan network hosts and update progress/output files."""
         stdscr.clear()
         stdscr.addstr(0, 0, "Network Scanner - Press Ctrl+C to stop")
         stdscr.refresh()
         curses.curs_set(0)
         curses.echo(False)
-        if self.debug:
-            print(
-                f"DEBUG: scan_network started with mode={mode}, output_file={output_file}")
-        # Interface check before scanning
+
         if not self.interface:
-            self.interface = self.get_active_interface()
-            if self.debug:
-                print(f"DEBUG: Auto-detected interface={self.interface}")
+            self.interface = resolve_active_interface()
             if not self.interface:
                 stdscr.addstr(4, 0, "No active interface found.")
                 stdscr.refresh()
                 curses.napms(1000)
                 return
+
         current_ip = self.get_interface_ip(self.interface)
-        if self.debug:
-            print(f"DEBUG: Current IP for {self.interface}={current_ip}")
         if not current_ip:
             stdscr.addstr(4, 0, f"Interface {self.interface} has no valid IP.")
             stdscr.refresh()
             curses.napms(1000)
             return
-        self.initial_interface_ip = current_ip  # Set for monitoring
 
-        # Signal handler for SIGINT (Ctrl+C)
+        self.initial_interface_ip = current_ip
+
         def signal_handler(sig, frame):
             self.shutdown_event.set()
             stdscr.addstr(4, 0, "Shutting down...")
             stdscr.refresh()
-            curses.napms(500)
+            curses.napms(250)
 
         signal.signal(signal.SIGINT, signal_handler)
 
-        executor = None
         try:
             self.mode = mode
-            remaining_hosts = self.calculate_remaining_hosts(
-                self.user_ip_addr) if self.mode == "resume" else self.hosts
-            if self.debug:
-                print(f"DEBUG: Total hosts to scan={remaining_hosts}")
-
-            max_workers = min(50, os.cpu_count() * 2)
+            remaining_hosts = (
+                self.calculate_remaining_hosts(self.user_ip_addr)
+                if self.mode == "resume"
+                else self.hosts
+            )
+            total = max(0, remaining_hosts)
             processed = 0
-            total = remaining_hosts
-            batches = list(self.generate_ip_in_batches())
-            if self.debug:
-                print(f"DEBUG: Generated {len(batches)} IP batches")
+            committed_progress = 0
 
-            # Start interface monitoring thread
+            cpu_count = os.cpu_count() or 2
+            max_workers = min(
+                DEFAULT_MAX_WORKER_CAP,
+                max(2, cpu_count * DEFAULT_WORKER_MULTIPLIER),
+            )
+
             self.monitor_thread = threading.Thread(
-                target=self.monitor_interface, args=(stdscr,))
+                target=self.monitor_interface,
+                args=(stdscr,),
+                daemon=True,
+            )
             self.monitor_thread.start()
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 with tqdm(total=total, desc="Scanning", file=sys.stdout, leave=False) as pbar:
-                    for ip_batch in batches:
+                    for ip_batch in self.generate_ip_in_batches():
                         if self.shutdown_event.is_set():
-                            if self.debug:
-                                print("DEBUG: Scan stopped by shutdown event")
                             break
-                        if self.debug:
-                            print(
-                                f"DEBUG: Processing batch of {len(ip_batch)} IPs")
-                        futures = {executor.submit(
-                            self.set_progressbar, mode, output_file, ip, stdscr):
-                                       ip for ip in ip_batch}
+
+                        futures = {
+                            executor.submit(
+                                self.set_progressbar,
+                                mode,
+                                output_file,
+                                ip,
+                                stdscr,
+                            ): ip
+                            for ip in ip_batch
+                        }
+
                         for _ in as_completed(futures):
                             if self.shutdown_event.is_set():
                                 break
+
                             processed += 1
-                            # [Performance] Update the progress bar every 100 IPs.
-                            # The previous code called pbar.update(100) both inside
-                            # this conditional AND unconditionally outside it, causing
-                            # double-counting on every 100th IP. Removed the redundant
-                            # unconditional call below.
-                            if processed % 100 == 0 or processed == total:
-                                pbar.update(min(100, processed))
-            # set scan complete when done
+                            if (
+                                processed % DEFAULT_PROGRESS_CHUNK == 0
+                                or processed == total
+                            ):
+                                delta = processed - committed_progress
+                                if delta > 0:
+                                    pbar.update(delta)
+                                    committed_progress = processed
+
+                    if processed > committed_progress:
+                        pbar.update(processed - committed_progress)
+
             self.scan_complete = not self.shutdown_event.is_set()
-            if self.debug:
-                print(f"DEBUG: Scan completed={self.scan_complete}")
-        except Exception as e:
-            stdscr.addstr(4, 0, f"Error: {e}")
+        except Exception as error:
+            stdscr.addstr(4, 0, f"Error: {error}")
             stdscr.refresh()
             curses.napms(1000)
             self.scan_complete = False
-            if self.debug:
-                print(f"DEBUG: Scan failed with error={e}")
         finally:
             print("Final cleanup...")
-            self.shutdown_event.set()  # Ensure monitor thread stops
+            self.shutdown_event.set()
             if self.monitor_thread:
-                self.monitor_thread.join()
-            if executor:
-                executor.shutdown(wait=False)
+                self.monitor_thread.join(timeout=2)
 
     def get_live_ips(self, output: str) -> int:
-        """Enumerates all IPs in a given network using ICMP ping command
-        :param mode: mode to use (SCAN | RESUME)
-               output: Name of the output file
-        :return number of ips that are alive
-        """
+        """Run the curses scanner and return discovered live host count."""
         try:
-            if self.debug:
-                print(
-                    f"DEBUG: get_live_ips called with output={output}, mode={self.mode}, subnet={self.subnet}, interface={self.interface}")
-            # Initialize the progress bar
             curses.wrapper(self.scan_network, self.mode, output)
-            # self.print_debug_message(f"Last unresponsive IP:  {self.user_ip_addr}")
-            if self.debug:
-                print("DEBUG: curses.wrapper completed, "
-                      f"live hosts={len(self.progress_bar.live_hosts) if self.progress_bar else 0}")
             return len(self.progress_bar.live_hosts) if self.progress_bar else 0
         except KeyboardInterrupt:
             print("\nProgram terminated by user.")
-            self.scan_complete = False  # Scan interrupted
+            self.scan_complete = False
             return len(self.progress_bar.live_hosts) if self.progress_bar else 0
-        except Exception as e:
-            if self.debug:
-                print(f"DEBUG: curses.wrapper failed with {e}")
-            self.print_error_message(exception_error=e)
-            self.scan_complete = False  # Scan exception
+        except Exception as error:
+            self.print_error_message(exception_error=error)
+            self.scan_complete = False
             return 0
 
-    def generate_ip_in_batches(self, batch_size: int = 2000):
-        """Generates IP ranges in batches"""
-        network = ipaddress.ip_network(
-            self.subnet, strict=False)  # subnet = 10.10.2.3/24
-        self.hosts = self.calculate_remaining_hosts(
-            self.user_ip_addr) if self.mode == "resume" else self.hosts
-        # update the total host values in progress bar
+    def generate_ip_in_batches(self, batch_size: int = DEFAULT_BATCH_SIZE):
+        """Yield IP addresses in batches for current mode/subnet."""
+        if self.mode == "resume":
+            self.hosts = self.calculate_remaining_hosts(self.user_ip_addr)
+            start_ip = self.user_ip_addr
+        else:
+            start_ip = None
+
         self.progress_bar.set_total_hosts(self.hosts)
-        start_ip = ipaddress.ip_address(
-            self.user_ip_addr) if self.mode == "resume" else network.network_address
-
-        def chunked_ips() -> Iterator[List[str]]:
-            ip_list = []
-            # Iterate over IPs from start_ip to the end of network
-            current_ip = start_ip
-            for ip_int in range(int(current_ip), int(network.broadcast_address) + 1):
-                ip = ipaddress.ip_address(ip_int)
-                if ip in network:
-                    ip_str = str(ip)
-                    ip_list.append(ip_str)
-                    if len(ip_list) >= batch_size:
-                        yield ip_list
-                        ip_list = []
-            if ip_list:  # Yield any remaining IPs
-                yield ip_list
-
-        return chunked_ips()
+        return generate_ip_batches(
+            subnet=self.subnet,
+            start_ip=start_ip,
+            batch_size=batch_size,
+        )
 
     def set_progressbar(self, mode, filename, ip, stdscr):
-        """Check if the host is alive using asynchronous pings and update UI"""
+        """Ping host and update progress/file outputs in a critical section."""
         if self.shutdown_event.is_set():
             return
+
         try:
-            is_alive = self.start_async_ping(ip)  # self.ping_hosts(ip)
-            with self.lock:  # Prevents concurrent writes
+            is_alive = self.start_async_ping(ip)
+            with self.lock:
                 self.progress_bar.update_ips(
-                    filename, mode, ip, is_alive, stdscr,
-                    self.save_to_csv, self.generate_filename, self.existing_unresponsive_ips)
-                # Update live IP count on screen
+                    filename,
+                    mode,
+                    ip,
+                    is_alive,
+                    stdscr,
+                    self.save_to_csv,
+                    self.generate_filename,
+                    self.existing_unresponsive_ips,
+                )
                 self.live_ip_count = len(self.progress_bar.live_hosts)
-                stdscr.refresh()
         except Exception as error:
             self.print_error_message(
-                f"set Progress bar failed for IP: {ip} : ", exception_error=error)
-
-    @staticmethod
-    def get_network_info(subnet) -> dict:
-        """
-        Function takes in network subnet and splits the provided
-        Values into an ip address and subnet.
-        It then returns a dictionary containing
-        """
-        # determine num of hosts from IP addr
-        # 2^(remaining bits)-2 = usable_hosts
-        ip, mask = subnet.split("/")
-        mask = int(mask)
-        bits = 32 - mask
-        total_hosts = (2 ** bits)
-        octets = list(map(int, ip.split(".")))
-        network_mask_int = 0xFFFFFFFF << bits
-        ip_int = (octets[0] << 24) + (octets[1] << 16) + \
-                 (octets[2] << 8) + octets[3]
-        network_base_address = ip_int & network_mask_int
-        return {
-            "ip_address": ip,
-            "hosts": total_hosts,  # - 2
-            "network_mask": mask,
-            "host_bits": bits,
-            "network_base_address": network_base_address
-        }
+                f"set Progress bar failed for IP: {ip} : ",
+                exception_error=error,
+            )
 
     def calculate_remaining_hosts(self, ip_string: str) -> int:
-        """Converts IP to decimal equivalent
-            w.x.y.z
-            [STEPS]
-            1. split IP into individual values [w, x, y, z]
-            2. Multiply each octet by the corresponding power of 256
+        """Calculate remaining scan space from an IP to subnet broadcast."""
+        return get_remaining_hosts(
+            ip_string=ip_string,
+            total_hosts=self.hosts,
+            network_base_address=self.network_base_address,
+        )
 
-                w * 256³ = W
-                x * 256² = X
-                y * 256¹ = Y
-                z * 256⁰ = Z
-
-            3. Add the values together
-                (W + X + Y + Z)
-
-        :param ip_string: IP address to convert
-        :return decimal equivalent:
-        """
-        try:
-            octets = [int(x) for x in ip_string.split(".")]  # [w, x, y, z]
-            # result = 0
-            # for i in range(1,3):
-            #     result += (int(octets[i]) * (256 ** (3-i)))
-            # return result
-            total_hosts = self.hosts
-            """
-            octet[0] << 24
-            example: 10 --> 00001010
-                    <<  --> 00001010 00000000 00000000 00000000 ==> 167772160
-            """
-            start_ip_int = (octets[0] << 24) + (octets[1] << 16) \
-                           + (octets[2] << 8) + octets[3]
-
-            # Calculate last IP in subnet
-            last_ip_int = self.network_base_address + total_hosts - 1
-            # Calculate remaining hosts
-            return last_ip_int - start_ip_int + 1
-
-        except Exception as e:
-            self.print_error_message(exception_error=e)
-
-    # TODO: include interface check before scanning
     def _is_interface_active(self, interface: str) -> bool:
-        """Check if the interface is active and unchanged."""
-        current_ip = self.get_interface_ip(interface)
-        if self.debug:
-            print(
-                f"DEBUG: Checking interface {interface}, current IP={current_ip}")
-        if not current_ip:
-            return False
-        # Check if the IP has changed from the initial value
-        if self.initial_interface_ip and current_ip != self.initial_interface_ip:
-            return False
-        return True
+        """Compatibility wrapper for existing callers."""
+        return is_interface_active(interface, self.initial_interface_ip)
 
     def monitor_interface(self, stdscr):
-        if self.debug:
-            print(
-                f"DEBUG: Monitoring interface {self.interface}, initial IP={self.initial_interface_ip}")
+        """Stop scan if interface drops or changes IP during execution."""
         while not self.shutdown_event.is_set():
-            current_ip = self.get_interface_ip(self.interface)
-            if self.debug:
-                print(f"DEBUG: Current IP={current_ip}")
-            if not current_ip or (self.initial_interface_ip and current_ip != self.initial_interface_ip):
+            if not is_interface_active(self.interface, self.initial_interface_ip):
                 with self.lock:
                     if stdscr:
                         stdscr.addstr(
-                            5, 0, f"Interface {self.interface} dropped or changed. Stopping scan.")
+                            5,
+                            0,
+                            f"Interface {self.interface} dropped or changed. Stopping scan.",
+                        )
                         stdscr.refresh()
-                    if self.debug:
-                        print(
-                            f"DEBUG: Interface {self.interface} changed or down, stopping scan")
                     self.shutdown_event.set()
                 break
-            time.sleep(1)
+            self.shutdown_event.wait(INTERFACE_POLL_INTERVAL_SECONDS)
 
     def kill_scan(self):
-        """Stop the network scan."""
+        """Stop the network scan if running."""
         if self.scan_thread and self.scan_thread.is_alive():
             self.shutdown_event.set()
             self.scan_thread.join()
-            self.monitor_thread.join()
+            if self.monitor_thread:
+                self.monitor_thread.join(timeout=2)
             print("Scan stopped.")
 
 
 def get_active_interface():
-    """"Getting the active interface
-    Returns the default gateway and interface name
-    """
-
-    try:
-        if netifaces is None:
-            return None
-
-        active_ = netifaces.gateways()
-        default_gateway: tuple = active_[2][0]
-
-        if default_gateway:
-            interface_tuple = default_gateway
-            return interface_tuple
-        else:
-            print("No active interface found.")
-    except (KeyError, AttributeError, IndexError):
-        pass
+    """Compatibility helper that returns the default active interface."""
+    return resolve_active_interface()
 
 
-def get_network_interfaces() -> List[str]:
-    """
-    Get the network interfaces on the system
-    """
-    if netifaces is None:
-        return []
-
-    interfaces = netifaces.interfaces()
-    return interfaces
+def get_network_interfaces():
+    """Compatibility helper that returns all interface names."""
+    return resolve_network_interfaces()

@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from ..shared import Commands
 from ..shared.colors import Bcolors
+from .password_output import parse_credentials_from_output
 
 
 class CredentialsUtil(Bcolors):
@@ -43,29 +44,17 @@ class CredentialsUtil(Bcolors):
         self.run_command = Commands()
 
     def split_pass_file(self) -> dict[str, str]:
-        """Parse the credential file into a {username: password} dictionary.
+        """Parse credential file into a ``{username: password}`` dictionary.
 
-        Expected line format: ``username:password``
-
-        Returns:
-            Dictionary mapping each username to its password.
+        Supported formats:
+          1. ``username:password``
+          2. grouped common-password blocks written by password generate mode.
         """
-        user_pass: dict[str, str] = {}
         try:
-            with open(self.creds_file, "r") as creds:
-                for line in creds:
-                    if not line.strip():
-                        continue
-                    try:
-                        username, password = line.strip().split(":", 1)
-                        user_pass[username] = password
-                    except ValueError:
-                        print(
-                            f"[-] Skipping malformed line in {self.creds_file}: {line.strip()}"
-                        )
+            return parse_credentials_from_output(self.creds_file)
         except FileNotFoundError:
             print(f"[!] Credentials file not found: {self.creds_file}")
-        return user_pass
+            return {}
 
     def test_credentials(
         self,

@@ -7,6 +7,7 @@ Fixes applied:
 """
 
 from ..shared.colors import Bcolors
+from .password_output import build_grouped_password_output
 
 
 class HashUtil:
@@ -63,6 +64,7 @@ class HashUtil:
         hash2compare: str,
         dump: str,
         userpass_list: str,
+        emit_match_logs: bool = True,
     ) -> tuple[int, int]:
         """Cross-reference cracked hashes against an NTDS dump to build a user:password list.
 
@@ -77,44 +79,126 @@ class HashUtil:
             Tuple of (total_matches_found, enabled_users_written).
         """
         cracked_hashes = self.get_hashes(hash2compare)
-        print(
-            f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes"
-        )
+        print(f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
 
         matches_found = 0
         enabled_users = 0
+        malformed_lines = 0
+        user_password_pairs: list[tuple[str, str]] = []
+        get_password = cracked_hashes.get
+        format_username = self.format_username
 
-        with open(dump, "r") as dumps, open(userpass_list, "a") as pass_file:
-            for line in dumps:
-                if not line.strip():
+        with open(dump, "r", encoding="utf-8", errors="replace") as dumps:
+            for raw_line in dumps:
+                line = raw_line.strip()
+                if not line:
                     continue
 
-                # Expected NTDS dump format (secretsdump):
-                # Guest:501:aad3b435b51404eeaad3b435:31d6cfe0d16ae::: (status=Disabled)
-                # [Naming] Renamed _parts → ntds_fields to clarify what is being parsed.
-                ntds_fields = line.strip().split(":")
+                fields = line.split(":", 6)
+                if len(fields) != 7:
+                    malformed_lines += 1
+                    continue
 
-                if len(ntds_fields) != 7:
+                username = fields[0]
+                nthash = fields[3]
+                status = fields[6]
+
+                password = get_password(nthash)
+                if password is None:
+                    continue
+
+                matches_found += 1
+                if "Enabled" not in status:
+                    continue
+
+                formatted_username = format_username(username)
+                user_password_pairs.append((formatted_username, password))
+                enabled_users += 1
+
+                if emit_match_logs:
                     print(
-                        f"{Bcolors.FAIL}[-]{Bcolors.ENDC} Skipping malformed dump line: {line.strip()}"
+                        f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
+                        f"{Bcolors.OKCYAN}{formatted_username}{Bcolors.ENDC}:"
+                        f"{Bcolors.WARNING}{password}{Bcolors.ENDC}"
                     )
-                    continue
 
-                username, _, _, nthash, _, _, status = ntds_fields
+        if malformed_lines:
+            print(
+                f"{Bcolors.WARNING}[-]{Bcolors.ENDC} Skipped "
+                f"{malformed_lines} malformed dump lines"
+            )
 
-                if nthash in cracked_hashes:
-                    password = cracked_hashes[nthash]
-                    matches_found += 1
-
-                    if "Enabled" in status:
-                        # [Fix] Renamed _formated → formatted_username (typo fix).
-                        formatted_username = self.format_username(username)
-                        pass_file.write(f"{formatted_username}:{password}\n")
-                        enabled_users += 1
-                        print(
-                            f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
-                            f"{Bcolors.OKCYAN}{formatted_username}{Bcolors.ENDC}:"
-                            f"{Bcolors.WARNING}{password}{Bcolors.ENDC}"
-                        )
+        grouped_output = build_grouped_password_output(user_password_pairs)
+        with open(userpass_list, "w", encoding="utf-8") as pass_file:
+            if grouped_output:
+                pass_file.write(grouped_output)
 
         return matches_found, enabled_users
+
+    def compare_hash_from_dump_collect(
+        self,
+        hash2compare: str,
+        dump: str,
+        userpass_list: str,
+        emit_match_logs: bool = False,
+    ) -> tuple[int, int, list[str]]:
+        """Compare hashes, write enabled user:password lines, and return matched passwords."""
+        cracked_hashes = self.get_hashes(hash2compare)
+        print(f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
+
+        matches_found = 0
+        enabled_users = 0
+        malformed_lines = 0
+        matched_passwords: list[str] = []
+        user_password_pairs: list[tuple[str, str]] = []
+        get_password = cracked_hashes.get
+        format_username = self.format_username
+        append_password = matched_passwords.append
+
+        with open(dump, "r", encoding="utf-8", errors="replace") as dumps:
+            for raw_line in dumps:
+                line = raw_line.strip()
+                if not line:
+                    continue
+
+                fields = line.split(":", 6)
+                if len(fields) != 7:
+                    malformed_lines += 1
+                    continue
+
+                username = fields[0]
+                nthash = fields[3]
+                status = fields[6]
+
+                password = get_password(nthash)
+                if password is None:
+                    continue
+
+                matches_found += 1
+                if "Enabled" not in status:
+                    continue
+
+                formatted_username = format_username(username)
+                user_password_pairs.append((formatted_username, password))
+                append_password(password)
+                enabled_users += 1
+
+                if emit_match_logs:
+                    print(
+                        f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
+                        f"{Bcolors.OKCYAN}{formatted_username}{Bcolors.ENDC}:"
+                        f"{Bcolors.WARNING}{password}{Bcolors.ENDC}"
+                    )
+
+        if malformed_lines:
+            print(
+                f"{Bcolors.WARNING}[-]{Bcolors.ENDC} Skipped "
+                f"{malformed_lines} malformed dump lines"
+            )
+
+        grouped_output = build_grouped_password_output(user_password_pairs)
+        with open(userpass_list, "w", encoding="utf-8") as pass_file:
+            if grouped_output:
+                pass_file.write(grouped_output)
+
+        return matches_found, enabled_users, matched_passwords

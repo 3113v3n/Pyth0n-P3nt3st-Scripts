@@ -16,15 +16,18 @@ from typing import Any
 import pandas
 from datetime import datetime
 from pathlib import Path
-import json
-import xml.etree.ElementTree as ET
 import shutil
+from handlers.file_selection_mixin import FileSelectionMixin
 from handlers.messages import DisplayHandler
 from utils.shared import Validator
+from utils.shared.text_formatting import (
+    beautify_structured_text,
+    prepare_text_for_write,
+)
 import ipaddress
 
 
-class FileHandler(Validator, DisplayHandler):
+class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
     """Handle file I/O, CSV/Excel operations, and output-directory management."""
     BYTES_PER_MB = 1024 * 1024
     DEFAULT_XLSX_MIN_FREE_MB = 256
@@ -293,221 +296,6 @@ class FileHandler(Validator, DisplayHandler):
             "unresponsive_hosts": self.unresponsive_hosts_file,
         }
 
-    def create_folder(self, folder_name, search_path="./output_directory"):
-
-        self.output_directory = f"{search_path}/{folder_name}"
-
-        if not self.check_subdirectory_exists(
-                folder_name, search_path=search_path
-        ):
-            folder_path = self.output_directory
-            os.makedirs(folder_path)
-
-    def find_files(self, search_path):
-        """Searches for a file in the given directory and its subdirectories.
-
-        :param search_path: Directory to start the search from.
-        :return: Full path of the files if found, None otherwise.
-        """
-
-        for root, _, files in os.walk(search_path):
-
-            for file in files:
-                file_object = {"filename": file,
-                               "full_path": os.path.join(root, file)}
-                self.files.append(file_object)
-        return self.files
-
-    def display_saved_files(self, dir_to_search, **kwargs):
-        """Display to the user a list of files available"""
-        self.find_files(dir_to_search)
-
-        self.files = self._get_filtered_files(**kwargs)
-
-        if not self.files:
-            return None
-
-        # Display available files
-        self._display_file_options()
-        # Resume scan
-        return self._handle_analysis(**kwargs)
-
-    def _get_filtered_files(self, **kwargs) -> list:
-        """Get filtered files based on user input
-        :param kwargs: Keyword Arguments
-        :keyword scan_extension:         return files with a given extension [apk,csv,ipa,xslx]
-        :keyword resume_scan:            returns an IP address from the given file
-        :keyword display_application:    returns mobile applications
-
-        :return: List of filtered files
-        """
-        file_collection = self._get_file_collections()
-
-        # Apply filters based on kwargs
-        if kwargs.get("scan_extension"):
-            return self._filter_files_by_extension(
-                file_collection,
-                kwargs["scan_extension"]
-            )
-        elif kwargs.get("resume_scan"):
-            return self._filter_unresponsive_host_files(file_collection["csv"])
-        elif kwargs.get("display_applications"):
-            return file_collection["applications"]
-        return self.files
-
-    def _get_file_collections(self) -> dict:
-        """ Get different collections of files by type."""
-
-        def get_files_by_type(ext):
-            """Filter files by extension type
-
-            :param ext: File extension
-            :returns: list of files matching the extension
-            """
-            return list(filter(
-                lambda file: self.check_filetype(
-                    file["filename"],
-                    ext
-                ),
-                self.files
-            ))
-
-        csv_files = get_files_by_type("csv")
-        xlsx_files = get_files_by_type("xlsx")
-        both_files = csv_files + xlsx_files
-        application_files = list(filter(
-            lambda file: self.check_filetype(file["filename"], "apk") or
-                         self.check_filetype(file["filename"], "ipa"),
-            self.files
-        ))
-        return {
-            "csv": csv_files,
-            "xlsx": xlsx_files,
-            "both": both_files,
-            "applications": application_files
-        }
-
-    @staticmethod
-    def _filter_unresponsive_host_files(csv_files) -> list[Any] | None:
-        """
-        Filter out CSV files only who are unresponsive
-
-        :param csv_files: List of CSV files
-        :return: List of unresponsive host files
-        """
-        unresponsive_file = list(filter(
-            lambda file: "unresponsive_host" in file["filename"],
-            csv_files
-        ))
-        if not unresponsive_file:
-            return None
-        return unresponsive_file
-
-    def _filter_files_by_extension(self, collections, extension) -> Any | None:
-        """Filter files by extension
-
-        :param collections: Dictionary of file collections
-        :param extension: Extension to filter by (csv, xlx, both, xlsx)
-        :return: List of files filtered by extension
-        """
-        if extension not in ["csv", "xlsx", "xlx", "both"]:
-            self.print_error_message(f"Invalid extension: {extension}")
-            return None
-        filtered_files = collections[extension]
-
-        if not filtered_files:
-            self.print_error_message("No files found")
-            return None
-        return filtered_files
-
-    def _display_file_options(self):
-        """Display available file options to user"""
-        for index, file in enumerate(self.files, 1):
-            self.print_selection_items(file, index)
-
-    def _handle_analysis(self, **kwargs):
-        """Route to the correct analysis action based on keyword flags.
-
-        Args:
-            kwargs:
-                scan_extension (bool):     Run VA file-selection flow.
-                display_applications (bool): Run application-selection flow.
-                resume_scan (bool):         Return starting IP for a resumed scan.
-        """
-        if kwargs.get("scan_extension"):
-            return self.select_and_analyze_file("files")
-        elif kwargs.get("display_applications"):
-            return self.select_and_analyze_file("applications")
-        elif kwargs.get("resume_scan"):
-            return self.select_and_analyze_file()
-
-    def index_out_of_range_display(self, input_str, data_list) -> int:
-        """Takes in an input string and a data list and returns the index of the
-        selected item in the data list.
-        :param input_str: Input string to be displayed to the user
-        :param data_list: list from which data will be displayed
-        """
-        while True:
-            # Error handling
-            try:
-                selected_value = int(input(f"\n{input_str}").strip())
-                if (
-                        0 < selected_value < len(data_list) + 1
-                ):  # display numbers are value of index + 1
-
-                    break
-                else:
-                    self.print_error_message("The selected number is out of range."
-                                             f" Please enter a valid number between 1 & {len(data_list)}")
-            except ValueError:
-                self.print_error_message(
-                    "Invalid input. Please enter a number.")
-                # return the index of selected item
-        return selected_value - 1
-
-    def select_and_analyze_file(self, to_analyze: str = "") -> tuple | str | None:
-        """Prompt the user to choose a file or application from the displayed list.
-
-        [Naming] Renamed from do_analysis() to better describe what this method does.
-
-        Args:
-            to_analyze: One of "files" (VA CSVs), "applications" (APK/IPA), or ""
-                        (resume scan — returns the last unresponsive IP).
-
-        Returns:
-            Tuple of (files, start_index) for VA, a file dict for applications, or an
-            IP address string for resume mode.
-        """
-        print(f"\n{self.OKBLUE}Analyzing {to_analyze}...{self.ENDC}")
-
-        if to_analyze == "files":
-            # VA analysis: let user choose which file to start from.
-            selected_file = self.index_out_of_range_display(
-                "Please enter the file number you would like to scan first: ",
-                self.files,
-            )
-            return self.files, selected_file
-
-        elif to_analyze == "applications":
-            # Mobile analysis: let user choose which application to scan.
-            selected_app = self.index_out_of_range_display(
-                "Select the application to scan: ", self.files
-            )
-            return self.files[selected_app]
-
-        else:
-            # Resume scan: return the last IP from the selected unresponsive file.
-            selected_file = self.index_out_of_range_display(
-                "Please enter the file number displayed above: ", self.files
-            )
-            self.filepath = self.files[selected_file]["full_path"]
-            starting_ip = self.get_last_unresponsive_ip(self.filepath)
-            return starting_ip
-
-    def do_analysis(self, to_analyze: str = "") -> tuple | str | None:
-        """Deprecated alias for select_and_analyze_file() — kept for backward compatibility."""
-        return self.select_and_analyze_file(to_analyze)
-
     @staticmethod
     def read_csv(dataframe, **kwargs):
         """Handles reading of CSV files
@@ -667,32 +455,7 @@ class FileHandler(Validator, DisplayHandler):
 
     @staticmethod
     def _beautify_structured_text(content: Any) -> tuple[str, str]:
-        if isinstance(content, (dict, list)):
-            return json.dumps(content, indent=2, ensure_ascii=False), "json"
-
-        text = str(content)
-        stripped = text.strip()
-        if not stripped:
-            return text, "text"
-
-        try:
-            parsed = json.loads(stripped)
-            if isinstance(parsed, (dict, list)):
-                return json.dumps(parsed, indent=2, ensure_ascii=False), "json"
-        except (json.JSONDecodeError, TypeError, ValueError):
-            pass
-
-        if stripped.startswith("<") and stripped.endswith(">"):
-            try:
-                root = ET.fromstring(stripped)
-                tree = ET.ElementTree(root)
-                if hasattr(ET, "indent"):
-                    ET.indent(tree, space="  ")
-                return ET.tostring(root, encoding="unicode"), "xml"
-            except ET.ParseError:
-                pass
-
-        return text, "text"
+        return beautify_structured_text(content)
 
     @staticmethod
     def _prepare_text_for_write(
@@ -700,11 +463,11 @@ class FileHandler(Validator, DisplayHandler):
         beautify_structured: bool = True,
         wrap_long_lines: bool = False,
     ) -> str:
-        if beautify_structured:
-            formatted, _ = FileHandler._beautify_structured_text(content)
-        else:
-            formatted = str(content)
-        return formatted
+        return prepare_text_for_write(
+            content,
+            beautify_structured=beautify_structured,
+            wrap_long_lines=wrap_long_lines,
+        )
 
     @staticmethod
     def read_last_line(filename) -> str:
