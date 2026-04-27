@@ -54,6 +54,7 @@ class MobileCommands(
 
     @CustomDecorators.measure_execution_time
     def inspect_application_files(self, application: str, test_domain: str, operating_system: str):
+        folder_name = ""
         try:
             if operating_system == "darwin":
                 self.update_grep_cmd()
@@ -251,6 +252,7 @@ class MobileCommands(
         except Exception as error:
             self.print_error_message(message="Error during mobile assessment", exception_error=error)
         finally:
+            self.cleanup_runtime_artifacts(extracted_folder=folder_name, remove_templates=False)
             self._cleanup_processes()
 
     def _cleanup_processes(self):
@@ -258,3 +260,15 @@ class MobileCommands(
             self.flush_system("I/O")
         except Exception as error:
             self.print_error_message(message="Error during cleanup", exception_error=error)
+
+    def cleanup_runtime_artifacts(self, extracted_folder: str = "", remove_templates: bool = False) -> None:
+        """Delete runtime-only artifacts while keeping reusable dependencies/caches."""
+        try:
+            self.cleanup_extraction_folder(extracted_folder)
+            if remove_templates:
+                self.cleanup_nuclei_templates()
+        except Exception as error:
+            self.print_warning_message(
+                "Runtime cleanup encountered an issue",
+                file_path=str(error),
+            )

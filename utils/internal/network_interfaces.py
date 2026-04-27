@@ -26,6 +26,22 @@ def get_interface_ip(interface: str) -> str | None:
     return None
 
 
+def get_interface_mac(interface: str) -> str | None:
+    """Get the MAC address for the specified interface."""
+    if netifaces is None:
+        return None
+    try:
+        addresses = netifaces.ifaddresses(interface)
+        link_entries = addresses.get(netifaces.AF_LINK, [])
+        for addr in link_entries:
+            mac_addr = addr.get("addr")
+            if mac_addr:
+                return mac_addr.lower()
+    except (ValueError, KeyError):
+        return None
+    return None
+
+
 def is_interface_active(interface: str, initial_interface_ip: str | None = None) -> bool:
     """Check if the interface is up and, if provided, still on the original IP."""
     current_ip = get_interface_ip(interface)

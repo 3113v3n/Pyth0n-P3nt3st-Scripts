@@ -16,6 +16,7 @@ from .password_output import (
 from .network_interfaces import (
     get_active_interface,
     get_interface_ip,
+    get_interface_mac,
     get_network_interfaces,
     is_interface_active,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "PASSWORD_OUTPUT_EXTENSION",
     "get_active_interface",
     "get_interface_ip",
+    "get_interface_mac",
     "get_network_interfaces",
     "is_interface_active",
     "calculate_remaining_hosts",

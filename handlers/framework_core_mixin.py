@@ -70,6 +70,10 @@ class FrameworkCoreMixin:
                     self.classes["network"],
                     self.classes["helper"],
                 )
+            elif domain_key == "external":
+                from domains.external_module import ExternalAssessment
+
+                domain_obj = ExternalAssessment()
             else:
                 return None
         except ModuleNotFoundError as error:

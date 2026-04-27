@@ -173,6 +173,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
             "font_size": self.FONT_SIZE,
         }
 
+        wrote_report = False
         try:
             with pandas.ExcelWriter(
                 self.filepath,
@@ -207,6 +208,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
 
                         # Apply a cell format to data rows
                         worksheet.set_column('A:ZZ', 15, formatted_cell)
+                wrote_report = True
         except OSError as error:
             if getattr(error, "errno", None) == errno.ENOSPC:
                 tmp_free = shutil.disk_usage(excel_tmpdir).free
@@ -218,10 +220,13 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
                     ),
                 ) from error
             raise
+        finally:
+            self._cleanup_excel_tmpdir(excel_tmpdir)
 
-        self.print_info_message(
-            message="Analyzed Vulnerabilities have been written to :",
-            file_path=self.filepath)
+        if wrote_report:
+            self.print_info_message(
+                message="Analyzed Vulnerabilities have been written to :",
+                file_path=self.filepath)
 
     def save_to_csv(self, filename, content, *args):
         """ 
@@ -351,6 +356,21 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         temp_dir = Path(self.working_dir) / ".tmp" / "xlsxwriter"
         temp_dir.mkdir(parents=True, exist_ok=True)
         return str(temp_dir)
+
+    @staticmethod
+    def _cleanup_excel_tmpdir(excel_tmpdir: str) -> None:
+        """Best-effort cleanup of temporary XLSX writer artifacts."""
+        tmp_dir = Path(excel_tmpdir)
+        if not tmp_dir.exists():
+            return
+        for child in tmp_dir.iterdir():
+            try:
+                if child.is_file() or child.is_symlink():
+                    child.unlink(missing_ok=True)
+                elif child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
+            except OSError:
+                continue
 
     def _estimate_excel_write_bytes(self, dataframe_objects: list) -> int:
         """Estimate bytes needed for XLSX temp/output writes.

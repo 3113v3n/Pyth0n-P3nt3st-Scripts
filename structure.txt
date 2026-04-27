@@ -45,9 +45,18 @@
 └── utils
     ├── __init__.py										                # Utils package marker
     ├── external
-    │   ├── __init__.py										                # External utilities package marker
-    │   ├── domain_recon.py										        # External domain reconnaissance helpers
-    │   └── external_recon.txt										        # External recon command/payload reference data
+    │   ├── __init__.py										                # External utilities package exports
+    │   ├── domain_recon.py										        # Subdomain enumeration + dnsx resolution wrappers
+    │   ├── external_constants.py										# Phase names, defaults, sensitive-file regex
+    │   ├── external_pipeline.py										# Phase orchestrator chaining recon → probe → ... → vulns
+    │   ├── external_recon.txt										        # External recon command/payload reference data
+    │   ├── http_probe.py										        # httpx-toolkit wrapper for alive-host probing
+    │   ├── port_scanner.py										        # nmap service-detection wrapper
+    │   ├── reporting.py										        # Consolidated markdown report writer
+    │   ├── screenshots.py										        # gowitness screenshot capture wrapper
+    │   ├── takeover.py										                # subzy / subjack subdomain-takeover detector
+    │   ├── url_collector.py										# gauplus / waybackurls historical URL collector
+    │   └── vuln_scanner.py										        # nuclei vulnerability scanner wrapper
     ├── internal
     │   ├── __init__.py										                # Internal utilities package exports
     │   ├── credentials_match.py										# Correlates cracked credentials with target identities

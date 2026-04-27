@@ -24,13 +24,13 @@ export PENTEST_SKIP_VENV_BOOTSTRAP=1
 
 The package handler is now OS-aware and supports dynamic dependency checks/installation on:
 - Debian-like Linux (`apt`)
-- macOS (`brew`)
+- macOS (`brew` or MacPorts `port`)
 - Windows (`winget` or `choco`)
 
 Dependency checks are now more accurate and avoid common false positives by:
 - checking command aliases where tools expose different binary names (e.g. `netexec` vs `nxc`)
 - probing executable identity for selected tools (`go`, `java`, `pipx`, `netexec`)
-- searching common non-default binary locations like `~/.local/bin` and `~/go/bin`
+- searching common non-default binary locations like `/opt/local/bin`, `/opt/local/sbin`, `~/.local/bin`, and `~/go/bin`
 
 Notes:
 - Some niche tools may still require manual installation depending on package-manager availability.
@@ -40,7 +40,13 @@ Some of the Scope covered or in progress include but not limited to:
 
 | Domain                       | Script Target                                                      |
 |------------------------------|--------------------------------------------------------------------|
-| External Penetration Testing | 1. Enumerate subdomains                           [coming_soon]    |
+| External Penetration Testing | 1. Subdomain enumeration + DNS resolution         [completed]      |
+|                              | 2. HTTP probing & technology fingerprinting       [completed]      |
+|                              | 3. Port & service enumeration (nmap)              [completed]      |
+|                              | 4. Web screenshots (gowitness)                    [completed]      |
+|                              | 5. Subdomain takeover detection (subzy/subjack)   [completed]      |
+|                              | 6. Historical URL + sensitive file discovery      [completed]      |
+|                              | 7. Vulnerability scanning (nuclei)                [completed]      |
 |                              |                                                                    |
 | Internal Penetration Testing | 1. Enumerate IPs give CIDR                        [completed]      |
 |                              |                                                                    |
@@ -93,6 +99,84 @@ The user is however required to provide the subnet that was being scanned initia
 ![Resume_scan](images/internal_resume.png)
 ![Scan Progress](images/scan_progress.png)
 
+### Internal Resume Reliability Update (April 2026)
+
+Changes carried out so far:
+
+1. Baseline performance/behavior benchmarks were executed for both `scan` and `resume` on a `/16` subnet with a controlled timeout.
+2. A new persistent session-state scaffold was added at `utils/internal/scan_session.py` to support:
+   - scan session metadata persistence
+   - atomic JSON state writes
+   - throttled checkpoint updates (to avoid I/O bottlenecks)
+   - interface similarity checks for safer resume behavior
+3. Existing flow behavior was validated before integration so regressions can be measured against a known baseline.
+
+#### Baseline commands used
+
+```sh
+# SCAN baseline (/16, 120s timeout, PTY for curses)
+script -q -c "timeout -s INT 120 ./.venv/bin/python main.py -M cli_args internal -a scan -I wlan0 --ip 192.168.100.44/16 -o baseline_pre_scan.csv" /dev/null
+
+# RESUME baseline (/16, 120s timeout, PTY for curses)
+script -q -c "timeout -s INT 120 ./.venv/bin/python main.py -M cli_args internal -a resume -I wlan0 -r output_directory/Internal/baseline_pre_scan_27-04-2026-12:38:19_unresponsive_hosts.csv -m 16" /dev/null
+```
+
+#### Baseline results snapshot
+
+- `scan` baseline: elapsed `121s`, partial progress `~15150/65536`, live hosts discovered `454`.
+- `resume` baseline: elapsed `121s`, partial progress `~15075/50336`, live hosts discovered `342`.
+- Both runs intentionally hit timeout and correctly retained unresponsive-host files for continuation.
+
+#### Suggested pictorial evidence sections (add your screenshots)
+
+You can add image evidence under this subsection using the following recommended captions:
+
+1. Baseline scan command execution (CLI + startup banner)
+2. Baseline scan progress view (`curses` screen)
+3. Baseline scan timeout/interruption handling message
+4. Baseline resume command execution (file + mask path)
+5. Baseline resume progress view (`curses` screen)
+6. Baseline resume timeout/interruption handling message
+7. (After integration) automatic subnet recovery from saved session metadata
+8. (After integration) interface similarity pass/fail behavior on resume
+
+Recommended file names for these docs images:
+
+- `images/docs/internal_baseline_scan_start.png`
+- `images/docs/internal_baseline_scan_progress.png`
+- `images/docs/internal_baseline_scan_timeout.png`
+- `images/docs/internal_baseline_resume_start.png`
+- `images/docs/internal_baseline_resume_progress.png`
+- `images/docs/internal_baseline_resume_timeout.png`
+- `images/docs/internal_resume_auto_subnet.png`
+- `images/docs/internal_resume_interface_validation.png`
+
+#### Image placeholders (drop screenshots into these paths)
+
+![Baseline scan start](images/docs/internal_baseline_scan_start.png)
+_Baseline scan command execution (CLI + startup banner)_
+
+![Baseline scan progress](images/docs/internal_baseline_scan_progress.png)
+_Baseline scan progress view (`curses` screen)_
+
+![Baseline scan timeout](images/docs/internal_baseline_scan_timeout.png)
+_Baseline scan timeout/interruption handling message_
+
+![Baseline resume start](images/docs/internal_baseline_resume_start.png)
+_Baseline resume command execution (file + mask path)_
+
+![Baseline resume progress](images/docs/internal_baseline_resume_progress.png)
+_Baseline resume progress view (`curses` screen)_
+
+![Baseline resume timeout](images/docs/internal_baseline_resume_timeout.png)
+_Baseline resume timeout/interruption handling message_
+
+![Resume auto subnet](images/docs/internal_resume_auto_subnet.png)
+_(After integration) automatic subnet recovery from saved session metadata_
+
+![Resume interface validation](images/docs/internal_resume_interface_validation.png)
+_(After integration) interface similarity pass/fail behavior on resume_
+
 ***
 
 ## 2. Vulnerability Analysis
@@ -144,7 +228,8 @@ CLI mode:
 - If a directory is provided, the module scans all APK/IPA files in that directory by default.
 - Use `--scan-mode single|all` to explicitly control directory behavior.
 - Use `--taxonomy none|masvs|mastg|both` to generate optional MASVS/MASTG mapping output for static findings.
-- Use `--taxonomy-profile strict|balanced|aggressive` to tune taxonomy tagging strictness.
+- Use `--taxonomy-profile strict|balanced|aggressive` to tune taxonomy mapping strictness.
+- Runtime-only mobile artifacts (decompiled folders and template clones) are cleaned automatically after each run.
 
 ```sh
 # Scan a single app file
@@ -203,6 +288,43 @@ python main.py -M cli_args password -t --ip 10.0.0.3 --domain testdomain.co --pa
 
 ## 5. External Penetration Testing
 
-[Coming Soon]
+Performs an end-to-end external assessment of a target domain by chaining seven
+phases. Each phase produces its own artifacts inside
+`output_directory/External/<domain>_<timestamp>/`, and a consolidated
+`external_report.md` is written at the end of the run.
 
-- To run the module simply enter [ **Number displayed on Right** ] on the provided prompt
+### Phases
+
+| # | Phase        | Tools                                          | Output                                    |
+|---|--------------|------------------------------------------------|-------------------------------------------|
+| 1 | recon        | subfinder, assetfinder, amass, findomain, dnsx | `<domain>_subdomains.txt`, `resolved_*.txt` |
+| 2 | probe        | httpx-toolkit                                  | `alive_hosts.json`, `alive_hosts.txt`     |
+| 3 | ports        | nmap                                           | `nmap_results.txt`, `nmap_results.gnmap`  |
+| 4 | screenshots  | gowitness                                      | `screenshots/*.png`                       |
+| 5 | takeover     | subzy / subjack                                | `takeover_<tool>.txt`                     |
+| 6 | urls         | gauplus / waybackurls                          | `historical_urls.txt`, `sensitive_urls.txt` |
+| 7 | vulns        | nuclei                                         | `nuclei_results.txt`                      |
+
+### Interactive mode
+
+Pick the External option from the main menu, supply the target domain when
+prompted, and either press Enter to run every phase or enter a comma-separated
+subset (e.g. `recon,probe,vulns`).
+
+### CLI mode
+
+```sh
+# Full run against example.com
+python main.py -M cli_args external -d example.com
+
+# Limit to a subset of phases
+python main.py -M cli_args external -d example.com --phases recon,probe,vulns
+```
+
+### Notes
+
+- Tools that aren't installed are skipped automatically; the consolidated
+  report records each skipped phase along with the missing binary.
+- AI summaries are appended to the report when `ANTHROPIC_API_KEY` is set
+  (use `--no-ai` to disable globally).
+- Temporary chaining artifacts used between external phases are cleaned automatically; only final phase outputs remain in the run directory.

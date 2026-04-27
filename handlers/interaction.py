@@ -9,8 +9,10 @@ called directly at the two call sites instead.
 """
 
 import os
+from pathlib import Path
 from argparse import RawTextHelpFormatter
 
+from utils.internal.scan_session import ScanSessionStore
 from utils.shared.validators import Validator
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
 
@@ -117,6 +119,8 @@ class InteractionHandler:
     @staticmethod
     def _add_external_arguments(subparsers):
         """Handle External PT Arguments"""
+        from utils.external.external_constants import DEFAULT_PHASES
+
         parser = subparsers.add_parser(
             "external", help="External Assessment Arguments")
         parser.add_argument(
@@ -124,7 +128,28 @@ class InteractionHandler:
             "--domain",
             required=True,
             type=str,
-            help="Domain to test",
+            help="Domain to test (e.g., example.com)",
+        )
+        parser.add_argument(
+            "--phases",
+            type=str,
+            default=",".join(DEFAULT_PHASES),
+            help=(
+                "Comma-separated list of phases to run, in order. "
+                f"Available: {', '.join(DEFAULT_PHASES)}. "
+                "Default runs every phase."
+            ),
+        )
+        parser.add_argument(
+            "--safe-mode",
+            action="store_true",
+            help="Run a lower-impact external scan profile (reduced scope/concurrency).",
+        )
+        parser.add_argument(
+            "--operator-tag",
+            type=str,
+            default="",
+            help="Operator identifier embedded in safe-mode HTTP headers and metadata.",
         )
 
     @staticmethod
@@ -284,7 +309,7 @@ class InteractionHandler:
             )
 
         interface_kwargs = {
-            "required": True if interface_choices else False,
+            "required": False,
             "help": interface_help,
         }
         if interface_choices:
@@ -394,13 +419,39 @@ class InteractionHandler:
 
     def handle_external_arguments(self, args, module):
         """Handle External arguments"""
+        from utils.external.external_constants import DEFAULT_PHASES, SAFE_OPERATOR_TAG_DEFAULT
 
-        if not self.validator.validate_domain(args.domain):
+        domain = args.domain.replace("https://", "").replace("http://", "").strip("/")
+        if not self.validator.validate_domain(domain):
             raise ValueError(
                 f"Domain {args.domain} is not valid. Ensure it is a valid domain name"
             )
-        print(f"\n[-] Running External Assessment on {args.domain} domain")
-        return {"module": module, "domain": args.domain}
+
+        requested_phases = tuple(
+            phase.strip().lower() for phase in (args.phases or "").split(",") if phase.strip()
+        ) or DEFAULT_PHASES
+        unknown = [phase for phase in requested_phases if phase not in DEFAULT_PHASES]
+        if unknown:
+            raise ValueError(
+                f"Unknown phase(s): {unknown}. Valid phases: {', '.join(DEFAULT_PHASES)}"
+            )
+
+        safe_mode = bool(getattr(args, "safe_mode", False))
+        operator_tag = str(getattr(args, "operator_tag", "") or "").strip()
+        if safe_mode and not operator_tag:
+            operator_tag = SAFE_OPERATOR_TAG_DEFAULT
+
+        print(
+            f"\n[-] Running External Assessment on {domain} domain "
+            f"(phases: {', '.join(requested_phases)}, safe_mode={safe_mode})"
+        )
+        return {
+            "module": module,
+            "target_domain": domain,
+            "phases": requested_phases,
+            "safe_mode": safe_mode,
+            "operator_tag": operator_tag,
+        }
 
     def handle_va_arguments(self, args, module):
         """Handle Vulnerability Assessment arguments"""
@@ -486,16 +537,16 @@ class InteractionHandler:
         """Handle Internal PT arguments"""
         action = args.action
         interface = args.interface
-        if not interface:
-            raise ValueError(
-                "No network interface provided. Use -I/--interface explicitly "
-                "(interface auto-discovery may be restricted in this environment)."
-            )
-        print(interface)
         if action == "scan":
             # scan network
             ip_cidr = args.ip
             output = args.output
+            if not interface:
+                raise ValueError(
+                    "No network interface provided. Use -I/--interface explicitly "
+                    "for scan mode."
+                )
+            print(interface)
             if not (ip_cidr and output):
                 raise ValueError(
                     "For Scan mode, --ip and --output are required")
@@ -515,11 +566,55 @@ class InteractionHandler:
             # Resume scan
             resume_file = args.resume
             mask = args.mask
-            if not (resume_file and mask):
-                raise ValueError(
-                    "For resume mode, --resume and --mask are required")
+            if not resume_file:
+                raise ValueError("For resume mode, --resume is required")
             if not self.validator.isfile_and_exists(resume_file):
                 raise ValueError(f"File {resume_file} does not exist")
+
+            resume_dir = str(Path(resume_file).resolve().parent)
+            session_store = ScanSessionStore(resume_dir)
+            session = session_store.get_session_by_unresponsive_file(resume_file)
+
+            if session:
+                subnet = session.get("subnet_cidr")
+                saved_snapshot = session.get("interface_snapshot") or {}
+                matched_interface = session_store.find_similar_active_interface(
+                    saved_snapshot,
+                    preferred_interface=interface,
+                )
+                if not subnet:
+                    raise ValueError(
+                        "Saved scan session has no subnet metadata for resume."
+                    )
+                if not matched_interface:
+                    raise ValueError(
+                        "Resume blocked: no similar active interface detected for "
+                        f"{os.path.basename(resume_file)}."
+                    )
+                print(matched_interface)
+                print(
+                    f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} "
+                    f"using saved subnet {subnet}"
+                )
+                return {
+                    "module": module,
+                    "action": action,
+                    "resume_file": resume_file,
+                    "subnet": subnet,
+                    "interface": matched_interface,
+                }
+
+            if not (interface and mask):
+                raise ValueError(
+                    "No saved session metadata found. Provide --interface and --mask "
+                    "for legacy resume mode."
+                )
+
+            print(
+                "[-] No saved session metadata found for this resume file. "
+                "Falling back to legacy resume mode."
+            )
+            print(interface)
             print(
                 f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} on /{mask} network"
             )

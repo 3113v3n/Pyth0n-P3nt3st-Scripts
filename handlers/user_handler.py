@@ -5,6 +5,7 @@ from handlers.screen import ScreenHandler
 from handlers.helper_handler import HelpHandler
 from handlers import FileHandler
 from handlers.network_handler import get_network_interfaces,NetworkHandler
+from utils.internal.scan_session import ScanSessionStore
 
 
 class UserHandler(FileHandler, Config, ScreenHandler):
@@ -216,15 +217,57 @@ class UserHandler(FileHandler, Config, ScreenHandler):
 
     def external_ui_handler(self):
         self.start_domain_helper(self.helper_.external_helper)
+        from utils.external.external_constants import (
+            DEFAULT_PHASES,
+            SAFE_OPERATOR_TAG_DEFAULT,
+        )
+
         try:
-            website_domain = (
-                self.get_user_input(
-                    "Enter domain to enumerate (example.domain.com)")
+            while True:
+                raw = self.get_user_input(
+                    "Enter domain to enumerate (example.domain.com)"
+                )
+                domain = raw.replace("https://", "").replace("http://", "").strip("/")
+                if self.validate_domain(domain):
+                    break
+                self.print_warning_message(
+                    f"'{raw}' is not a valid domain. Try again.")
+
+            phase_text = (
+                f"\n[+] Phases to run (comma-separated). "
+                f"Press Enter for ALL.\n    Available: {', '.join(DEFAULT_PHASES)}\n"
             )
+            raw_phases = self.prompt_format(phase_text).strip()
+            phases = tuple(
+                p.strip().lower() for p in raw_phases.split(",") if p.strip()
+            ) or DEFAULT_PHASES
+            unknown = [p for p in phases if p not in DEFAULT_PHASES]
+            if unknown:
+                self.print_warning_message(
+                    f"Ignoring unknown phase(s): {unknown}. Falling back to ALL."
+                )
+                phases = DEFAULT_PHASES
 
-            # TODO: strip https://
+            safe_mode_choice = self.validate_user_choice(
+                {"yes", "y", "no", "n"},
+                self.get_user_input,
+                "Enable safe mode (lower-impact external profile)? [yes|no]: ",
+            )
+            safe_mode = safe_mode_choice in {"yes", "y"}
+            operator_tag = ""
+            if safe_mode:
+                tag_prompt = (
+                    "Operator tag for audit headers/metadata "
+                    f"[default: {SAFE_OPERATOR_TAG_DEFAULT}]: "
+                )
+                operator_tag = (self.get_user_input(tag_prompt) or "").strip() or SAFE_OPERATOR_TAG_DEFAULT
 
-            return {"target_domain": website_domain}
+            return {
+                "target_domain": domain,
+                "phases": phases,
+                "safe_mode": safe_mode,
+                "operator_tag": operator_tag,
+            }
         except Exception as error:
             self.print_error_message(error)
 
@@ -324,6 +367,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         try:
             subnet = ""
             output_file = ""
+            interface = ""
             valid_actions = {"scan", "resume"}
             # [Performance] Reuse a single NetworkHandler instance for all checks
             # instead of creating a new one per interface.
@@ -341,11 +385,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 valid_actions,
                 self.get_user_input,
                 self.internal_mode_choice)
-            interface = self.validate_user_choice(
-                valid_interfaces,
-                self.get_user_input,
-                f"Enter a network interface to run your scan \n{valid_interfaces} "
-            )
 
             if action == "resume":
                 resume_ip = self.display_saved_files(
@@ -359,18 +398,60 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     action = "scan"
                 else:
                     output_file = self.filepath
-                    while True:
-                        cidr = self.get_cidr()
-                        if cidr:
-                            subnet = f"{resume_ip}/{cidr}"
-                            break
-                        else:
+                    session_store = ScanSessionStore(self.output_directory)
+                    session = session_store.get_session_by_unresponsive_file(output_file)
+
+                    if session:
+                        saved_subnet = session.get("subnet_cidr")
+                        saved_snapshot = session.get("interface_snapshot") or {}
+                        matched_interface = session_store.find_similar_active_interface(
+                            saved_snapshot
+                        )
+                        if not saved_subnet:
+                            raise ValueError(
+                                "Saved scan session has no subnet metadata for resume."
+                            )
+                        if not matched_interface:
+                            raise ValueError(
+                                "Resume blocked: no similar active interface detected "
+                                "for the saved scan session."
+                            )
+                        subnet = saved_subnet
+                        interface = matched_interface
+                        self.print_info_message(
+                            "Resume metadata loaded from saved scan session"
+                        )
+                        self.print_info_message(
+                            "Using subnet", file_path=subnet
+                        )
+                        self.print_info_message(
+                            "Using interface", file_path=interface
+                        )
+                    else:
+                        self.print_warning_message(
+                            "No saved session metadata found for this file. "
+                            "Falling back to manual CIDR resume."
+                        )
+                        interface = self.validate_user_choice(
+                            valid_interfaces,
+                            self.get_user_input,
+                            f"Enter a network interface to run your scan \n{valid_interfaces} "
+                        )
+                        while True:
+                            cidr = self.get_cidr()
+                            if cidr:
+                                subnet = f"{resume_ip}/{cidr}"
+                                break
                             self.print_warning_message(
                                 "Please enter a valid CIDR")
-                            continue
 
             # If mode is scan or defaulted to scan
             if action == "scan":
+                interface = self.validate_user_choice(
+                    valid_interfaces,
+                    self.get_user_input,
+                    f"Enter a network interface to run your scan \n{valid_interfaces} "
+                )
                 subnet = self.get_user_subnet()
                 output_file = self.get_output_filename()
 

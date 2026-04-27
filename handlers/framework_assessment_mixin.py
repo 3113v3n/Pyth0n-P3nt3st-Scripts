@@ -29,11 +29,12 @@ class FrameworkAssessmentMixin:
 
             if _action == "resume":
                 resume_file = _vars["resume_file"]
-                subnet_mask = _vars["mask"]
-                last_ip = user.get_last_unresponsive_ip(resume_file)
-                # Resume flow now rebuilds subnet context from the persisted host file.
-                _vars["subnet"] = f"{last_ip}/{subnet_mask}"
                 _output_file = resume_file
+                if not _vars.get("subnet"):
+                    subnet_mask = _vars["mask"]
+                    last_ip = user.get_last_unresponsive_ip(resume_file)
+                    # Legacy resume flow builds subnet from last host + provided mask.
+                    _vars["subnet"] = f"{last_ip}/{subnet_mask}"
             elif _action == "scan":
                 _output_file = _vars["output"]
                 network.existing_unresponsive_ips = user.existing_unresponsive_ips
@@ -128,37 +129,76 @@ class FrameworkAssessmentMixin:
             if isinstance(mobile_testing_vars, dict)
             else None
         )
-
-        mobile.reset_total_time()
-        if applications:
-            total = len(applications)
-            self.print_info_message(f"Running mobile assessment on {total} application(s)")
-            for index, app in enumerate(applications, 1):
-                filename = app.get("filename", "unknown")
-                self.print_info_message(
-                    message=f"Scanning application [{index}/{total}]",
-                    file=filename,
-                )
-                app_vars = {
-                    "filename": filename,
-                    "full_path": app.get("full_path"),
-                    "taxonomy": mobile_testing_vars.get("taxonomy", "both"),
-                    "taxonomy_profile": mobile_testing_vars.get("taxonomy_profile", "balanced"),
-                }
-                mobile.initialize_variables(app_vars)
-                mobile._inspect_files(test_domain, self.os)
-            mobile.print_total_time("Total analysis time for all applications:")
+        try:
             mobile.reset_total_time()
+            if applications:
+                total = len(applications)
+                self.print_info_message(f"Running mobile assessment on {total} application(s)")
+                for index, app in enumerate(applications, 1):
+                    filename = app.get("filename", "unknown")
+                    self.print_info_message(
+                        message=f"Scanning application [{index}/{total}]",
+                        file=filename,
+                    )
+                    app_vars = {
+                        "filename": filename,
+                        "full_path": app.get("full_path"),
+                        "taxonomy": mobile_testing_vars.get("taxonomy", "both"),
+                        "taxonomy_profile": mobile_testing_vars.get("taxonomy_profile", "balanced"),
+                    }
+                    mobile.initialize_variables(app_vars)
+                    mobile._inspect_files(test_domain, self.os)
+                mobile.print_total_time("Total analysis time for all applications:")
+                mobile.reset_total_time()
+                return
+
+            mobile.initialize_variables(mobile_testing_vars)
+            mobile._inspect_files(test_domain, self.os)
+            mobile.print_total_time(f"Total analysis time for {mobile.package_name}:")
+            mobile.reset_total_time()
+        finally:
+            if hasattr(mobile, "cleanup_runtime_artifacts"):
+                # Keep reusable template/tool caches between runs for efficiency.
+                # Only runtime artifacts (e.g., extracted app folders) are cleaned.
+                mobile.cleanup_runtime_artifacts(remove_templates=False)
+
+    def handle_external_assessment(self, user, external, **kwargs):
+        """Handle external penetration testing assessment."""
+        from pathlib import Path
+
+        if kwargs.get("user_data"):
+            variables = kwargs["user_data"]
+            target_domain = variables.get("target_domain")
+            phases = variables.get("phases")
+            safe_mode = bool(variables.get("safe_mode", False))
+            operator_tag = str(variables.get("operator_tag", "") or "").strip()
+        else:
+            variables = user.domain_variables or {}
+            target_domain = variables.get("target_domain")
+            phases = variables.get("phases")
+            safe_mode = bool(variables.get("safe_mode", False))
+            operator_tag = str(variables.get("operator_tag", "") or "").strip()
+
+        if not target_domain:
+            self.print_error_message("No target domain provided for external assessment")
             return
 
-        mobile.initialize_variables(mobile_testing_vars)
-        mobile._inspect_files(test_domain, self.os)
-        mobile.print_total_time(f"Total analysis time for {mobile.package_name}:")
-        mobile.reset_total_time()
+        # Output directory was created by user.update_output_directory("external").
+        base_dir = Path(user.output_directory) / "External"
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-    def handle_external_assessment(self, user):
-        """Handle external assessment."""
-        pass
+        external.initialize_variables({
+            "target_domain": target_domain,
+            "phases": phases,
+            "safe_mode": safe_mode,
+            "operator_tag": operator_tag,
+            "base_dir": base_dir,
+        })
+        external.decorator.reset_total_time()
+        try:
+            external.run()
+        finally:
+            external.decorator.reset_total_time()
 
     def process_domain(self, user_test_domain: str, **kwargs) -> None:
         """Process the selected testing domain."""
@@ -202,7 +242,14 @@ class FrameworkAssessmentMixin:
             return
 
         if user_test_domain == "external":
-            print("External assessment not implemented yet")
+            external = self._load_domain("external")
+            if external is None:
+                return
+            self.handle_external_assessment(
+                self.classes["user"],
+                external,
+                user_data=user_data,
+            )
             return
 
         if user_test_domain == "password":
