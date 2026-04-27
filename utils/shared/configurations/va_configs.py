@@ -18,8 +18,8 @@ class VAConfigs:
             "compliance": self._compile_regex(self.COMPLIANCE_STRINGS),
             "rating": self._compile_regex(self.RISK_RATING_STRINGS),
             "rce": self._compile_regex(self.RCE_STRING),
-            "rce_implicit": self._compile_regex(self.RCE_IMPLICIT_STRINGS),
-            "rce_remote_context": self._compile_regex(self.RCE_REMOTE_CONTEXT_STRINGS),
+            "rce_exploitable": self._compile_regex(self.RCE_EXPLOITABLE_STRINGS),
+            "rce_ignore": self._compile_regex(self.RCE_IGNORE_STRINGS),
             "rce_client": self._compile_regex(self.RCE_CLIENT_DEPENDENCY_STRINGS),
             "important_no_risk": self._compile_regex(self.IMPORTANT_NO_RISK_STRINGS),
             "patch_or_upgrade": self._compile_regex(self.PATCH_OR_UPGRADE),
@@ -143,16 +143,22 @@ class VAConfigs:
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     RCE_STRING = (
         r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b|"
-        r"\b[Rr]emote [Cc]ommand [Ee]xecution\b"
+        r"\b[Rr]emote [Cc]ommand [Ee]xecution\b|"
+        r"\bMS17-010\b|\b[Ee]ternal[Bb]lue\b"
     )
-    RCE_IMPLICIT_STRINGS = (
-        r"\b[Aa]rbitrary [Cc]ode [Ee]xecution\b|\b[Cc]ode [Ee]xecution [Vv]ulnerability\b|"
-        r"\b[Ee]xecute (?:unauthorized )?[Aa]rbitrary (?:[Cc]ode|[Cc]ommands?)\b|"
-        r"\b[Bb]ypass authentication and execute\b"
+    RCE_EXPLOITABLE_STRINGS = (
+        r"\b[Aa]rbitrary [Cc]ode [Ee]xecution\b|"
+        r"\b[Cc]ode [Ee]xecution [Vv]ulnerability\b|"
+        r"\b[Aa]rbitrary [Cc]ode can be executed on the remote host\b|"
+        r"\b[Aa]n (?:unauthenticated )?[Rr]emote attacker .* execute\b|"
+        r"\b[Cc]an be exploited remotely\b|"
+        r"\b[Rr]emotely exploitable\b"
     )
-    RCE_REMOTE_CONTEXT_STRINGS = (
-        r"\b[Rr]emot(?:e|ely)\b|\b[Nn]etwork\b|\b[Ss]erver\b|\b[Ss]ervice\b|\b[Uu]nauthenticated\b|"
-        r"\b[Bb]ypass authentication\b|\b[Oo]ver (?:the )?network\b|\b[Hh][Tt][Tt][Pp]\b|\b[Ss][Mm][Bb]\b|\b[Rr][Pp][Cc]\b"
+    RCE_IGNORE_STRINGS = (
+        r"^KB\d+|"
+        r"^[Ss]ecurity [Uu]pdates? for|^[Ss]ecurity [Uu]pdate for|"
+        r"\b[Nn]essus has not tested for these issues\b|"
+        r"\bself-reported version number\b"
     )
     IMPORTANT_NO_RISK_STRINGS = (
         r"(?i)\bMicrosoft Windows SMB Shares Enumeration\b|"
