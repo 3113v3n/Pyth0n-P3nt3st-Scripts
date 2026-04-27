@@ -18,6 +18,10 @@ class VAConfigs:
             "compliance": self._compile_regex(self.COMPLIANCE_STRINGS),
             "rating": self._compile_regex(self.RISK_RATING_STRINGS),
             "rce": self._compile_regex(self.RCE_STRING),
+            "rce_implicit": self._compile_regex(self.RCE_IMPLICIT_STRINGS),
+            "rce_remote_context": self._compile_regex(self.RCE_REMOTE_CONTEXT_STRINGS),
+            "rce_client": self._compile_regex(self.RCE_CLIENT_DEPENDENCY_STRINGS),
+            "important_no_risk": self._compile_regex(self.IMPORTANT_NO_RISK_STRINGS),
             "patch_or_upgrade": self._compile_regex(self.PATCH_OR_UPGRADE),
             "ssh": self._compile_regex(self.SSH_STRINGS),
             "info": self._compile_regex(self.INFO_DISCLOSURE_STRINGS),
@@ -94,6 +98,7 @@ class VAConfigs:
         "WinVerifyTrust": "winverify_condition",
         "Unquoted Service Path": "unquoted_condition",
         "SMB Issues": "smb_condition",
+        "SMB / Null Session Exposure (No Risk)": "important_no_risk_condition",
         "Active Directory": "AD_condition",
         "Windows Defender": "defender_condition",
         "RDP Misconfig": "rdp_condition",
@@ -136,7 +141,34 @@ class VAConfigs:
     WEB_IGNORE_FILTER = "TLS|SSL"
     RISK_RATING_STRINGS = "Critical|High|Medium"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
-    RCE_STRING = r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b"
+    RCE_STRING = (
+        r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b|"
+        r"\b[Rr]emote [Cc]ommand [Ee]xecution\b"
+    )
+    RCE_IMPLICIT_STRINGS = (
+        r"\b[Aa]rbitrary [Cc]ode [Ee]xecution\b|\b[Cc]ode [Ee]xecution [Vv]ulnerability\b|"
+        r"\b[Ee]xecute (?:unauthorized )?[Aa]rbitrary (?:[Cc]ode|[Cc]ommands?)\b|"
+        r"\b[Bb]ypass authentication and execute\b"
+    )
+    RCE_REMOTE_CONTEXT_STRINGS = (
+        r"\b[Rr]emot(?:e|ely)\b|\b[Nn]etwork\b|\b[Ss]erver\b|\b[Ss]ervice\b|\b[Uu]nauthenticated\b|"
+        r"\b[Bb]ypass authentication\b|\b[Oo]ver (?:the )?network\b|\b[Hh][Tt][Tt][Pp]\b|\b[Ss][Mm][Bb]\b|\b[Rr][Pp][Cc]\b"
+    )
+    IMPORTANT_NO_RISK_STRINGS = (
+        r"(?i)\bMicrosoft Windows SMB Shares Enumeration\b|"
+        r"\bMicrosoft Windows SMB Shares Access\b|"
+        r"\bMicrosoft Windows SMB Log In Possible\b|"
+        r"\bMicrosoft Windows SMB Share Hosting Office Files\b|"
+        r"\bMicrosoft Windows SMB LsaQueryInformationPolicy Function (?:NULL Session )?(?:Domain )?SID Enumeration\b"
+    )
+    RCE_CLIENT_DEPENDENCY_STRINGS = (
+        r"\b[Bb]rowser\b|\b[Ii]nternet [Ee]xplorer\b|\b[Ee]dge\b|\b[Ff]irefox\b|\b[Cc]hrome\b|\b[Ss]afari\b|"
+        r"\b[Uu]ser interaction\b|\b[Cc]onvince (?:a )?user\b|\b[Tt]rick (?:a )?user\b|"
+        r"\b[Vv]isit (?:a )?malicious\b|\b[Oo]pen (?:a )?malicious\b|"
+        r"\b[Dd]ocument\b|\b[Pp][Dd][Ff]\b|\b[Oo]ffice\b|\b[Ww]ord\b|\b[Ee]xcel\b|\b[Pp]ower[Pp]oint\b|\b[Oo]utlook\b|"
+        r"\b[Mm]ail [Cc]lient\b|\b[Ee]mail\b|\b[Aa]ttachment\b|\b[Pp]review [Pp]ane\b|\b[Ll][Nn][Kk]\b|"
+        r"\b[Ss]hortcut [Ff]ile\b"
+    )
     PATCH_OR_UPGRADE = "[Uu]pdate|[Uu]pgrade"
     WIN_SPECULATIVE = r"\b[Ww]indows [Ss]peculative [Ee]xecution\b"
     SSH_STRINGS = "SSH|SSH [Ss]erver|rlogin"
