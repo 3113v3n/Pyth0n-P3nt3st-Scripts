@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import curses
+import ipaddress
 import os
 import signal
 import sys
 import threading
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tqdm import tqdm
@@ -30,6 +32,7 @@ from utils.internal.network_math import (
     generate_ip_batches,
     get_network_info,
 )
+from utils.internal.scan_session import ScanSessionStore
 from utils.shared import Commands
 
 
@@ -58,6 +61,10 @@ class NetworkHandler(FileHandler, Commands):
         self.debug = False
         self.lock = threading.Lock()
         self.shutdown_event = threading.Event()
+        self.session_store: ScanSessionStore | None = None
+        self.current_scan_session: dict | None = None
+        self.last_scanned_ip: str | None = None
+        self.resume_scanned_ips: set[str] = set()
 
     def reset_state(self) -> None:
         """Reset instance state to defaults between runs."""
@@ -75,6 +82,10 @@ class NetworkHandler(FileHandler, Commands):
         self.lock = threading.Lock()
         self.shutdown_event = threading.Event()
         self.scan_complete = False
+        self.session_store = None
+        self.current_scan_session = None
+        self.last_scanned_ip = None
+        self.resume_scanned_ips = set()
 
     @classmethod
     def reset_class_states(cls):
@@ -93,6 +104,10 @@ class NetworkHandler(FileHandler, Commands):
         cls.lock = threading.Lock()
         cls.shutdown_event = threading.Event()
         cls.scan_complete = False
+        cls.session_store = None
+        cls.current_scan_session = None
+        cls.last_scanned_ip = None
+        cls.resume_scanned_ips = set()
 
     def initialize_network_variables(self, variables, test_domain, progress_bar):
         """Initialize scan variables from user/domain input."""
@@ -108,10 +123,106 @@ class NetworkHandler(FileHandler, Commands):
         self.progress_bar = progress_bar()
         self.update_output_directory(test_domain)
         self.initial_interface_ip = self.get_interface_ip(self.interface)
+        self.session_store = ScanSessionStore(self.output_directory)
+        self.current_scan_session = None
+        self.last_scanned_ip = None
+        self.resume_scanned_ips = set()
 
     @staticmethod
     def get_interface_ip(interface: str) -> str | None:
         return resolve_interface_ip(interface)
+
+    def _resolve_output_path(self, filename: str) -> str:
+        """Resolve scan output filename to an absolute path."""
+        path = Path(filename)
+        if not path.is_absolute():
+            path = Path(self.output_directory) / path.name
+        return str(path.resolve())
+
+    def _initialize_scan_session(self, mode: str, output_file: str) -> None:
+        """Initialize persisted scan session state for scan/resume flows."""
+        if not self.session_store:
+            return
+
+        if mode == "scan":
+            live_path = self._resolve_output_path(
+                self.generate_filename(mode, True, output_file)
+            )
+            unresponsive_path = self._resolve_output_path(
+                self.generate_filename(mode, False, output_file)
+            )
+            self.current_scan_session = self.session_store.create_session(
+                subnet_cidr=self.subnet,
+                interface_name=self.interface or "",
+                live_file=live_path,
+                unresponsive_file=unresponsive_path,
+            )
+            return
+
+        # Resume mode: try to bind to an existing session if present.
+        resume_path = self._resolve_output_path(output_file)
+        session = self.session_store.get_session_by_unresponsive_file(resume_path)
+        if session:
+            session["status"] = "running"
+            self.session_store.save_session(session)
+            self.current_scan_session = session
+
+    @staticmethod
+    def _derive_live_file_from_unresponsive(unresponsive_file: str) -> str:
+        """Map '*_unresponsive_hosts.csv' to its matching live-host CSV path."""
+        path = Path(unresponsive_file)
+        suffix = "_unresponsive_hosts"
+        stem = path.stem
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+        return str(path.with_name(f"{stem}{path.suffix or '.csv'}"))
+
+    @staticmethod
+    def _read_ips_from_file(file_path: str) -> set[str]:
+        """Load newline-delimited IP strings from a file, best-effort."""
+        ips: set[str] = set()
+        if not file_path:
+            return ips
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    ip = line.strip()
+                    if ip:
+                        ips.add(ip.split(",")[0].strip())
+        except OSError:
+            return ips
+        return ips
+
+    def _load_resume_scanned_ips(self, output_file: str) -> None:
+        """Load all previously scanned IPs for resume (live + unresponsive)."""
+        unresponsive_file = self._resolve_output_path(output_file)
+        live_file = self._derive_live_file_from_unresponsive(unresponsive_file)
+
+        if self.current_scan_session:
+            files = self.current_scan_session.get("files", {})
+            live_file = files.get("live_hosts", live_file)
+            unresponsive_file = files.get("unresponsive_hosts", unresponsive_file)
+
+        prior_live = self._read_ips_from_file(live_file)
+        prior_unresponsive = self._read_ips_from_file(unresponsive_file)
+        self.existing_unresponsive_ips = set(prior_unresponsive)
+
+        network = ipaddress.ip_network(self.subnet, strict=False)
+        scanned: set[str] = set()
+        for ip in prior_live.union(prior_unresponsive):
+            try:
+                ip_obj = ipaddress.ip_address(ip)
+            except ValueError:
+                continue
+            if ip_obj in network:
+                scanned.add(str(ip_obj))
+        self.resume_scanned_ips = scanned
+
+    def _calculate_resume_pending_hosts(self) -> int:
+        """Return number of IPs still pending for resume mode."""
+        if self.mode != "resume":
+            return self.hosts
+        return max(0, self.hosts - len(self.resume_scanned_ips))
 
     def port_discovery(self):
         # use masscan to discover open ports if ICMP is blocked
@@ -156,6 +267,10 @@ class NetworkHandler(FileHandler, Commands):
             return
 
         self.initial_interface_ip = current_ip
+        self.last_scanned_ip = None
+        self._initialize_scan_session(mode, output_file)
+        if mode == "resume":
+            self._load_resume_scanned_ips(output_file)
 
         def signal_handler(sig, frame):
             self.shutdown_event.set()
@@ -167,12 +282,11 @@ class NetworkHandler(FileHandler, Commands):
 
         try:
             self.mode = mode
-            remaining_hosts = (
-                self.calculate_remaining_hosts(self.user_ip_addr)
+            total = (
+                self._calculate_resume_pending_hosts()
                 if self.mode == "resume"
                 else self.hosts
             )
-            total = max(0, remaining_hosts)
             processed = 0
             committed_progress = 0
 
@@ -210,7 +324,19 @@ class NetworkHandler(FileHandler, Commands):
                             if self.shutdown_event.is_set():
                                 break
 
+                            ip = futures[_]
+                            self.last_scanned_ip = ip
                             processed += 1
+                            if self.current_scan_session and self.session_store:
+                                live_count = len(self.progress_bar.live_hosts)
+                                dead_count = len(self.progress_bar.unresponsive_hosts)
+                                self.session_store.update_checkpoint(
+                                    session=self.current_scan_session,
+                                    last_scanned_ip=ip,
+                                    scanned_count=processed,
+                                    live_count=live_count,
+                                    unresponsive_count=dead_count,
+                                )
                             if (
                                 processed % DEFAULT_PROGRESS_CHUNK == 0
                                 or processed == total
@@ -234,6 +360,23 @@ class NetworkHandler(FileHandler, Commands):
             self.shutdown_event.set()
             if self.monitor_thread:
                 self.monitor_thread.join(timeout=2)
+            if self.current_scan_session and self.session_store:
+                live_count = len(self.progress_bar.live_hosts) if self.progress_bar else 0
+                dead_count = (
+                    len(self.progress_bar.unresponsive_hosts)
+                    if self.progress_bar
+                    else 0
+                )
+                self.session_store.update_checkpoint(
+                    session=self.current_scan_session,
+                    last_scanned_ip=self.last_scanned_ip or "",
+                    scanned_count=live_count + dead_count,
+                    live_count=live_count,
+                    unresponsive_count=dead_count,
+                    force=True,
+                )
+                final_status = "completed" if self.scan_complete else "interrupted"
+                self.session_store.mark_status(self.current_scan_session, final_status)
 
     def get_live_ips(self, output: str) -> int:
         """Run the curses scanner and return discovered live host count."""
@@ -251,18 +394,25 @@ class NetworkHandler(FileHandler, Commands):
 
     def generate_ip_in_batches(self, batch_size: int = DEFAULT_BATCH_SIZE):
         """Yield IP addresses in batches for current mode/subnet."""
-        if self.mode == "resume":
-            self.hosts = self.calculate_remaining_hosts(self.user_ip_addr)
-            start_ip = self.user_ip_addr
-        else:
-            start_ip = None
-
-        self.progress_bar.set_total_hosts(self.hosts)
-        return generate_ip_batches(
-            subnet=self.subnet,
-            start_ip=start_ip,
-            batch_size=batch_size,
+        pending_hosts = (
+            self._calculate_resume_pending_hosts()
+            if self.mode == "resume"
+            else self.hosts
         )
+        self.progress_bar.set_total_hosts(pending_hosts)
+
+        for ip_batch in generate_ip_batches(
+            subnet=self.subnet,
+            start_ip=None,
+            batch_size=batch_size,
+        ):
+            if self.mode != "resume" or not self.resume_scanned_ips:
+                yield ip_batch
+                continue
+
+            pending_batch = [ip for ip in ip_batch if ip not in self.resume_scanned_ips]
+            if pending_batch:
+                yield pending_batch
 
     def set_progressbar(self, mode, filename, ip, stdscr):
         """Ping host and update progress/file outputs in a critical section."""
