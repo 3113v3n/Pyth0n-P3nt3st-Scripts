@@ -52,7 +52,14 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     # Optional version probes for command identity checks (prevents ambiguous matches).
     _VERSION_PROBES = {
-        "netexec": {"args": ["--version"], "contains": ("nxc", "netexec")},
+        # NetExec currently prints version text then exits with code 1 for
+        # `--version` in some builds. Accept rc 1 as valid as long as output exists.
+        "netexec": {
+            "args": ["--version"],
+            "contains": (),
+            "returncodes": (0, 1),
+            "require_output": True,
+        },
         "go": {"args": ["version"], "contains": ("go version",)},
         "java": {"args": ["-version"], "contains": ("version",)},
         "pipx": {"args": ["--version"], "contains": ("pipx",)},
@@ -679,7 +686,14 @@ class PackageHandler(Config, DisplayHandler, Commands):
         self._which_cache[executable] = resolved
         return resolved
 
-    def _probe_binary_identity(self, executable_path: str, args: list[str], expected_tokens: tuple[str, ...]) -> bool:
+    def _probe_binary_identity(
+        self,
+        executable_path: str,
+        args: list[str],
+        expected_tokens: tuple[str, ...],
+        allowed_returncodes: tuple[int, ...] = (0,),
+        require_output: bool = False,
+    ) -> bool:
         cache_key = (executable_path, tuple(args))
         if cache_key in self._probe_cache:
             return self._probe_cache[cache_key]
@@ -687,7 +701,14 @@ class PackageHandler(Config, DisplayHandler, Commands):
         try:
             proc = self.execute_command([executable_path, *args], timeout=5)
             output = f"{proc.stdout}\n{proc.stderr}".lower()
-            result = any(token.lower() in output for token in expected_tokens)
+            if proc.returncode not in allowed_returncodes:
+                result = False
+            elif require_output and not output.strip():
+                result = False
+            elif expected_tokens:
+                result = any(token.lower() in output for token in expected_tokens)
+            else:
+                result = True
         except Exception:
             result = False
 
@@ -716,6 +737,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
                     resolved,
                     probe.get("args", ["--version"]),
                     tuple(probe.get("contains", (candidate,))),
+                    tuple(probe.get("returncodes", (0,))),
+                    bool(probe.get("require_output", False)),
                 ):
                     return False
                 continue

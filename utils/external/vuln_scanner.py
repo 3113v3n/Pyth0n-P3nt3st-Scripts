@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from utils.shared.commands import Commands
-from .external_constants import NUCLEI_CONCURRENCY
+from .external_constants import NUCLEI_CONCURRENCY, SAFE_NUCLEI_CONCURRENCY
 from .tooling import available_name
 
 
@@ -26,12 +26,13 @@ class VulnerabilityScanner:
     def __init__(self) -> None:
         self.command = Commands()
 
-    def scan(self, alive_urls_file: Path, output_dir: Path) -> dict:
+    def scan(self, alive_urls_file: Path, output_dir: Path, safe_mode: bool = False) -> dict:
         """Run nuclei against the alive URLs.
 
         Args:
             alive_urls_file: File containing one URL per line.
             output_dir:      Destination directory for nuclei output.
+            safe_mode:       Enable lower-impact scanner concurrency profile.
 
         Returns:
             Dict with output path, total findings, severity counts, and a
@@ -44,11 +45,12 @@ class VulnerabilityScanner:
         if nuclei is None:
             return {"output": None, "total": 0, "severities": {}, "missing": NUCLEI_BIN, "skipped": True}
 
+        concurrency = SAFE_NUCLEI_CONCURRENCY if safe_mode else NUCLEI_CONCURRENCY
         report = output_dir / "nuclei_results.txt"
         cmd = [
             nuclei,
             "-l", str(alive_urls_file),
-            "-c", str(NUCLEI_CONCURRENCY),
+            "-c", str(concurrency),
             "-severity", ",".join(SEVERITY_LEVELS),
             "-silent",
         ]

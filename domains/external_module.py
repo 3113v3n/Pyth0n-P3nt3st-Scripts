@@ -12,7 +12,7 @@ from pathlib import Path
 
 from handlers.messages import DisplayHandler
 from utils.external import ExternalPipeline, ExternalReport
-from utils.external.external_constants import DEFAULT_PHASES
+from utils.external.external_constants import DEFAULT_PHASES, SAFE_OPERATOR_TAG_DEFAULT
 from utils.shared.decorators import CustomDecorators
 
 
@@ -23,6 +23,8 @@ class ExternalAssessment(DisplayHandler):
         super().__init__()
         self.target_domain = ""
         self.phases: tuple[str, ...] = DEFAULT_PHASES
+        self.safe_mode = False
+        self.operator_tag = SAFE_OPERATOR_TAG_DEFAULT
         self.base_dir: Path | None = None
         self.debug = False
         self.pipeline = ExternalPipeline(debug=self.debug)
@@ -36,7 +38,10 @@ class ExternalAssessment(DisplayHandler):
 
         Args:
             variables: Mapping with at minimum {"target_domain", "base_dir"}.
-                       Optional keys: "phases" (tuple/list of phase names).
+                       Optional keys:
+                         - "phases" (tuple/list of phase names)
+                         - "safe_mode" (bool)
+                         - "operator_tag" (str)
         """
         self.target_domain = variables["target_domain"]
         base_dir = variables.get("base_dir")
@@ -47,6 +52,9 @@ class ExternalAssessment(DisplayHandler):
         configured = variables.get("phases")
         if configured:
             self.phases = tuple(configured)
+        self.safe_mode = bool(variables.get("safe_mode", False))
+        raw_operator = str(variables.get("operator_tag", "") or "").strip()
+        self.operator_tag = raw_operator or SAFE_OPERATOR_TAG_DEFAULT
 
     def run(self) -> dict:
         """Execute all configured phases and write the consolidated report.
@@ -64,14 +72,18 @@ class ExternalAssessment(DisplayHandler):
             target_domain=self.target_domain,
             base_dir=self.base_dir,
             phases=self.phases,
+            safe_mode=self.safe_mode,
+            operator_tag=self.operator_tag,
         )
 
         ai_summary = self._maybe_ai_summary(results)
+        run_policy = results.get("_run_policy") if isinstance(results, dict) else None
         report_path = self.reporter.write(
             target_domain=self.target_domain,
             run_dir=run_dir,
             phase_results=results,
             ai_summary=ai_summary,
+            run_policy=run_policy if isinstance(run_policy, dict) else None,
         )
 
         self.print_success_message(

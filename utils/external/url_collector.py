@@ -8,7 +8,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from utils.shared.commands import Commands
-from .external_constants import GAUPLUS_THREADS, SENSITIVE_EXTENSION_RE
+from .external_constants import (
+    GAUPLUS_THREADS,
+    SAFE_GAUPLUS_THREADS,
+    SENSITIVE_EXTENSION_RE,
+)
 from .tooling import available_name
 
 
@@ -22,12 +26,13 @@ class UrlCollector:
     def __init__(self) -> None:
         self.command = Commands()
 
-    def collect(self, hosts_file: Path, output_dir: Path) -> dict:
+    def collect(self, hosts_file: Path, output_dir: Path, safe_mode: bool = False) -> dict:
         """Run the first available URL collector against *hosts_file*.
 
         Args:
             hosts_file: Resolved hostnames or alive URLs (one per line).
             output_dir: Destination directory for the URL artifacts.
+            safe_mode:  Enable lower-impact collection profile.
 
         Returns:
             Dict with keys: urls (path), sensitive (path), counts, tool, missing.
@@ -59,7 +64,7 @@ class UrlCollector:
         urls_path = output_dir / "historical_urls.txt"
         sensitive_path = output_dir / "sensitive_urls.txt"
 
-        cmd = self._build_command(tool, executable, hosts_file)
+        cmd = self._build_command(tool, executable, hosts_file, safe_mode=safe_mode)
         self.command.stream_command(cmd, output_file=urls_path, prefix=f"[{tool}] ")
 
         sensitive = self._filter_sensitive(urls_path)
@@ -76,11 +81,21 @@ class UrlCollector:
         }
 
     @staticmethod
-    def _build_command(tool: str, executable: str, hosts_file: Path) -> list[str]:
+    def _build_command(
+        tool: str,
+        executable: str,
+        hosts_file: Path,
+        safe_mode: bool = False,
+    ) -> list[str]:
+        threads = SAFE_GAUPLUS_THREADS if safe_mode else GAUPLUS_THREADS
         if tool == "gauplus":
-            return [executable, "-t", str(GAUPLUS_THREADS), "-subs", "-random-agent", str(hosts_file)]
+            cmd = [executable, "-t", str(threads), "-subs"]
+            if not safe_mode:
+                cmd.append("-random-agent")
+            cmd.append(str(hosts_file))
+            return cmd
         if tool == "gau":
-            return [executable, "--threads", str(GAUPLUS_THREADS), "--subs", str(hosts_file)]
+            return [executable, "--threads", str(threads), "--subs", str(hosts_file)]
         return [executable, str(hosts_file)]
 
     @staticmethod

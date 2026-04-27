@@ -13,7 +13,12 @@ import subprocess
 from pathlib import Path
 
 from utils.shared.commands import Commands
-from .external_constants import HTTP_PROBE_PORTS, HTTPX_THREADS
+from .external_constants import (
+    HTTP_PROBE_PORTS,
+    HTTPX_THREADS,
+    SAFE_HTTPX_THREADS,
+    SAFE_OPERATOR_TAG_DEFAULT,
+)
 from .tooling import TOOLS_BIN, available_name
 
 
@@ -27,12 +32,20 @@ class HttpProbe:
     def __init__(self) -> None:
         self.command = Commands()
 
-    def probe(self, hosts_file: Path, output_dir: Path) -> dict:
+    def probe(
+        self,
+        hosts_file: Path,
+        output_dir: Path,
+        safe_mode: bool = False,
+        operator_tag: str = SAFE_OPERATOR_TAG_DEFAULT,
+    ) -> dict:
         """Probe each host in *hosts_file* and write alive_hosts.json + alive_hosts.txt.
 
         Args:
             hosts_file: Path to file containing one hostname per line.
-            output_dir: Directory where probe results are stored.
+            output_dir:   Directory where probe results are stored.
+            safe_mode:    Enable lower-impact probing profile.
+            operator_tag: Operator identifier used for audit headers.
 
         Returns:
             Dictionary with keys:
@@ -50,19 +63,26 @@ class HttpProbe:
         if httpx is None:
             return {"json_path": None, "txt_path": None, "count": 0, "missing": "/".join(HTTPX_ALIASES), "skipped": True}
 
+        thread_count = SAFE_HTTPX_THREADS if safe_mode else HTTPX_THREADS
         cmd = [
             httpx,
             "-l", str(hosts_file),
             "-ports", HTTP_PROBE_PORTS,
-            "-threads", str(HTTPX_THREADS),
+            "-threads", str(thread_count),
             "-title",
             "-tech-detect",
             "-web-server",
             "-status-code",
-            "-random-agent",
             "-json",
             "-silent",
         ]
+        if safe_mode:
+            tag = (operator_tag or SAFE_OPERATOR_TAG_DEFAULT).strip()
+            cmd.extend(["-H", f"User-Agent: PentestFramework/{tag}"])
+            cmd.extend(["-H", f"X-Scan-Operator: {tag}"])
+            cmd.extend(["-H", "X-Scan-Mode: safe"])
+        else:
+            cmd.append("-random-agent")
         self.command.stream_command(cmd, output_file=json_path, prefix="[httpx] ")
 
         urls = self._extract_urls(json_path)

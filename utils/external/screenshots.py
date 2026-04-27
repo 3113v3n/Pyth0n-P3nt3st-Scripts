@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from utils.shared.commands import Commands
+from .external_constants import SAFE_GOWITNESS_THREADS
 from .tooling import available_name
 
 
@@ -22,12 +23,13 @@ class Screenshotter:
     def __init__(self) -> None:
         self.command = Commands()
 
-    def capture(self, alive_urls_file: Path, output_dir: Path) -> dict:
+    def capture(self, alive_urls_file: Path, output_dir: Path, safe_mode: bool = False) -> dict:
         """Run gowitness against the URLs in *alive_urls_file*.
 
         Args:
             alive_urls_file: File containing one URL per line.
             output_dir:      Run directory; screenshots land in <output>/screenshots.
+            safe_mode:       Enable lower-impact screenshot threading profile.
 
         Returns:
             Dict with the screenshot directory path, the count of images, and
@@ -47,6 +49,7 @@ class Screenshotter:
             gowitness,
             alive_urls_file,
             screenshots_dir,
+            safe_mode=safe_mode,
         )
         for cmd in command_candidates:
             result = self.command.stream_command(cmd, prefix="[gowitness] ")
@@ -64,14 +67,17 @@ class Screenshotter:
         gowitness: str,
         alive_urls_file: Path,
         screenshots_dir: Path,
+        safe_mode: bool = False,
     ) -> list[list[str]]:
         """Return gowitness command variants ordered by likely local version."""
+        threads = str(SAFE_GOWITNESS_THREADS) if safe_mode else "6"
         modern = [
             gowitness,
             "scan",
             "file",
             "-f", str(alive_urls_file),
             "-s", str(screenshots_dir),
+            "-t", threads,
             "--screenshot-format", "png",
         ]
         legacy = [
@@ -79,6 +85,7 @@ class Screenshotter:
             "file",
             "-f", str(alive_urls_file),
             "-P", str(screenshots_dir),
+            "--threads", threads,
             "--disable-db",
         ]
         help_text = self.command.get_process_output([gowitness, "--help"]).lower()

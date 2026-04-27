@@ -99,6 +99,84 @@ The user is however required to provide the subnet that was being scanned initia
 ![Resume_scan](images/internal_resume.png)
 ![Scan Progress](images/scan_progress.png)
 
+### Internal Resume Reliability Update (April 2026)
+
+Changes carried out so far:
+
+1. Baseline performance/behavior benchmarks were executed for both `scan` and `resume` on a `/16` subnet with a controlled timeout.
+2. A new persistent session-state scaffold was added at `utils/internal/scan_session.py` to support:
+   - scan session metadata persistence
+   - atomic JSON state writes
+   - throttled checkpoint updates (to avoid I/O bottlenecks)
+   - interface similarity checks for safer resume behavior
+3. Existing flow behavior was validated before integration so regressions can be measured against a known baseline.
+
+#### Baseline commands used
+
+```sh
+# SCAN baseline (/16, 120s timeout, PTY for curses)
+script -q -c "timeout -s INT 120 ./.venv/bin/python main.py -M cli_args internal -a scan -I wlan0 --ip 192.168.100.44/16 -o baseline_pre_scan.csv" /dev/null
+
+# RESUME baseline (/16, 120s timeout, PTY for curses)
+script -q -c "timeout -s INT 120 ./.venv/bin/python main.py -M cli_args internal -a resume -I wlan0 -r output_directory/Internal/baseline_pre_scan_27-04-2026-12:38:19_unresponsive_hosts.csv -m 16" /dev/null
+```
+
+#### Baseline results snapshot
+
+- `scan` baseline: elapsed `121s`, partial progress `~15150/65536`, live hosts discovered `454`.
+- `resume` baseline: elapsed `121s`, partial progress `~15075/50336`, live hosts discovered `342`.
+- Both runs intentionally hit timeout and correctly retained unresponsive-host files for continuation.
+
+#### Suggested pictorial evidence sections (add your screenshots)
+
+You can add image evidence under this subsection using the following recommended captions:
+
+1. Baseline scan command execution (CLI + startup banner)
+2. Baseline scan progress view (`curses` screen)
+3. Baseline scan timeout/interruption handling message
+4. Baseline resume command execution (file + mask path)
+5. Baseline resume progress view (`curses` screen)
+6. Baseline resume timeout/interruption handling message
+7. (After integration) automatic subnet recovery from saved session metadata
+8. (After integration) interface similarity pass/fail behavior on resume
+
+Recommended file names for these docs images:
+
+- `images/docs/internal_baseline_scan_start.png`
+- `images/docs/internal_baseline_scan_progress.png`
+- `images/docs/internal_baseline_scan_timeout.png`
+- `images/docs/internal_baseline_resume_start.png`
+- `images/docs/internal_baseline_resume_progress.png`
+- `images/docs/internal_baseline_resume_timeout.png`
+- `images/docs/internal_resume_auto_subnet.png`
+- `images/docs/internal_resume_interface_validation.png`
+
+#### Image placeholders (drop screenshots into these paths)
+
+![Baseline scan start](images/docs/internal_baseline_scan_start.png)
+_Baseline scan command execution (CLI + startup banner)_
+
+![Baseline scan progress](images/docs/internal_baseline_scan_progress.png)
+_Baseline scan progress view (`curses` screen)_
+
+![Baseline scan timeout](images/docs/internal_baseline_scan_timeout.png)
+_Baseline scan timeout/interruption handling message_
+
+![Baseline resume start](images/docs/internal_baseline_resume_start.png)
+_Baseline resume command execution (file + mask path)_
+
+![Baseline resume progress](images/docs/internal_baseline_resume_progress.png)
+_Baseline resume progress view (`curses` screen)_
+
+![Baseline resume timeout](images/docs/internal_baseline_resume_timeout.png)
+_Baseline resume timeout/interruption handling message_
+
+![Resume auto subnet](images/docs/internal_resume_auto_subnet.png)
+_(After integration) automatic subnet recovery from saved session metadata_
+
+![Resume interface validation](images/docs/internal_resume_interface_validation.png)
+_(After integration) interface similarity pass/fail behavior on resume_
+
 ***
 
 ## 2. Vulnerability Analysis

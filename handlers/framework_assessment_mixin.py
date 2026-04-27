@@ -29,11 +29,12 @@ class FrameworkAssessmentMixin:
 
             if _action == "resume":
                 resume_file = _vars["resume_file"]
-                subnet_mask = _vars["mask"]
-                last_ip = user.get_last_unresponsive_ip(resume_file)
-                # Resume flow now rebuilds subnet context from the persisted host file.
-                _vars["subnet"] = f"{last_ip}/{subnet_mask}"
                 _output_file = resume_file
+                if not _vars.get("subnet"):
+                    subnet_mask = _vars["mask"]
+                    last_ip = user.get_last_unresponsive_ip(resume_file)
+                    # Legacy resume flow builds subnet from last host + provided mask.
+                    _vars["subnet"] = f"{last_ip}/{subnet_mask}"
             elif _action == "scan":
                 _output_file = _vars["output"]
                 network.existing_unresponsive_ips = user.existing_unresponsive_ips
@@ -169,10 +170,14 @@ class FrameworkAssessmentMixin:
             variables = kwargs["user_data"]
             target_domain = variables.get("target_domain")
             phases = variables.get("phases")
+            safe_mode = bool(variables.get("safe_mode", False))
+            operator_tag = str(variables.get("operator_tag", "") or "").strip()
         else:
             variables = user.domain_variables or {}
             target_domain = variables.get("target_domain")
             phases = variables.get("phases")
+            safe_mode = bool(variables.get("safe_mode", False))
+            operator_tag = str(variables.get("operator_tag", "") or "").strip()
 
         if not target_domain:
             self.print_error_message("No target domain provided for external assessment")
@@ -185,6 +190,8 @@ class FrameworkAssessmentMixin:
         external.initialize_variables({
             "target_domain": target_domain,
             "phases": phases,
+            "safe_mode": safe_mode,
+            "operator_tag": operator_tag,
             "base_dir": base_dir,
         })
         external.decorator.reset_total_time()

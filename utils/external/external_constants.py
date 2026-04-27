@@ -35,6 +35,20 @@ HTTPX_THREADS = 100
 GAUPLUS_THREADS = 30
 NUCLEI_CONCURRENCY = 50
 
+# Safe-mode profile: lower-impact defaults intended for authorized environments
+# where scan load must be tightly controlled.
+SAFE_MODE_ALLOWED_PHASES = (
+    PHASE_RECON,
+    PHASE_PROBE,
+    PHASE_URLS,
+)
+SAFE_HTTPX_THREADS = 8
+SAFE_GAUPLUS_THREADS = 5
+SAFE_NUCLEI_CONCURRENCY = 10
+SAFE_GOWITNESS_THREADS = 2
+SAFE_MAX_TARGETS_PER_PHASE = 200
+SAFE_OPERATOR_TAG_DEFAULT = "authorized-security-testing"
+
 # Sensitive file extensions to flag in historical URL output. Used by url_collector.
 # Pattern is anchored at the end of the path or before a query string.
 SENSITIVE_EXTENSION_RE = re.compile(

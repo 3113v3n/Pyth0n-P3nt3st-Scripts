@@ -9,8 +9,10 @@ domain class, the report writer, the AI assistant) read the same shape.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from handlers.messages import DisplayHandler
 
@@ -24,6 +26,9 @@ from .external_constants import (
     PHASE_TAKEOVER,
     PHASE_URLS,
     PHASE_VULNS,
+    SAFE_MAX_TARGETS_PER_PHASE,
+    SAFE_MODE_ALLOWED_PHASES,
+    SAFE_OPERATOR_TAG_DEFAULT,
 )
 from .http_probe import HttpProbe
 from .port_scanner import PortScanner
@@ -51,6 +56,8 @@ class ExternalPipeline(DisplayHandler):
         target_domain: str,
         base_dir: Path,
         phases: tuple[str, ...] = DEFAULT_PHASES,
+        safe_mode: bool = False,
+        operator_tag: str = SAFE_OPERATOR_TAG_DEFAULT,
     ) -> tuple[Path, dict]:
         """Execute the requested phases and return (run_dir, results).
 
@@ -58,27 +65,75 @@ class ExternalPipeline(DisplayHandler):
             target_domain: Root domain (URL prefixes are stripped by recon).
             base_dir:      Parent directory for all run artifacts.
             phases:        Phases to execute, in order.
+            safe_mode:     Apply lower-impact profile (phase/concurrency caps).
+            operator_tag:  Identifier used in safe-mode request metadata/headers.
 
         Returns:
             Tuple of (run-directory path, phase results dict).
         """
         run_dir = self._build_run_dir(base_dir, target_domain)
         results: dict = {}
+        effective_phases, dropped = self._effective_phases(phases, safe_mode=safe_mode)
+        safe_operator = (operator_tag or SAFE_OPERATOR_TAG_DEFAULT).strip() or SAFE_OPERATOR_TAG_DEFAULT
+        run_policy = {
+            "safe_mode": safe_mode,
+            "operator_tag": safe_operator if safe_mode else "",
+            "requested_phases": ",".join(phases),
+            "effective_phases": ",".join(effective_phases),
+            "dropped_phases": ",".join(dropped),
+            "scope_root": target_domain,
+            "max_targets_per_phase": SAFE_MAX_TARGETS_PER_PHASE if safe_mode else "",
+        }
+        policy_path = run_dir / "run_policy.json"
+        policy_path.write_text(json.dumps(run_policy, indent=2), encoding="utf-8")
+        run_policy["path"] = str(policy_path)
+        results["_run_policy"] = run_policy
+        if safe_mode and dropped:
+            self.print_warning_message(
+                "Safe mode skipped high-noise phases",
+                file_path=", ".join(dropped),
+            )
 
         # Dispatch table — each entry receives the run_dir + previous results
         # so later phases can chain off earlier artifacts.
         dispatch = {
             PHASE_RECON: self._run_recon,
-            PHASE_PROBE: self._run_probe,
+            PHASE_PROBE: lambda domain, workdir, prior: self._run_probe(
+                domain,
+                workdir,
+                prior,
+                safe_mode=safe_mode,
+                operator_tag=safe_operator,
+            ),
             PHASE_PORTS: self._run_ports,
-            PHASE_SCREENSHOTS: self._run_screenshots,
-            PHASE_TAKEOVER: self._run_takeover,
-            PHASE_URLS: self._run_urls,
-            PHASE_VULNS: self._run_vulns,
+            PHASE_SCREENSHOTS: lambda domain, workdir, prior: self._run_screenshots(
+                domain,
+                workdir,
+                prior,
+                safe_mode=safe_mode,
+            ),
+            PHASE_TAKEOVER: lambda domain, workdir, prior: self._run_takeover(
+                domain,
+                workdir,
+                prior,
+                safe_mode=safe_mode,
+            ),
+            PHASE_URLS: lambda domain, workdir, prior: self._run_urls(
+                domain,
+                workdir,
+                prior,
+                safe_mode=safe_mode,
+            ),
+            PHASE_VULNS: lambda domain, workdir, prior: self._run_vulns(
+                domain,
+                workdir,
+                prior,
+                safe_mode=safe_mode,
+            ),
         }
 
         try:
-            for phase in phases:
+            for phase in effective_phases:
                 handler = dispatch.get(phase)
                 if handler is None:
                     self.print_warning_message(f"Unknown phase '{phase}' — skipping.")
@@ -111,12 +166,28 @@ class ExternalPipeline(DisplayHandler):
     def _run_recon(self, domain: str, run_dir: Path, _: dict) -> dict:
         return self._recon.enumerate_subdomain(domain, run_dir)
 
-    def _run_probe(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_probe(
+        self,
+        _domain: str,
+        run_dir: Path,
+        results: dict,
+        safe_mode: bool = False,
+        operator_tag: str = SAFE_OPERATOR_TAG_DEFAULT,
+    ) -> dict:
         recon = results.get(PHASE_RECON) or {}
         hosts = self._resolved_hosts_path(recon)
         if hosts is None:
             return {"json_path": None, "txt_path": None, "count": 0}
-        return self._http.probe(hosts, run_dir)
+        scoped = self._build_scoped_hosts_file(
+            hosts,
+            target_domain=_domain,
+            run_dir=run_dir,
+            label="probe",
+            safe_mode=safe_mode,
+        )
+        if scoped is None:
+            return {"json_path": None, "txt_path": None, "count": 0, "scope_filtered": True}
+        return self._http.probe(scoped, run_dir, safe_mode=safe_mode, operator_tag=operator_tag)
 
     def _run_ports(
         self,
@@ -132,25 +203,51 @@ class ExternalPipeline(DisplayHandler):
             else {"normal": None, "grepable": None, "count": 0}
         )
 
-    def _run_screenshots(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_screenshots(self, _domain: str, run_dir: Path, results: dict, safe_mode: bool = False) -> dict:
         probe = results.get(PHASE_PROBE) or {}
         alive = probe.get("txt_path")
-        return self._shots.capture(alive, run_dir) if alive else {"directory": None, "count": 0}
+        return self._shots.capture(alive, run_dir, safe_mode=safe_mode) if alive else {"directory": None, "count": 0}
 
-    def _run_takeover(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_takeover(self, _domain: str, run_dir: Path, results: dict, safe_mode: bool = False) -> dict:
         recon = results.get(PHASE_RECON) or {}
         hosts = self._resolved_hosts_path(recon) or recon.get("subdomains_file")
-        return self._takeover.check(hosts, run_dir)
+        if hosts is None:
+            return {"output": None, "tool": None, "count": 0}
+        scoped = self._build_scoped_hosts_file(
+            hosts,
+            target_domain=_domain,
+            run_dir=run_dir,
+            label="takeover",
+            safe_mode=safe_mode,
+        )
+        if scoped is None:
+            return {"output": None, "tool": None, "count": 0, "scope_filtered": True}
+        return self._takeover.check(scoped, run_dir)
 
-    def _run_urls(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_urls(self, _domain: str, run_dir: Path, results: dict, safe_mode: bool = False) -> dict:
         recon = results.get(PHASE_RECON) or {}
         hosts = self._resolved_hosts_path(recon) or recon.get("subdomains_file")
-        return self._urls.collect(hosts, run_dir)
+        if hosts is None:
+            return {"urls": None, "sensitive": None, "url_count": 0, "sensitive_count": 0}
+        scoped = self._build_scoped_hosts_file(
+            hosts,
+            target_domain=_domain,
+            run_dir=run_dir,
+            label="urls",
+            safe_mode=safe_mode,
+        )
+        if scoped is None:
+            return {"urls": None, "sensitive": None, "url_count": 0, "sensitive_count": 0, "scope_filtered": True}
+        return self._urls.collect(scoped, run_dir, safe_mode=safe_mode)
 
-    def _run_vulns(self, _domain: str, run_dir: Path, results: dict) -> dict:
+    def _run_vulns(self, _domain: str, run_dir: Path, results: dict, safe_mode: bool = False) -> dict:
         probe = results.get(PHASE_PROBE) or {}
         alive = probe.get("txt_path")
-        return self._vulns.scan(alive, run_dir) if alive else {"output": None, "total": 0, "severities": {}}
+        return (
+            self._vulns.scan(alive, run_dir, safe_mode=safe_mode)
+            if alive
+            else {"output": None, "total": 0, "severities": {}}
+        )
 
     # ------------------------------------------------------------------
     # Helpers
@@ -177,6 +274,67 @@ class ExternalPipeline(DisplayHandler):
             hosts_only.write_text("\n".join(sorted(seen)) + "\n", encoding="utf-8")
             return hosts_only
         return recon_result.get("subdomains_file")
+
+    @staticmethod
+    def _effective_phases(phases: tuple[str, ...], safe_mode: bool = False) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """Return (effective, dropped) phase tuples based on execution mode."""
+        requested = tuple(dict.fromkeys(phases))
+        if not safe_mode:
+            return requested, tuple()
+        allowed = set(SAFE_MODE_ALLOWED_PHASES)
+        effective = tuple(phase for phase in requested if phase in allowed)
+        dropped = tuple(phase for phase in requested if phase not in allowed)
+        if not effective:
+            effective = SAFE_MODE_ALLOWED_PHASES
+        return effective, dropped
+
+    @staticmethod
+    def _in_scope_host(host: str, target_domain: str) -> bool:
+        host_value = host.strip().lower().strip(".")
+        root = target_domain.strip().lower().strip(".")
+        if not host_value or not root:
+            return False
+        return host_value == root or host_value.endswith(f".{root}")
+
+    def _build_scoped_hosts_file(
+        self,
+        source_file: Path,
+        target_domain: str,
+        run_dir: Path,
+        label: str,
+        safe_mode: bool = False,
+    ) -> Path | None:
+        """Filter target list to in-scope hosts and apply safe-mode caps."""
+        if not source_file.exists():
+            return None
+        scoped: list[str] = []
+        seen: set[str] = set()
+        for raw in source_file.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            token = line.split()[0]
+            host = (urlparse(token).hostname or token).strip().lower().strip(".")
+            if not self._in_scope_host(host, target_domain):
+                continue
+            if host in seen:
+                continue
+            seen.add(host)
+            scoped.append(host)
+
+        if safe_mode and len(scoped) > SAFE_MAX_TARGETS_PER_PHASE:
+            self.print_warning_message(
+                f"Safe mode target cap reached for phase '{label}' "
+                f"({len(scoped)} -> {SAFE_MAX_TARGETS_PER_PHASE})"
+            )
+            scoped = scoped[:SAFE_MAX_TARGETS_PER_PHASE]
+
+        if not scoped:
+            return None
+
+        scoped_file = run_dir / f"{label}_scoped_targets.txt"
+        scoped_file.write_text("\n".join(scoped) + "\n", encoding="utf-8")
+        return scoped_file
 
     def _print_phase_summary(self, phase: str, result: dict) -> None:
         if result.get("missing") and result.get("skipped"):

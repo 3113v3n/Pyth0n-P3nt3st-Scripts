@@ -41,6 +41,7 @@ class ExternalReport:
         run_dir: Path,
         phase_results: dict,
         ai_summary: str | None = None,
+        run_policy: dict | None = None,
     ) -> Path:
         """Write the consolidated report to <run_dir>/external_report.md.
 
@@ -49,6 +50,7 @@ class ExternalReport:
             run_dir:       Directory containing all phase artifacts.
             phase_results: Mapping of phase name → result dict.
             ai_summary:    Optional AI-generated narrative summary.
+            run_policy:    Optional execution policy/guard metadata.
 
         Returns:
             Path to the generated report.
@@ -66,6 +68,15 @@ class ExternalReport:
         lines.append("")
         lines.append(self._summary_table(phase_results))
         lines.append("")
+
+        if run_policy:
+            lines.append("## Run Policy")
+            lines.append("")
+            for key, value in run_policy.items():
+                if value in (None, "", [], {}, ()):
+                    continue
+                lines.append(f"- **{key}**: {value}")
+            lines.append("")
 
         if ai_summary:
             lines.append("## AI-Assisted Summary")

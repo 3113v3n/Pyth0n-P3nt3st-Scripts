@@ -119,6 +119,9 @@ own artifact directory inside [output_directory/External/<domain>_<timestamp>/].
 {color.OKCYAN}{color.UNDERLINE}:params{color.ENDC} :
         {color.OKGREEN}domain {color.ENDC}      Target domain (e.g. example.com)
         {color.OKGREEN}phases {color.ENDC}      Optional comma-separated subset of phases to execute
+        {color.OKGREEN}safe_mode {color.ENDC}   Lower-impact profile: in-scope filtering, capped targets, reduced concurrency
+                                and high-noise phases disabled (recon, probe, urls only).
+        {color.OKGREEN}operator_tag{color.ENDC} Optional identifier added to safe-mode HTTP headers and run metadata.
 
 A consolidated [external_report.md] is written into the run directory at the
 end of every assessment; it lists each phase's artifacts and counts.
