@@ -89,7 +89,7 @@ class ScreenHandler(DisplayHandler):
 
     def prompt_format(self, prompt, **kwargs):
         decorator = "..." * 30
-        dotted_lines = f"{self.OKGREEN}{decorator}{self.ENDC}"
+        dotted_lines = f"{self.MUTED}{decorator}{self.ENDC}"
 
         def not_lower():
             user_input = input(prompt).strip()

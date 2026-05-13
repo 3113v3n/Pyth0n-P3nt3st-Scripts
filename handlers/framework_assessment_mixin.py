@@ -2,9 +2,55 @@
 
 from __future__ import annotations
 
+import sys
+
+from utils.shared.commands import Commands, StrictModeViolation
+
 
 class FrameworkAssessmentMixin:
     """Dispatch and run the selected assessment domain."""
+
+    def _should_temporarily_relax(self, phase: str, error: StrictModeViolation) -> bool:
+        """Determine whether to grant temporary relaxed mode for a blocked phase."""
+        if getattr(self, "auto_relax_on_strict", False):
+            self.print_warning_message(
+                f"Auto-relax enabled. Retrying '{phase}' with temporary relaxed mode."
+            )
+            return True
+
+        if not sys.stdin.isatty():
+            self.print_warning_message(
+                f"Strict mode blocked '{phase}' in non-interactive run.",
+                file_path=(
+                    "Re-run with --auto-relax-on-strict or --no-strict-project-mode "
+                    "if this behavior is expected."
+                ),
+            )
+            return False
+
+        self.print_warning_message(str(error))
+        try:
+            choice = input(
+                f"[?] Allow temporary relaxed mode for '{phase}' only? [y/N]: "
+            ).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return False
+        return choice in {"y", "yes"}
+
+    def _run_with_strict_fallback(self, phase: str, runner: callable):
+        """Run an assessment phase and optionally retry in temporary relaxed mode."""
+        try:
+            return runner()
+        except StrictModeViolation as error:
+            if not Commands.strict_project_mode_enabled():
+                raise
+            if not self._should_temporarily_relax(phase, error):
+                raise
+            self.print_warning_message(
+                f"Temporarily relaxing strict mode for '{phase}'. Strict mode will be restored automatically."
+            )
+            with Commands.temporary_relaxation(reason=phase):
+                return runner()
 
     def handle_internal_assessment(self, user, network, internal, **kwargs):
         """Handle Internal penetration testing assessment."""
@@ -106,6 +152,8 @@ class FrameworkAssessmentMixin:
                 "Analysis Completed in Approximately: "
             )
             return True
+        except StrictModeViolation:
+            raise
         except Exception as error:
             self.print_error_message(
                 message="Error in vulnerability assessment",
@@ -211,11 +259,14 @@ class FrameworkAssessmentMixin:
             internal = self._load_domain("internal")
             if internal is None:
                 return
-            self.handle_internal_assessment(
-                self.classes["user"],
-                self.classes["network"],
-                internal,
-                user_data=user_data,
+            self._run_with_strict_fallback(
+                "internal assessment",
+                lambda: self.handle_internal_assessment(
+                    self.classes["user"],
+                    self.classes["network"],
+                    internal,
+                    user_data=user_data,
+                ),
             )
             return
 
@@ -223,10 +274,13 @@ class FrameworkAssessmentMixin:
             vulnerability = self._load_domain("vulnerability")
             if vulnerability is None:
                 return
-            self.handle_vulnerability_assessment(
-                self.classes["user"],
-                vulnerability,
-                user_data=user_data,
+            self._run_with_strict_fallback(
+                "vulnerability analysis",
+                lambda: self.handle_vulnerability_assessment(
+                    self.classes["user"],
+                    vulnerability,
+                    user_data=user_data,
+                ),
             )
             return
 
@@ -234,10 +288,13 @@ class FrameworkAssessmentMixin:
             mobile = self._load_domain("mobile")
             if mobile is None:
                 return
-            self.handle_mobile_assessment(
-                self.classes["user"],
-                mobile,
-                user_data=user_data,
+            self._run_with_strict_fallback(
+                "mobile assessment",
+                lambda: self.handle_mobile_assessment(
+                    self.classes["user"],
+                    mobile,
+                    user_data=user_data,
+                ),
             )
             return
 
@@ -245,10 +302,13 @@ class FrameworkAssessmentMixin:
             external = self._load_domain("external")
             if external is None:
                 return
-            self.handle_external_assessment(
-                self.classes["user"],
-                external,
-                user_data=user_data,
+            self._run_with_strict_fallback(
+                "external assessment",
+                lambda: self.handle_external_assessment(
+                    self.classes["user"],
+                    external,
+                    user_data=user_data,
+                ),
             )
             return
 
@@ -256,10 +316,13 @@ class FrameworkAssessmentMixin:
             password = self._load_domain("password")
             if password is None:
                 return
-            self.handle_password_operations(
-                self.classes["user"],
-                password,
-                user_data=user_data,
+            self._run_with_strict_fallback(
+                "password operations",
+                lambda: self.handle_password_operations(
+                    self.classes["user"],
+                    password,
+                    user_data=user_data,
+                ),
             )
             return
 

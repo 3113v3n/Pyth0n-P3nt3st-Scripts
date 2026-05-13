@@ -17,6 +17,14 @@ from utils.shared.validators import Validator
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse common truthy/falsey environment values."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
 class InteractionHandler:
     """Class responsible for handling interactions with the user.
     Switches between different modes [interactive and arguments]
@@ -25,6 +33,7 @@ class InteractionHandler:
     def __init__(self):
         self.argument_mode = False
         self.arguments = {}
+        self.runtime_options = {}
         self.validator = Validator()
         self.filehandler = None
 
@@ -46,7 +55,6 @@ class InteractionHandler:
             "-M",
             dest="script_mode",
             choices=["interactive", "cli_args"],
-            required=True,
             default="interactive",
             help=(
                 "Select the mode to run the script with:\n"
@@ -70,6 +78,32 @@ class InteractionHandler:
             default=True,
             help="Disable AI-powered analysis (default: enabled when ANTHROPIC_API_KEY is set)",
         )
+        strict_default = _env_bool("PENTEST_STRICT_PROJECT_MODE", True)
+        parser.add_argument(
+            "--strict-project-mode",
+            dest="strict_project_mode",
+            action="store_true",
+            default=strict_default,
+            help=(
+                "Enable strict project confinement (default: enabled; "
+                "or set via PENTEST_STRICT_PROJECT_MODE=0/1)."
+            ),
+        )
+        parser.add_argument(
+            "--no-strict-project-mode",
+            dest="strict_project_mode",
+            action="store_false",
+            help="Disable strict project confinement for this run.",
+        )
+        parser.add_argument(
+            "--auto-relax-on-strict",
+            action="store_true",
+            default=False,
+            help=(
+                "When strict mode blocks a phase, auto-grant temporary relaxed mode "
+                "for that phase and revert afterward."
+            ),
+        )
 
         # Add subparsers for different modules
         subparsers = parser.add_subparsers(
@@ -86,6 +120,10 @@ class InteractionHandler:
         args = parser.parse_args()
         _mode = args.script_mode
         _module = args.module
+        self.runtime_options = {
+            "strict_project_mode": bool(getattr(args, "strict_project_mode", strict_default)),
+            "auto_relax_on_strict": bool(getattr(args, "auto_relax_on_strict", False)),
+        }
 
         if _mode == "interactive":
             # Run Script with user interaction
@@ -115,6 +153,8 @@ class InteractionHandler:
         self.arguments = handler[module](args, module)
         # [AI] Forward the --no-ai flag so main() can disable the AI instance
         self.arguments["use_ai"] = getattr(args, "use_ai", True)
+        self.arguments["strict_project_mode"] = bool(getattr(args, "strict_project_mode", True))
+        self.arguments["auto_relax_on_strict"] = bool(getattr(args, "auto_relax_on_strict", False))
 
     @staticmethod
     def _add_external_arguments(subparsers):

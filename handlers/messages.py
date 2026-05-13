@@ -46,14 +46,14 @@ class DisplayHandler(Bcolors):
 
     @staticmethod
     def print_debug_message(message: str) -> None:
-        """Print a debug message (header color).
+        """Print a debug message (muted for low visual noise).
 
         Args:
             message: Debug text to display.
         """
         print(
-            f" {Bcolors.HEADER}[#] DEBUG:{Bcolors.ENDC} "
-            f"\n{Bcolors.WARNING}{message}{Bcolors.ENDC}"
+            f" {Bcolors.DEBUG}[#] DEBUG:{Bcolors.ENDC} "
+            f"\n{Bcolors.MUTED}{message}{Bcolors.ENDC}"
         )
 
     @staticmethod
@@ -67,12 +67,12 @@ class DisplayHandler(Bcolors):
                 extras (str):         Additional text appended inline.
                 flush (bool):         If True, flush stdout immediately.
         """
-        msg = f"\n{Bcolors.OKGREEN}[+] {message}{Bcolors.ENDC}"
+        msg = f"\n{Bcolors.SUCCESS}[+] {message}{Bcolors.ENDC}"
 
         if kwargs.get("mobile_success"):
             msg = (
-                f"\n{Bcolors.WARNING}[+]{Bcolors.ENDC} {message}\n"
-                f"{Bcolors.OKGREEN}{Bcolors.UNDERLINE}{kwargs['mobile_success']}{Bcolors.ENDC}\n"
+                f"\n{Bcolors.SUCCESS}[+]{Bcolors.ENDC} {message}\n"
+                f"{Bcolors.SUCCESS}{Bcolors.UNDERLINE}{kwargs['mobile_success']}{Bcolors.ENDC}\n"
             )
         elif kwargs.get("extras"):
             extra_data = kwargs["extras"]
@@ -114,7 +114,7 @@ class DisplayHandler(Bcolors):
         msg = f"\n{Bcolors.WARNING}[-] Warning: {message} {Bcolors.ENDC}\n"
 
         if kwargs.get("flush"):
-            msg = f"\n{Bcolors.HEADER}[#] Summary: {message} {Bcolors.ENDC}\n"
+            msg = f"\n{Bcolors.HIGHLIGHT}[#] Summary: {message} {Bcolors.ENDC}\n"
             ip_list = kwargs["data"]
             return print(msg, ip_list, flush=kwargs["flush"])
 
@@ -130,7 +130,7 @@ class DisplayHandler(Bcolors):
         Args:
             message: Trace text to display.
         """
-        print(f"\n {Bcolors.HEADER}[TRACE]{Bcolors.ENDC} {message}")
+        print(f"\n {Bcolors.TRACE}[TRACE]{Bcolors.ENDC} {message}")
 
     @staticmethod
     def print_info_message(message: str, **kwargs) -> None:
@@ -144,7 +144,7 @@ class DisplayHandler(Bcolors):
                 file_path (str):       File path shown on a separate line.
                 file (str):            File being currently scanned (mobile module).
         """
-        msg = f"\n{Bcolors.OKCYAN}[*] Info: {message} {Bcolors.ENDC}\n"
+        msg = f"\n{Bcolors.INFO}[*] Info: {message} {Bcolors.ENDC}\n"
 
         if kwargs.get("flush"):
             encoded_string = kwargs.get("encoded_string", "")
@@ -153,7 +153,7 @@ class DisplayHandler(Bcolors):
 
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
-            msg = f"\n{Bcolors.HEADER}[-] Info: {message} {Bcolors.ENDC}\n{path}"
+            msg = f"\n{Bcolors.INFO}[-] Info: {message} {Bcolors.ENDC}\n{path}"
         elif kwargs.get("file"):
             msg = f"{msg}{kwargs['file']}"
 
@@ -169,7 +169,7 @@ class DisplayHandler(Bcolors):
         """
         filename = f" {Bcolors.BOLD}{Bcolors.WARNING}{file['filename']}{Bcolors.ENDC}"
         display_str = (
-            f"Enter [{Bcolors.OKGREEN}{Bcolors.BOLD}{index}{Bcolors.ENDC}] to select"
+            f"Enter [{Bcolors.INFO}{Bcolors.BOLD}{index}{Bcolors.ENDC}] to select"
             f"{filename}"
         )
         print(display_str)

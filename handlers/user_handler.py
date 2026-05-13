@@ -52,8 +52,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             # Format each option with colors and spacing
             formatted_option = (
                 # <30 align with width of 30 characters
-                f"\n{number}. {self.OKGREEN}{option['domain']:<30} {self.ENDC}"
-                f"[{self.OKGREEN} ENTER {number:<2}{self.ENDC}] {option['icon']}\n"
+                f"\n{number}. {self.HIGHLIGHT}{option['domain']:<30} {self.ENDC}"
+                f"[{self.INFO} ENTER {number:<2}{self.ENDC}] {option['icon']}\n"
             )
             test_options.append(formatted_option)
             # set up default test domains
@@ -201,6 +201,11 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     # display files depending on a user selected extension
                     search_dir, self.display_saved_files, scan_extension=file_extension
                 )
+                if not files_tuple:
+                    self.print_warning_message(
+                        "No valid scan files were selected. Please choose another location."
+                    )
+                    continue
 
                 output_filename = self.get_output_filename()
 
@@ -210,7 +215,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     "scanner": selected_scanner,
                 }
 
-            except (FileExistsError, ValueError) as error:
+            except (FileExistsError, FileNotFoundError, ValueError) as error:
                 self.print_error_message(
                     message="Error in VA UI handler", exception_error=error)
                 return None

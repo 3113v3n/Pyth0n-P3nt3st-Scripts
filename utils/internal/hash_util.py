@@ -6,6 +6,8 @@ Fixes applied:
   2. Fixed typo _formated → formatted_username.
 """
 
+import os
+
 from ..shared.colors import Bcolors
 from .password_output import build_grouped_password_output
 
@@ -15,6 +17,21 @@ class HashUtil:
 
     def __init__(self):
         super().__init__()
+
+    @staticmethod
+    def _open_private_output(path: str, append: bool = False):
+        """Open sensitive credential output files with 0600 permissions."""
+        flags = os.O_WRONLY | os.O_CREAT
+        flags |= os.O_APPEND if append else os.O_TRUNC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+
+        fd = os.open(path, flags, 0o600)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return os.fdopen(fd, "a" if append else "w", encoding="utf-8")
 
     @staticmethod
     def format_username(username: str) -> str:
@@ -129,7 +146,7 @@ class HashUtil:
             )
 
         grouped_output = build_grouped_password_output(user_password_pairs)
-        with open(userpass_list, "w", encoding="utf-8") as pass_file:
+        with self._open_private_output(userpass_list) as pass_file:
             if grouped_output:
                 pass_file.write(grouped_output)
 
@@ -197,7 +214,7 @@ class HashUtil:
             )
 
         grouped_output = build_grouped_password_output(user_password_pairs)
-        with open(userpass_list, "w", encoding="utf-8") as pass_file:
+        with self._open_private_output(userpass_list) as pass_file:
             if grouped_output:
                 pass_file.write(grouped_output)
 

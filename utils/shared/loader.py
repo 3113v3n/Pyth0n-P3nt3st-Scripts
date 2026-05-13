@@ -62,7 +62,7 @@ class Loader:
             if self.continuous:
                 while not self._done.is_set():
                     frame = next(spinner_cycle)
-                    output = f"\033[F\033[G{Bcolors.OKCYAN}{self.desc}{Bcolors.ENDC} {frame} "
+                    output = f"\033[F\033[G{Bcolors.INFO}{self.desc}{Bcolors.ENDC} {frame} "
                     print(output, flush=True, end="")
                     sleep(self.timeout)
 
@@ -76,7 +76,7 @@ class Loader:
                     # print(f"\033[F\033[G{self.desc} {frame} ",
                     #       flush=True, end="")
                     print(
-                        f"\r{Bcolors.OKCYAN}{self.desc}{Bcolors.ENDC} {frame} ", flush=True, end="")
+                        f"\r{Bcolors.INFO}{self.desc}{Bcolors.ENDC} {frame} ", flush=True, end="")
                     sleep(self.timeout)
                 self._done.set()
 
@@ -84,7 +84,7 @@ class Loader:
             # Clear the line and print end message
             print("\r" + " " * self._cols, end="", flush=True)
             if self.end:
-                print(f"\r{Bcolors.OKGREEN}{self.end}{Bcolors.ENDC}", flush=True)
+                print(f"\r{Bcolors.SUCCESS}{self.end}{Bcolors.ENDC}", flush=True)
 
     def stop(self):
         """Stop Animation"""

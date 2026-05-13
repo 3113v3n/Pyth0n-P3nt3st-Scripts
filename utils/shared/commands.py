@@ -16,6 +16,7 @@ import threading
 import platform
 import subprocess
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, TextIO
 
@@ -39,8 +40,161 @@ _ANSI_ESCAPE_RE = re.compile(
 _THREAD_LOCAL = threading.local()
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    """Parse boolean-like environment variables."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+class StrictModeViolation(RuntimeError):
+    """Raised when strict project mode blocks a risky operation."""
+
+
 class Commands:
     """Shared command-execution helpers used across all framework modules."""
+
+    _POLICY_LOCK = threading.RLock()
+    _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    _STRICT_PROJECT_MODE = _env_flag("PENTEST_STRICT_PROJECT_MODE", True)
+    _STRICT_UMASK_PREVIOUS: int | None = None
+    _RELAX_DEPTH = 0
+    _BLOCKED_STRICT_EXECUTABLES = {"sudo"}
+    _BLOCKED_PACKAGE_MANAGER_SUBCOMMANDS = {
+        "apt": {"install", "remove", "purge", "upgrade", "dist-upgrade", "full-upgrade", "autoremove"},
+        "apt-get": {"install", "remove", "purge", "upgrade", "dist-upgrade", "full-upgrade", "autoremove"},
+        "yum": {"install", "remove", "upgrade"},
+        "dnf": {"install", "remove", "upgrade"},
+        "pacman": {"-s", "-r", "-u", "--sync", "--remove", "--upgrade"},
+        "zypper": {"install", "remove", "update", "patch", "dist-upgrade"},
+        "brew": {"install", "reinstall", "upgrade", "tap", "untap"},
+        "port": {"install", "uninstall", "upgrade", "selfupdate"},
+        "snap": {"install", "remove", "refresh"},
+        "winget": {"install", "uninstall", "upgrade"},
+        "choco": {"install", "uninstall", "upgrade"},
+    }
+
+    @classmethod
+    def configure_policy(
+        cls,
+        *,
+        strict_project_mode: bool | None = None,
+        project_root: str | Path | None = None,
+    ) -> None:
+        """Configure strict-mode policy and project root boundaries."""
+        with cls._POLICY_LOCK:
+            if project_root is not None:
+                cls._PROJECT_ROOT = Path(project_root).resolve()
+            if strict_project_mode is not None:
+                cls._STRICT_PROJECT_MODE = bool(strict_project_mode)
+            cls._apply_umask_locked()
+
+    @classmethod
+    def strict_project_mode_enabled(cls) -> bool:
+        """Return True when strict project mode is enabled."""
+        return cls._STRICT_PROJECT_MODE
+
+    @classmethod
+    def strict_policy_active(cls) -> bool:
+        """Return True when strict mode is enabled and not temporarily relaxed."""
+        with cls._POLICY_LOCK:
+            return cls._STRICT_PROJECT_MODE and cls._RELAX_DEPTH == 0
+
+    @classmethod
+    def reset_temporary_relaxation(cls) -> None:
+        """Force any temporary relaxation state back to strict defaults."""
+        with cls._POLICY_LOCK:
+            cls._RELAX_DEPTH = 0
+            cls._apply_umask_locked()
+
+    @classmethod
+    @contextmanager
+    def temporary_relaxation(cls, reason: str = ""):
+        """Temporarily relax strict policy and auto-restore on exit."""
+        _ = reason  # retained for logging hooks/future auditing
+        with cls._POLICY_LOCK:
+            cls._RELAX_DEPTH += 1
+            cls._apply_umask_locked()
+        try:
+            yield
+        finally:
+            with cls._POLICY_LOCK:
+                cls._RELAX_DEPTH = max(0, cls._RELAX_DEPTH - 1)
+                cls._apply_umask_locked()
+
+    @classmethod
+    def _apply_umask_locked(cls) -> None:
+        """Set restrictive umask in strict mode and restore when disabled."""
+        strict_active = cls._STRICT_PROJECT_MODE and cls._RELAX_DEPTH == 0
+        if strict_active:
+            if cls._STRICT_UMASK_PREVIOUS is None:
+                cls._STRICT_UMASK_PREVIOUS = os.umask(0o077)
+            return
+        if cls._STRICT_UMASK_PREVIOUS is not None:
+            os.umask(cls._STRICT_UMASK_PREVIOUS)
+            cls._STRICT_UMASK_PREVIOUS = None
+
+    @classmethod
+    def _is_within_project_root(cls, path: Path) -> bool:
+        """Return True when *path* resolves inside configured project root."""
+        try:
+            path.resolve().relative_to(cls._PROJECT_ROOT.resolve())
+            return True
+        except ValueError:
+            return False
+
+    @classmethod
+    def _guard_command_policy(cls, cmd: list[str]) -> None:
+        """Block risky commands in strict project mode."""
+        if not cls.strict_policy_active():
+            return
+        if not cmd:
+            raise ValueError("Command list cannot be empty.")
+
+        executable = Path(str(cmd[0])).name.lower()
+        if executable in cls._BLOCKED_STRICT_EXECUTABLES:
+            raise StrictModeViolation(
+                f"Strict project mode blocked host-level command '{executable}'. "
+                "Temporarily relax policy to run this phase if explicitly required."
+            )
+        blocked_tokens = cls._BLOCKED_PACKAGE_MANAGER_SUBCOMMANDS.get(executable, set())
+        normalized_args = {str(part).strip().lower() for part in cmd[1:]}
+        if blocked_tokens.intersection(normalized_args):
+            raise StrictModeViolation(
+                f"Strict project mode blocked package-manager mutation via '{executable}'. "
+                "Dependency installation is disabled unless temporarily relaxed."
+            )
+
+    @staticmethod
+    def _open_secure_output_file(
+        path: Path,
+        *,
+        append: bool = False,
+        encoding: str = "utf-8",
+    ) -> TextIO:
+        """Open output files with 0600 permissions and symlink protection."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.is_symlink():
+            raise ValueError(f"Refusing to write via symlink path: {path}")
+
+        if hasattr(os, "O_NOFOLLOW"):
+            flags = os.O_WRONLY | os.O_CREAT
+            flags |= os.O_APPEND if append else os.O_TRUNC
+            flags |= os.O_NOFOLLOW
+            fd = os.open(path, flags, 0o600)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+            return os.fdopen(fd, "a" if append else "w", encoding=encoding)
+
+        handle = path.open("a" if append else "w", encoding=encoding)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return handle
 
     @staticmethod
     def strip_ansi(text: str) -> str:
@@ -128,6 +282,7 @@ class Commands:
                 "execute_command() requires a list, not a string. "
                 "Use _execute_shell_string() only for internal pipelines."
             )
+        Commands._guard_command_policy(cmd)
         env = Commands._with_project_tmp_env(kwargs.pop("env", None))
         result = subprocess.run(
             cmd,
@@ -157,6 +312,7 @@ class Commands:
         """
         if not isinstance(cmd, list):
             raise ValueError("stream_command() requires a list, not a string.")
+        Commands._guard_command_policy(cmd)
 
         user_stdout = kwargs.pop("stdout", None)
         user_stderr = kwargs.pop("stderr", None)
@@ -165,9 +321,14 @@ class Commands:
 
         file_handle: TextIO | None = None
         if output_file is not None:
-            file_path = Path(output_file)
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_handle = file_path.open("a" if append else "w", encoding="utf-8")
+            file_path = Path(output_file).expanduser()
+            if not file_path.is_absolute():
+                file_path = (Path.cwd() / file_path).resolve()
+            if Commands.strict_policy_active() and not Commands._is_within_project_root(file_path):
+                raise StrictModeViolation(
+                    f"Strict project mode blocked write outside project root: {file_path}"
+                )
+            file_handle = Commands._open_secure_output_file(file_path, append=append)
 
         env = Commands._with_project_tmp_env(kwargs.pop("env", None))
         process = subprocess.Popen(
@@ -214,6 +375,11 @@ class Commands:
         Returns:
             CompletedProcess instance.
         """
+        if Commands.strict_policy_active():
+            raise StrictModeViolation(
+                "Strict project mode blocks shell-string execution. "
+                "Use list-form commands or temporarily relax policy."
+            )
         # [Security] Kept for internal shell pipelines (rabin2|grep, apktool, etc.)
         # Callers are responsible for validating all embedded paths/values.
         env = Commands._with_project_tmp_env(kwargs.pop("env", None))
@@ -241,8 +407,14 @@ class Commands:
         Returns:
             CompletedProcess instance.
         """
+        allow_shell_string = bool(kwargs.pop("allow_shell_string", False))
         if isinstance(command, list):
             return self.execute_command(command, **kwargs)
+        if not allow_shell_string:
+            raise ValueError(
+                "String commands are disabled by default for security. "
+                "Use list-form commands or pass allow_shell_string=True for trusted internal commands."
+            )
         return self._execute_shell_string(command, **kwargs)
 
     @staticmethod
@@ -256,6 +428,7 @@ class Commands:
             Popen instance with stdout available for line-by-line reading.
         """
         # [Security] List form — no shell expansion.
+        Commands._guard_command_policy(cmd)
         env = Commands._with_project_tmp_env()
         return subprocess.Popen(
             cmd,
@@ -301,6 +474,7 @@ class Commands:
             Output string from the command.
         """
         # [Security] List form avoids subprocess.getoutput() which uses shell=True.
+        Commands._guard_command_policy(command)
         result = subprocess.run(
             command,
             stdout=subprocess.PIPE,
@@ -320,6 +494,7 @@ class Commands:
         Args:
             command: Command as a list.
         """
+        Commands._guard_command_policy(command)
         try:
             proc = subprocess.Popen(
                 command,
@@ -434,6 +609,10 @@ class Commands:
         """
         # [Security] Constant string — no user input involved.
         return os.system("cls" if os.name == "nt" else "clear")
+
+
+# Initialize policy defaults once at import time.
+Commands.configure_policy()
 
 
 def validate_shell_input(value: str) -> Optional[str]:

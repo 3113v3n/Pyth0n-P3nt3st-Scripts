@@ -24,3 +24,4 @@ dependencies.txt
 *.pyc
 *.pyo
 .venv
+.agents

@@ -5,8 +5,11 @@ Python scripts that aims to automate common activities conducted during penetrat
 ## Quick Start
 
 ```shell
-python3 main.py -M interactive
+python3 main.py
 ```
+
+By default, the script starts in `interactive` mode.
+In non-interactive environments (CI, pipes, cron, or redirected stdin), run with `-M cli_args ...`.
 
 ### Automatic first-run bootstrap
 

@@ -29,11 +29,16 @@ class FileSelectionMixin:
 
     def display_saved_files(self, dir_to_search, **kwargs):
         """Display to the user a list of files available."""
+        # Always reset discovered files for this selection request.
+        self.files = []
         self.find_files(dir_to_search)
         self.files = self._get_filtered_files(**kwargs)
 
         if not self.files:
             return None
+
+        if len(self.files) == 1:
+            return self._auto_select_single_file(**kwargs)
 
         self._display_file_options()
         return self._handle_analysis(**kwargs)
@@ -121,6 +126,41 @@ class FileSelectionMixin:
             return self.select_and_analyze_file()
         return None
 
+    def _auto_select_single_file(self, **kwargs):
+        """Auto-select a single discovered file and avoid redundant prompts."""
+        if not self.files:
+            self.print_error_message("No files found to auto-select.")
+            return None
+
+        selected = self.files[0]
+        self.print_info_message(
+            "Only one file found. Selecting it automatically.",
+            file_path=selected["filename"],
+        )
+
+        try:
+            if kwargs.get("scan_extension"):
+                return self.files, 0
+            if kwargs.get("display_applications"):
+                return selected
+            if kwargs.get("resume_scan"):
+                self.filepath = selected["full_path"]
+                starting_ip = self.get_last_unresponsive_ip(self.filepath)
+                if not starting_ip:
+                    self.print_error_message(
+                        "Unable to resume scan: selected file does not contain any valid IPs."
+                    )
+                    return None
+                return starting_ip
+        except Exception as error:
+            self.print_error_message(
+                message="Failed to auto-select the discovered file",
+                exception_error=error,
+            )
+            return None
+
+        return None
+
     def index_out_of_range_display(self, input_str, data_list) -> int:
         """Prompt for a numeric selection and return its 0-based index."""
         while True:
@@ -138,7 +178,38 @@ class FileSelectionMixin:
 
     def select_and_analyze_file(self, to_analyze: str = "") -> tuple | str | None:
         """Prompt user to choose an item and return the scan context."""
-        print(f"\n{self.OKBLUE}Analyzing {to_analyze}...{self.ENDC}")
+        print(f"\n{self.INFO}Analyzing {to_analyze}...{self.ENDC}")
+
+        if not self.files:
+            self.print_error_message("No files available for selection.")
+            return None
+
+        if len(self.files) == 1:
+            selected = self.files[0]
+            self.print_info_message(
+                "Only one file found. Selecting it automatically.",
+                file_path=selected["filename"],
+            )
+            if to_analyze == "files":
+                return self.files, 0
+            if to_analyze == "applications":
+                return selected
+
+            try:
+                self.filepath = selected["full_path"]
+                starting_ip = self.get_last_unresponsive_ip(self.filepath)
+                if not starting_ip:
+                    self.print_error_message(
+                        "Unable to resume scan: selected file does not contain any valid IPs."
+                    )
+                    return None
+                return starting_ip
+            except Exception as error:
+                self.print_error_message(
+                    message="Failed to prepare single-file analysis",
+                    exception_error=error,
+                )
+                return None
 
         if to_analyze == "files":
             selected_file = self.index_out_of_range_display(
