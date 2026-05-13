@@ -7,6 +7,7 @@ import termios
 import time
 
 from utils.shared.colors import Bcolors
+from utils.shared.commands import Commands
 
 
 class FrameworkRuntimeMixin:
@@ -37,12 +38,20 @@ class FrameworkRuntimeMixin:
                 if choice in {"y", "yes", "n", "no"}:
                     return choice
             except EOFError:
-                continue
+                # No stdin available (non-interactive run), treat as exit.
+                return "y"
             except KeyboardInterrupt:
                 return "y"
 
     def run_program(self) -> None:
         """Main program loop."""
+        if not sys.stdin.isatty():
+            self.print_error_message(
+                "Interactive mode requires a TTY. Run with '-M cli_args ...' in non-interactive environments."
+            )
+            self.exit_menu = True
+            return
+
         while not self.exit_menu:
             try:
                 # Refactor note: state reset happens once per menu iteration.
@@ -76,12 +85,18 @@ class FrameworkRuntimeMixin:
             except KeyboardInterrupt:
                 self.print_error_message("Program interrupted by user")
                 self.exit_menu = True
+            except EOFError:
+                self.print_error_message(
+                    "Interactive input stream closed. Exiting program."
+                )
+                self.exit_menu = True
             except Exception as error:
                 self.print_error_message(
                     message="An error in Main Program occurred",
                     exception_error=error,
                 )
             finally:
+                Commands.reset_temporary_relaxation()
                 command = self.classes.get("command") if isinstance(self.classes, dict) else None
                 if command:
                     command.cleanup_runtime_tmp()
@@ -115,6 +130,7 @@ class FrameworkRuntimeMixin:
                 exception_error=error,
             )
         finally:
+            Commands.reset_temporary_relaxation()
             command = self.classes.get("command") if isinstance(self.classes, dict) else None
             if command:
                 command.cleanup_runtime_tmp()

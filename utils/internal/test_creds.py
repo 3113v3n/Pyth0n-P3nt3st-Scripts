@@ -8,6 +8,7 @@ Bug fix applied:
   2. get_string_from_list() had the same early-return bug — fixed to check all items.
 """
 
+import os
 import time
 from datetime import datetime
 from ..shared import Commands
@@ -42,6 +43,21 @@ class CredentialsUtil(Bcolors):
         self.tested_accounts: dict[str, bool] = {}
         self.output_file = ""
         self.run_command = Commands()
+
+    @staticmethod
+    def _open_private_output(path: str, append: bool = True):
+        """Open credential logs/output with owner-only permissions."""
+        flags = os.O_WRONLY | os.O_CREAT
+        flags |= os.O_APPEND if append else os.O_TRUNC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+
+        fd = os.open(path, flags, 0o600)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return os.fdopen(fd, "a" if append else "w", encoding="utf-8")
 
     def split_pass_file(self) -> dict[str, str]:
         """Parse credential file into a ``{username: password}`` dictionary.
@@ -86,7 +102,7 @@ class CredentialsUtil(Bcolors):
         )
         print(start_message)
 
-        with open(f"{save_dir}/{self.log_file}", "a") as log_file:
+        with self._open_private_output(f"{save_dir}/{self.log_file}", append=True) as log_file:
             log_file.write(f"{start_message}\n")
 
         if not user_pass_list:
@@ -115,14 +131,14 @@ class CredentialsUtil(Bcolors):
 
         process = self.run_command.run_nxc_command(command)
 
-        with open(f"{save_dir}/{self.log_file}", "a") as logfile:
+        with self._open_private_output(f"{save_dir}/{self.log_file}", append=True) as logfile:
             for line in process.stdout:
                 line = line.strip()
                 formatted_line = self.format_text_output(line)
                 print(formatted_line)
 
                 if self.SUCCESS_DECORATOR in line:
-                    with open(self.output_file, "a") as success_file:
+                    with self._open_private_output(self.output_file, append=True) as success_file:
                         success_file.write(f"{line}\n")
 
                 logfile.write(f"{line}\n")

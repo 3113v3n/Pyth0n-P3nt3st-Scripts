@@ -10,6 +10,7 @@ It also provides first-run virtualenv bootstrapping for the project.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import platform
 import shutil
@@ -19,6 +20,7 @@ from collections import defaultdict
 from importlib import metadata
 from pathlib import Path
 from typing import Dict, List
+from urllib.parse import urlparse
 
 from handlers.messages import DisplayHandler
 from utils.shared import Commands, Config
@@ -28,6 +30,15 @@ class PackageHandler(Config, DisplayHandler, Commands):
     """Check, plan, and install runtime dependencies for pentest modules."""
 
     _SUPPORTED_OS = {"debian", "macos", "windows"}
+    _REQ_STAMP_FILE = ".requirements.sha256"
+    _ALLOWED_DOWNLOAD_HOSTS = {
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "github-releases.githubusercontent.com",
+    }
 
     # Project-local tool root. Tools installed here avoid macOS SIP-protected
     # paths (`/usr/bin`, system Ruby gem dirs) and never require sudo.
@@ -253,6 +264,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
         root = Path(project_root or Path(__file__).resolve().parents[1]).resolve()
         venv_dir = root / venv_name
         venv_python = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        req_file = root / requirements_file
 
         try:
             current_prefix = Path(sys.prefix).resolve()
@@ -272,22 +284,66 @@ class PackageHandler(Config, DisplayHandler, Commands):
                         [str(venv_python), "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
                         check=False,
                     )
-                    req_file = root / requirements_file
                     if req_file.exists():
                         print("[Bootstrap] Installing Python requirements into project virtualenv...")
-                        subprocess.run(
-                            [str(venv_python), "-m", "pip", "install", "-r", str(req_file)],
-                            check=True,
-                        )
+                        cls._install_requirements_into_venv(venv_python, req_file, venv_dir)
             except Exception as error:
                 print(f"[Bootstrap] Virtualenv setup failed: {error}")
                 return False
+        elif venv_python.exists() and req_file.exists():
+            # Retry requirements install when previous bootstrap failed or deps changed.
+            if not cls._requirements_stamp_matches(venv_dir, req_file):
+                print("[Bootstrap] Completing/refreshing project requirements in virtualenv...")
+                try:
+                    cls._install_requirements_into_venv(venv_python, req_file, venv_dir)
+                except Exception as error:
+                    print(f"[Bootstrap] Virtualenv setup failed: {error}")
+                    return False
 
         if venv_python.exists():
             # Always continue execution from project venv for consistent dependency resolution.
             os.execv(str(venv_python), [str(venv_python), *sys.argv])
 
         return True
+
+    @classmethod
+    def _requirements_hash(cls, requirements_file: Path) -> str:
+        return hashlib.sha256(requirements_file.read_bytes()).hexdigest()
+
+    @classmethod
+    def _requirements_stamp_path(cls, venv_dir: Path) -> Path:
+        return venv_dir / cls._REQ_STAMP_FILE
+
+    @classmethod
+    def _requirements_stamp_matches(cls, venv_dir: Path, requirements_file: Path) -> bool:
+        if not requirements_file.exists():
+            return True
+        stamp_file = cls._requirements_stamp_path(venv_dir)
+        if not stamp_file.exists():
+            return False
+        try:
+            recorded_hash = stamp_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            return False
+        return recorded_hash == cls._requirements_hash(requirements_file)
+
+    @classmethod
+    def _write_requirements_stamp(cls, venv_dir: Path, requirements_file: Path) -> None:
+        stamp_file = cls._requirements_stamp_path(venv_dir)
+        stamp_file.write_text(f"{cls._requirements_hash(requirements_file)}\n", encoding="utf-8")
+
+    @classmethod
+    def _install_requirements_into_venv(
+        cls,
+        venv_python: Path,
+        requirements_file: Path,
+        venv_dir: Path,
+    ) -> None:
+        subprocess.run(
+            [str(venv_python), "-m", "pip", "install", "-r", str(requirements_file)],
+            check=True,
+        )
+        cls._write_requirements_stamp(venv_dir, requirements_file)
 
     def _detect_os_family(self) -> str:
         if self.operating_system == "linux":
@@ -578,6 +634,18 @@ class PackageHandler(Config, DisplayHandler, Commands):
             pass
         return None
 
+    @classmethod
+    def _validate_download_url(cls, url: str) -> str:
+        """Allow only trusted HTTPS download locations for binary artifacts."""
+        parsed = urlparse(url)
+        if parsed.scheme.lower() != "https":
+            raise ValueError(f"Blocked non-HTTPS download URL: {url}")
+
+        hostname = (parsed.hostname or "").lower()
+        if hostname not in cls._ALLOWED_DOWNLOAD_HOSTS:
+            raise ValueError(f"Blocked untrusted download host: {hostname or 'unknown'}")
+        return url
+
     def _build_download_action(self, tool_name: str, url: str) -> Dict[str, object]:
         """Return an action that fetches a prebuilt binary into ``tools/bin/``.
 
@@ -585,28 +653,37 @@ class PackageHandler(Config, DisplayHandler, Commands):
         download when available; always uses Python's ``zipfile`` for extraction
         so there is no dependency on a system ``unzip``.
         """
-        dest = str(self._tools_bin_dir() / tool_name)
-        is_zip = url.lower().endswith(".zip")
+        if Path(tool_name).name != tool_name or any(part in tool_name for part in ("/", "\\")):
+            raise ValueError(f"Invalid tool name for download action: {tool_name}")
+
+        safe_url = self._validate_download_url(url)
+        dest_path = self._tools_bin_dir() / tool_name
+        if dest_path.exists() and dest_path.is_symlink():
+            raise ValueError(f"Refusing to overwrite symlink destination: {dest_path}")
+        dest = str(dest_path)
+        is_zip = urlparse(safe_url).path.lower().endswith(".zip")
 
         if is_zip:
             # Single Python call: download zip into a temp file, extract the
             # binary (matched by name), place it in tools/bin/, then clean up.
             extract_script = (
-                "import urllib.request, zipfile, tempfile, os, shutil; "
-                f"tmp = tempfile.mktemp(suffix='.zip'); "
-                f"urllib.request.urlretrieve({url!r}, tmp); "
-                f"z = zipfile.ZipFile(tmp); "
+                "import os, tempfile, urllib.request, zipfile; "
+                "tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip'); "
+                "tmp_path = tmp.name; tmp.close(); "
+                f"urllib.request.urlretrieve({safe_url!r}, tmp_path); "
+                "z = zipfile.ZipFile(tmp_path); "
                 f"members = [m for m in z.namelist() if os.path.basename(m).split('.')[0] == {tool_name!r}]; "
-                f"src = members[0] if members else z.namelist()[0]; "
-                f"data = z.open(src).read(); "
+                "if not members: raise RuntimeError('No matching binary asset in archive'); "
+                "data = z.open(members[0]).read(); "
                 f"open({dest!r}, 'wb').write(data); "
                 f"os.chmod({dest!r}, 0o755); "
-                f"os.unlink(tmp)"
+                "z.close(); "
+                "os.unlink(tmp_path)"
             )
             commands: list[list[str]] = [[sys.executable, "-c", extract_script]]
         elif shutil.which("curl"):
             commands = [
-                ["curl", "-fsSL", "--output", dest, url],
+                ["curl", "--proto", "=https", "--tlsv1.2", "-fsSL", "--output", dest, safe_url],
                 ["chmod", "+x", dest],
             ]
         else:
@@ -614,7 +691,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
             commands = [
                 [
                     sys.executable, "-c",
-                    f"import urllib.request, os; urllib.request.urlretrieve({url!r}, {dest!r}); os.chmod({dest!r}, 0o755)",
+                    f"import urllib.request, os; urllib.request.urlretrieve({safe_url!r}, {dest!r}); os.chmod({dest!r}, 0o755)",
                 ]
             ]
         return self._action(f"download:{tool_name}", commands, [tool_name])

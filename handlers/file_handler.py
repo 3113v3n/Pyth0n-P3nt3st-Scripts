@@ -12,7 +12,7 @@ Naming: do_analysis() → select_and_analyze_file(); flat_content → deduplicat
 
 import os
 import errno
-from typing import Any
+from typing import Any, TextIO
 import pandas
 from datetime import datetime
 from pathlib import Path
@@ -36,6 +36,9 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
     FONT_SIZE = 12
     FONT_COLOR = "white"
     BG_COLOR = "black"
+    EXCEL_SHEETNAME_MAX_LEN = 31
+    _EXCEL_INVALID_SHEET_CHARS = set('[]:*?/\\')
+    _EXCEL_FORMULA_PREFIXES = ("=", "+", "-", "@")
 
     def __init__(self) -> None:
         super().__init__()
@@ -98,11 +101,52 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         # [Security] Prevent path traversal.
         resolved_base = Path(base_dir).resolve()
         resolved_path = (resolved_base / filename).resolve()
-        if not str(resolved_path).startswith(str(resolved_base)):
+        try:
+            resolved_path.relative_to(resolved_base)
+        except ValueError as error:
             raise ValueError(
                 f"Path traversal detected: '{filename}' resolves outside '{base_dir}'"
-            )
+            ) from error
         return resolved_path
+
+    @staticmethod
+    def _assert_not_symlink(path: Path) -> None:
+        """Reject symlink targets before writing to avoid link-traversal clobbering."""
+        try:
+            if path.is_symlink():
+                raise ValueError(f"Refusing to write via symlink path: {path}")
+        except OSError as error:
+            raise ValueError(f"Unable to validate output path safety: {path}") from error
+
+    @classmethod
+    def _open_secure_output_file(
+        cls,
+        path: Path,
+        *,
+        append: bool,
+        encoding: str = "utf-8",
+    ) -> TextIO:
+        """Open output files with restrictive permissions and no symlink following."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cls._assert_not_symlink(path)
+
+        if hasattr(os, "O_NOFOLLOW"):
+            flags = os.O_WRONLY | os.O_CREAT
+            flags |= os.O_APPEND if append else os.O_TRUNC
+            flags |= os.O_NOFOLLOW
+            fd = os.open(path, flags, 0o600)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+            return os.fdopen(fd, "a" if append else "w", encoding=encoding)
+
+        handle = path.open("a" if append else "w", encoding=encoding)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+        return handle
 
     def set_new_dir(self, new_path):
         """Universal function to update output directory"""
@@ -146,7 +190,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
             beautify_structured=True,
             wrap_long_lines=False,
         )
-        with target_path.open("a", encoding="utf-8") as file:
+        with self._open_secure_output_file(target_path, append=True) as file:
             file.write(prepared)
             if not prepared.endswith("\n"):
                 file.write("\n")
@@ -155,7 +199,10 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
             self, dataframe_objects: list, filename: str
     ):
         """Dataframe Object containing dataframes and their equivalent sheet names"""
-        self.filepath = f"{self.output_directory}/{self.generate_unique_name(filename, extension='xlsx')}"
+        report_name = self.generate_unique_name(filename, extension="xlsx")
+        report_path = self._safe_path(self.output_directory, report_name)
+        self._assert_not_symlink(report_path)
+        self.filepath = str(report_path)
         excel_tmpdir = self._get_excel_tmpdir()
         self._warn_if_low_excel_space(dataframe_objects, excel_tmpdir)
 
@@ -184,13 +231,19 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
                         "tmpdir": excel_tmpdir,
                         # Disable auto URL conversion to reduce processing overhead.
                         "strings_to_urls": False,
+                        # Prevent '='-prefixed user strings from being treated as formulas.
+                        "strings_to_formulas": False,
                     }
                 },
             ) as writer:
+                used_sheetnames: set[str] = set()
                 for dataframe in dataframe_objects:
                     if not dataframe["dataframe"].empty:
-                        sheetname = dataframe["sheetname"]
-                        df = dataframe["dataframe"]
+                        sheetname = self._unique_excel_sheet_name(
+                            dataframe.get("sheetname", "Sheet"),
+                            used_sheetnames,
+                        )
+                        df = self._sanitize_excel_dataframe(dataframe["dataframe"])
 
                         df.to_excel(writer, sheet_name=sheetname, index=False)
 
@@ -238,12 +291,16 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         """
 
         filename = self.get_file_basename(filename)
-
-        # If filename is not full path prepend output_directory
-        if not os.path.isabs(filename) and not filename.startswith(self.output_directory):
-            file_path = os.path.join(self.output_directory, filename)
-        else:
-            file_path = filename
+        try:
+            target_path = self._safe_path(self.output_directory, filename)
+            self._assert_not_symlink(target_path)
+        except ValueError as error:
+            self.print_error_message(
+                message=f"Unsafe CSV output path rejected for '{filename}'",
+                exception_error=error,
+            )
+            return
+        file_path = str(target_path)
 
         # TODO: Remove CSV headers
         if "unresponsive_hosts" not in filename:
@@ -288,9 +345,16 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         if not new_ips:
             return
 
-        with open(file_path, "a", encoding="utf-8") as csv_file:
-            for ip in new_ips:
-                csv_file.write(f"{ip}\n")
+        try:
+            with self._open_secure_output_file(target_path, append=True) as csv_file:
+                for ip in new_ips:
+                    csv_file.write(f"{ip}\n")
+        except OSError as error:
+            self.print_error_message(
+                message=f"Failed writing CSV output '{file_path}'",
+                exception_error=error,
+            )
+            return
 
         cache.update(new_ips)
 
@@ -339,13 +403,70 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
     @staticmethod
     def append_to_sheets(data_frame: object, file: str):
         """Appends data to existing Workbook"""
+        target_file = Path(file)
+        FileHandler._assert_not_symlink(target_file)
+        sheetname = FileHandler._sanitize_excel_sheet_name(
+            data_frame.get("sheetname", "Sheet")
+        )
+        safe_df = FileHandler._sanitize_excel_dataframe(data_frame["dataframe"])
         with pandas.ExcelWriter(
-                file, engine="openpyxl", mode="a", if_sheet_exists="replace"
+                str(target_file), engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
             # Write new data frame to a new sheet
-            data_frame["dataframe"].to_excel(
-                writer, sheet_name=data_frame["sheetname"], index=False
+            safe_df.to_excel(
+                writer, sheet_name=sheetname, index=False
             )
+
+    @classmethod
+    def _sanitize_excel_sheet_name(cls, raw_name: Any) -> str:
+        """Return an Excel-safe sheet name (length and character constraints)."""
+        candidate = str(raw_name or "").strip()
+        if not candidate:
+            candidate = "Sheet"
+
+        cleaned = "".join("_" if ch in cls._EXCEL_INVALID_SHEET_CHARS else ch for ch in candidate)
+        cleaned = " ".join(cleaned.split()).strip("'")
+        if not cleaned:
+            cleaned = "Sheet"
+
+        return cleaned[: cls.EXCEL_SHEETNAME_MAX_LEN]
+
+    @classmethod
+    def _sanitize_excel_cell_value(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        stripped = value.lstrip()
+        if stripped and stripped[0] in cls._EXCEL_FORMULA_PREFIXES:
+            return f"'{value}"
+        return value
+
+    @classmethod
+    def _sanitize_excel_dataframe(cls, dataframe: pandas.DataFrame) -> pandas.DataFrame:
+        if dataframe is None or dataframe.empty:
+            return dataframe
+
+        safe_df = dataframe.copy()
+        candidate_columns = safe_df.select_dtypes(include=["object", "string"]).columns
+        for column in candidate_columns:
+            safe_df[column] = safe_df[column].map(cls._sanitize_excel_cell_value)
+        return safe_df
+
+    @classmethod
+    def _unique_excel_sheet_name(cls, raw_name: Any, used_names: set[str]) -> str:
+        """Ensure the generated Excel sheet name is unique (case-insensitive)."""
+        base = cls._sanitize_excel_sheet_name(raw_name)
+        candidate = base
+        index = 2
+
+        while candidate.lower() in used_names:
+            suffix = f" ({index})"
+            max_base_len = max(1, cls.EXCEL_SHEETNAME_MAX_LEN - len(suffix))
+            candidate = f"{base[:max_base_len]}{suffix}"
+            index += 1
+
+        used_names.add(candidate.lower())
+        return candidate
 
     def _get_excel_tmpdir(self) -> str:
         """Return a writable temp directory on the project filesystem.
@@ -468,7 +589,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
             beautify_structured=True,
             wrap_long_lines=False,
         )
-        with open(f"{filename}", "a", encoding="utf-8") as file:
+        with FileHandler._open_secure_output_file(Path(filename), append=True) as file:
             file.write(prepared)
             if not prepared.endswith("\n"):
                 file.write("\n")

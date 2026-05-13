@@ -6,6 +6,7 @@ import sys
 
 from utils.shared.ai_assistant import PentestAI
 from utils.shared.colors import Bcolors
+from utils.shared.commands import Commands
 
 
 class FrameworkCoreMixin:
@@ -123,7 +124,7 @@ class FrameworkCoreMixin:
         if user_test_domain not in package_supported_domains:
             return True
 
-        print(Bcolors.WARNING + "[?] Checking for required packages..." + Bcolors.ENDC)
+        print(Bcolors.INFO + "[?] Checking for required packages..." + Bcolors.ENDC)
         if _package.is_supported_os is None:
             _package.is_supported_os = _package._check_is_supported()
             self.os = _package.operating_system
@@ -134,6 +135,19 @@ class FrameworkCoreMixin:
 
         missing_packages = _package.get_missing_packages(user_test_domain)
         if not missing_packages:
+            return True
+
+        if Commands.strict_project_mode_enabled():
+            missing_tools: set[str] = set()
+            for action in missing_packages:
+                missing_tools.update(str(name) for name in action.get("verify_names", []))
+            summary = ", ".join(sorted(missing_tools)) if missing_tools else "unknown tools"
+            self.print_warning_message(
+                "Strict project mode is enabled; skipping host-level dependency installation."
+            )
+            self.print_warning_message(
+                "Missing tools may reduce functionality for this run", file_path=summary
+            )
             return True
 
         num_of_packages = len(missing_packages)

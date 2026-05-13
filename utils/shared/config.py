@@ -26,6 +26,8 @@ This is a custom CLI tool for Penetration Testing.
     -M MODE   Select mode: 'interactive' or 'cli_args'
               {self.color.OKGREEN}interactive:{self.color.ENDC} Run with user interaction
               {self.color.OKGREEN}cli_args:{self.color.ENDC}    Run with command-line arguments
+    --strict-project-mode / --no-strict-project-mode : Enable/disable strict project confinement
+    --auto-relax-on-strict                            : Auto-temporarily relax strict mode per blocked phase
         
 {self.color.BOLD}MODULE:{self.color.ENDC}       Choose module:                          [mobile, internal, password, va, external]
 
@@ -203,12 +205,12 @@ This is a custom CLI tool for Penetration Testing.
     domain_select_error = ("\n[!] Please choose one of: \n")
 
     test_domains = [
-        {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱"},
-        {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️"},
-        {"domain": "External Penetration Testing", "alias": "external", "icon": "🌐"},
-        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "🔎"},
-        {"domain": "Password Module", "alias": "password", "icon": "🔐"},
-        {"domain": "Exit Program", "alias": "exit", "icon": "✖"}
+        {"domain": "Mobile   Penetration Testing", "alias": "mobile", "icon": "📱🧪"},
+        {"domain": "Internal Penetration Testing", "alias": "internal", "icon": "🖥️🔐"},
+        {"domain": "External Penetration Testing", "alias": "external", "icon": "🌍🛰️"},
+        {"domain": "Vulnerability Analysis", "alias": "va", "icon": "📊🔍"},
+        {"domain": "Password Module", "alias": "password", "icon": "🔑🛡️"},
+        {"domain": "Exit Program", "alias": "exit", "icon": "🛑🚪"}
     ]
     scan_modes = ["SCAN", "RESUME"]
 
