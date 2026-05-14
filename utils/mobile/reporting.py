@@ -12,6 +12,14 @@ class MobileReportingMixin:
     """Report writing and summary presentation helpers."""
 
     @staticmethod
+    def _format_kv_block(heading: str, fields: list[tuple[str, object]]) -> str:
+        """Render a heading with indented key/value lines for console output."""
+        lines = [f"{heading}:"]
+        for key, value in fields:
+            lines.append(f"        {key}={value}")
+        return "\n".join(lines)
+
+    @staticmethod
     def _taxonomy_tags_for_finding(
         finding: Finding,
         taxonomy_profile: str = "balanced",
@@ -333,32 +341,48 @@ class MobileReportingMixin:
 
     def _console_summary(self, summary: dict) -> None:
         scoring = summary.get("scoring", {})
+        summary_message = self._format_kv_block(
+            "Mobile static analysis summary",
+            [
+                ("files", summary["files_scanned"]),
+                ("skipped", summary["files_skipped"]),
+                ("urls", summary["url_count"]),
+                ("ips", summary["ip_count"]),
+                ("hardcoded", summary["hardcoded_count"]),
+                ("api_key_checks", summary.get("api_key_assessment_count", 0)),
+                ("api_key_issues", summary.get("api_key_issue_count", 0)),
+                ("base64", summary["base64_count"]),
+                ("risk_findings", summary["risk_count"]),
+                ("integrity_controls", summary["control_count"]),
+                ("taxonomy_tagged", summary.get("taxonomy_tagged_count", 0)),
+            ],
+        )
         self.print_success_message(
-            (
-                "Mobile static analysis summary: "
-                f"files={summary['files_scanned']} skipped={summary['files_skipped']} "
-                f"urls={summary['url_count']} ips={summary['ip_count']} "
-                f"hardcoded={summary['hardcoded_count']} "
-                f"api_key_checks={summary.get('api_key_assessment_count', 0)} "
-                f"api_key_issues={summary.get('api_key_issue_count', 0)} "
-                f"base64={summary['base64_count']} "
-                f"risk_findings={summary['risk_count']} integrity_controls={summary['control_count']} "
-                f"taxonomy_tagged={summary.get('taxonomy_tagged_count', 0)}"
-            )
+            summary_message
         )
         if scoring:
+            risk_message = self._format_kv_block(
+                "Risk scoring",
+                [
+                    ("risk_score", scoring.get("risk_score")),
+                    ("security_posture_score", scoring.get("security_posture_score")),
+                    ("band", scoring.get("risk_band")),
+                ],
+            )
             self.print_info_message(
-                "Risk scoring: "
-                f"risk_score={scoring.get('risk_score')} "
-                f"security_posture_score={scoring.get('security_posture_score')} "
-                f"band={scoring.get('risk_band')}"
+                risk_message
             )
         if summary.get("taxonomy_mode") and summary.get("taxonomy_mode") != "none":
+            taxonomy_message = self._format_kv_block(
+                "Taxonomy mapping",
+                [
+                    ("mode", summary.get("taxonomy_mode")),
+                    ("profile", summary.get("taxonomy_profile", "balanced")),
+                    ("tagged_findings", summary.get("taxonomy_tagged_count", 0)),
+                ],
+            )
             self.print_info_message(
-                "Taxonomy mapping: "
-                f"mode={summary.get('taxonomy_mode')} "
-                f"profile={summary.get('taxonomy_profile', 'balanced')} "
-                f"tagged_findings={summary.get('taxonomy_tagged_count', 0)}"
+                taxonomy_message
             )
 
         if summary["top_risks"]:
