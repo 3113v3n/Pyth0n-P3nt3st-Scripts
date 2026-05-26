@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -26,14 +27,8 @@ class MobileExtractionMixin:
         runtime_root = Path(self.working_dir) / ".tmp" / "mobile-extraction"
         runtime_root.mkdir(parents=True, exist_ok=True)
 
-        # Remove abandoned extraction folders from interrupted runs.
-        for child in runtime_root.iterdir():
-            if child.is_dir():
-                shutil.rmtree(child, ignore_errors=True)
-            else:
-                child.unlink(missing_ok=True)
-
-        folder = tempfile.mkdtemp(prefix=f"{self.file_name}_", dir=str(runtime_root))
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        folder = tempfile.mkdtemp(prefix=f"{self.file_name}_{timestamp}_", dir=str(runtime_root))
         return str(Path(folder))
 
     @staticmethod
@@ -102,24 +97,18 @@ class MobileExtractionMixin:
         self.mobile_output_dir = f"{self.mobile_output_dir}/{new_folder_name}"
 
     def cleanup_extraction_folder(self, folder_name: str) -> None:
-        """Remove decompiled/extracted app directory after report generation."""
+        """Retain decompiled/extracted directories for manual review."""
         if not folder_name:
             return
         try:
             safe_folder = self._validate_file_path(folder_name)
         except ValueError:
             return
-        if safe_folder.endswith("_scan_results"):
-            return
         folder = Path(safe_folder)
-        if folder.exists() and folder.is_dir():
-            shutil.rmtree(folder, ignore_errors=True)
-            try:
-                parent = folder.parent
-                if parent.name == "mobile-extraction":
-                    parent.rmdir()
-            except OSError:
-                pass
+        if folder.exists() and folder.is_dir() and getattr(self, "debug", False):
+            self.print_info_message(
+                f"Retaining decompiled app folder for manual review: {folder}"
+            )
 
     def cleanup_nuclei_templates(self) -> None:
         """Remove mobile nuclei template clone (runtime cache) after assessment."""

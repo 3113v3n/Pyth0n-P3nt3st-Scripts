@@ -219,6 +219,7 @@ It decompiles the apk file using apktool and runs regex checks on the files pres
 2. URLs present within the application
 3. IP addresses present
 4. Decode any available base64 strings
+5. Obfuscated Android string-resource references (integer ID -> decoded string value)
 
 Mobile nuclei templates are automatically synced to the latest version before running nuclei checks.
 
@@ -232,7 +233,8 @@ CLI mode:
 - Use `--scan-mode single|all` to explicitly control directory behavior.
 - Use `--taxonomy none|masvs|mastg|both` to generate optional MASVS/MASTG mapping output for static findings.
 - Use `--taxonomy-profile strict|balanced|aggressive` to tune taxonomy mapping strictness.
-- Runtime-only mobile artifacts (decompiled folders and template clones) are cleaned automatically after each run.
+- Decompiled/extracted mobile app folders are retained under `.tmp/mobile-extraction/` for manual review.
+- Android obfuscated string mappings are exported to `<app>_android_obfuscated_string_map.txt` as `resource_id = decoded_string`.
 
 ```sh
 # Scan a single app file

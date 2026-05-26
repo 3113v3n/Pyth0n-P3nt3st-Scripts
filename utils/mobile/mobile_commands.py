@@ -51,6 +51,8 @@ class MobileCommands(
 
         self._scan_stats: dict = {}
         self._nuclei_templates_synced = False
+        self._android_obfuscated_resource_map: dict[int, dict] = {}
+        self._android_obfuscated_symbol_map: dict[str, set[int]] = {}
 
     @CustomDecorators.measure_execution_time
     def inspect_application_files(self, application: str, test_domain: str, operating_system: str):
@@ -73,10 +75,19 @@ class MobileCommands(
 
             root = Path(folder_name)
             workers = max(4, min(32, (os.cpu_count() or 4) * self.THREAD_FACTOR))
+            if platform == "android":
+                (
+                    self._android_obfuscated_resource_map,
+                    self._android_obfuscated_symbol_map,
+                ) = self._build_android_obfuscated_maps(root)
+            else:
+                self._android_obfuscated_resource_map = {}
+                self._android_obfuscated_symbol_map = {}
 
             urls: set[str] = set()
             ips: set[str] = set()
             hardcoded: list[Finding] = []
+            obfuscated_refs: list[dict] = []
             base64_entries: list[dict] = []
             risk_findings: list[Finding] = []
             control_findings: list[Finding] = []
@@ -99,6 +110,7 @@ class MobileCommands(
                     urls.update(scanned["urls"])
                     ips.update(scanned["ips"])
                     hardcoded.extend(scanned["hardcoded"])
+                    obfuscated_refs.extend(scanned.get("obfuscated_refs", []))
                     base64_entries.extend(scanned["base64"])
                     risk_findings.extend(scanned["risk_findings"])
                     control_findings.extend(scanned["control_findings"])
@@ -147,6 +159,7 @@ class MobileCommands(
             hardcoded_file = Path(f"{basename}_hardcoded.txt")
             api_key_report_file = Path(f"{basename}_api_key_checklist.txt")
             base64_file = Path(f"{basename}_base64.txt")
+            obfuscated_map_file = Path(f"{basename}_obfuscated_string_map.txt")
             risk_file = Path(f"{basename}_integrity_findings.txt")
             control_file = Path(f"{basename}_integrity_controls.txt")
             summary_file = Path(f"{basename}_summary.json")
@@ -160,6 +173,11 @@ class MobileCommands(
             hardcoded_count = self._write_findings_report(hardcoded_file, hardcoded)
             api_key_assessment_count = self._write_api_check_report(api_key_report_file, api_key_report_lines)
             base64_count = self._write_base64_report(base64_file, base64_entries)
+            obfuscated_map_count = self._write_obfuscated_string_map(
+                obfuscated_map_file,
+                self._android_obfuscated_resource_map,
+                obfuscated_refs,
+            )
             risk_count = self._write_findings_report(risk_file, risk_findings)
             control_count = self._write_findings_report(control_file, control_findings)
             taxonomy_report = self._build_masvs_mastg_report(
@@ -188,6 +206,8 @@ class MobileCommands(
                 reports["api_key_checklist"] = str(api_key_report_file)
             if base64_count:
                 reports["base64"] = str(base64_file)
+            if obfuscated_map_count:
+                reports["obfuscated_string_map"] = str(obfuscated_map_file)
             if risk_count:
                 reports["integrity_findings"] = str(risk_file)
             if control_count:
@@ -224,6 +244,7 @@ class MobileCommands(
                 "api_key_assessment_count": api_key_assessment_count,
                 "api_key_issue_count": len(api_key_findings),
                 "base64_count": base64_count,
+                "obfuscated_string_refs_count": obfuscated_map_count,
                 "risk_count": risk_count,
                 "control_count": control_count,
                 "combined_risk_count": len(combined_risk_findings),
@@ -262,7 +283,7 @@ class MobileCommands(
             self.print_error_message(message="Error during cleanup", exception_error=error)
 
     def cleanup_runtime_artifacts(self, extracted_folder: str = "", remove_templates: bool = False) -> None:
-        """Delete runtime-only artifacts while keeping reusable dependencies/caches."""
+        """Cleanup optional runtime artifacts while preserving decompiled app folders."""
         try:
             self.cleanup_extraction_folder(extracted_folder)
             if remove_templates:
