@@ -1,10 +1,17 @@
 from .messages import DisplayHandler
+from .navigation import check_navigation_command
 from utils.shared.loader import Loader
 
 
 class ScreenHandler(DisplayHandler):
+    NAVIGATION_HINT = "Type 'back' to return to previous menu or 'main' for Main Menu."
+
     def __init__(self):
         super().__init__()
+
+    @classmethod
+    def show_navigation_hint(cls):
+        print(f"\n{cls.MUTED}[Navigation] {cls.NAVIGATION_HINT}{cls.ENDC}")
 
     @staticmethod
     def create_menu_selection(
@@ -93,6 +100,7 @@ class ScreenHandler(DisplayHandler):
 
         def not_lower():
             user_input = input(prompt).strip()
+            check_navigation_command(user_input)
             print(dotted_lines)
             return user_input
 
@@ -102,7 +110,9 @@ class ScreenHandler(DisplayHandler):
         if kwargs.get('filename'):
             return not_lower()
 
-        user_input = input(prompt).strip().lower()
+        raw_input = input(prompt).strip()
+        check_navigation_command(raw_input)
+        user_input = raw_input.lower()
         print(dotted_lines)
         return user_input
 

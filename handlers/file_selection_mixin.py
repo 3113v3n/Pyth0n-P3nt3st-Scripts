@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from handlers.navigation import check_navigation_command
+
 
 class FileSelectionMixin:
     """Mixin that encapsulates file listing/filtering and selection prompts."""
@@ -165,7 +167,9 @@ class FileSelectionMixin:
         """Prompt for a numeric selection and return its 0-based index."""
         while True:
             try:
-                selected_value = int(input(f"\n{input_str}").strip())
+                raw_value = input(f"\n{input_str}").strip()
+                check_navigation_command(raw_value)
+                selected_value = int(raw_value)
                 if 0 < selected_value < len(data_list) + 1:
                     break
                 self.print_error_message(

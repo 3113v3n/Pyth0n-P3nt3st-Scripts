@@ -1,6 +1,7 @@
 # trunk-ignore-all(black)
 import sys
 from utils.shared import Config
+from handlers.navigation import BackToMainMenu, BackToPreviousMenu
 from handlers.screen import ScreenHandler
 from handlers.helper_handler import HelpHandler
 from handlers import FileHandler
@@ -22,6 +23,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.helper_ = helper_instance
         self.command_ = command_instance
         self.debug = False
+        self.menu_state = {}
         self.formatted_question = (
             "\nWhat would you like to do?\n"
             f"{self.OPTIONS}\n"
@@ -34,6 +36,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         self.not_valid_domain = False
         self.domain = ""
         self.domain_variables = ""
+        self.menu_state = {}
 
     @classmethod
     def reset_class_states(cls):
@@ -42,6 +45,24 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         cls.not_valid_domain = False
         cls.domain = ""
         cls.domain_variables = ""
+        cls.menu_state = {}
+
+    def _get_menu_state(self, module: str) -> dict:
+        state = self.menu_state.get(module)
+        if isinstance(state, dict):
+            return state
+        state = {}
+        self.menu_state[module] = state
+        return state
+
+    def _clear_all_menu_state(self) -> None:
+        self.menu_state = {}
+
+    def _go_to_previous_step(self, step: int) -> int:
+        if step <= 0:
+            raise BackToMainMenu()
+        self.print_info_message("Returning to previous menu step.")
+        return step - 1
 
     def set_test_options(self):
         # Create a list to store formatted options
@@ -70,211 +91,301 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             helper_function(text)
         else:
             helper_function()
+        self.show_navigation_hint()
 
-        input_text = ("[-] Would you like to start ? [ "
-                      f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC}] ")
-        valid_options = {"yes", "y", "no", "n", "quit", "exit"}
+        input_text = (
+            "[-] Would you like to start ? [ "
+            f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC} ] "
+        )
+        valid_options = {"yes", "y", "no", "n"}
 
-        response = self.validate_user_choice(
-            valid_options, self.get_user_input, input_text)
+        try:
+            response = self.validate_user_choice(
+                valid_options, self.get_user_input, input_text
+            )
+        except BackToPreviousMenu as error:
+            raise BackToMainMenu() from error
 
         if response == "yes" or response == "y":
             self.command_.clear_screen()
         else:
-            self.print_warning_message("Exiting Program...")
-            return exit()
+            raise BackToMainMenu()
 
     def mobile_ui_handler(self):
-
+        state = self._get_menu_state("mobile")
         self.start_domain_helper(self.helper_.mobile_helper)
+        step = 0
+
         while True:
             try:
-                taxonomy_raw = self.prompt_format(
-                    "Taxonomy tags [none | masvs | mastg | both] (default: both): "
-                ).strip().lower()
-                taxonomy = taxonomy_raw if taxonomy_raw in {"none", "masvs", "mastg", "both"} else "both"
-                profile_raw = self.prompt_format(
-                    "Taxonomy profile [strict | balanced | aggressive] (default: balanced): "
-                ).strip().lower()
-                taxonomy_profile = (
-                    profile_raw if profile_raw in {"strict", "balanced", "aggressive"} else "balanced"
-                )
-
-                package_path = self.get_file_path(
-                    "Please provide the path to a directory containing your mobile application(s)\nPath to Directory:  ",
-                    self.check_folder_exists
-                )
-
-                self.files = []
-                self.find_files(package_path)
-                file_collection = self._get_file_collections()
-                applications = file_collection["applications"]
-                if not applications:
-                    raise FileNotFoundError(
-                        f"No APK/IPA files found in: {package_path}"
+                if step == 0:
+                    taxonomy_raw = self.prompt_format(
+                        "Taxonomy tags [none | masvs | mastg | both] (default: both): "
+                    ).strip().lower()
+                    state["taxonomy"] = (
+                        taxonomy_raw
+                        if taxonomy_raw in {"none", "masvs", "mastg", "both"}
+                        else "both"
                     )
+                    step += 1
+                    continue
 
-                total_apps = len(applications)
-                self.print_info_message(
-                    "Applications discovered in directory",
-                    file_path=f"{package_path} ({total_apps} found)",
-                )
+                if step == 1:
+                    profile_raw = self.prompt_format(
+                        "Taxonomy profile [strict | balanced | aggressive] (default: balanced): "
+                    ).strip().lower()
+                    state["taxonomy_profile"] = (
+                        profile_raw
+                        if profile_raw in {"strict", "balanced", "aggressive"}
+                        else "balanced"
+                    )
+                    step += 1
+                    continue
 
-                if total_apps == 1:
+                if step == 2:
+                    package_path = self.get_file_path(
+                        "Please provide the path to a directory containing your mobile application(s)\nPath to Directory:  ",
+                        self.check_folder_exists,
+                    )
+                    self.files = []
+                    self.find_files(package_path)
+                    file_collection = self._get_file_collections()
+                    applications = file_collection["applications"]
+                    if not applications:
+                        raise FileNotFoundError(
+                            f"No APK/IPA files found in: {package_path}"
+                        )
+
+                    state["source_path"] = package_path
+                    state["applications"] = applications
+                    total_apps = len(applications)
                     self.print_info_message(
-                        "Only one application found; scanning that app."
+                        "Applications discovered in directory",
+                        file_path=f"{package_path} ({total_apps} found)",
                     )
-                    app = dict(applications[0])
-                    app["taxonomy"] = taxonomy
-                    app["taxonomy_profile"] = taxonomy_profile
-                    return app
 
-                mode = self.validate_user_choice(
-                    {"single", "s", "all", "a"},
-                    self.get_user_input,
-                    "Select scan mode [single | all]: ",
-                )
+                    if total_apps == 1:
+                        self.print_info_message(
+                            "Only one application found; scanning that app."
+                        )
+                        app = dict(applications[0])
+                        app["taxonomy"] = state["taxonomy"]
+                        app["taxonomy_profile"] = state["taxonomy_profile"]
+                        state["scan_mode"] = "single"
+                        self.domain_variables = app
+                        return app
 
-                if mode in {"all", "a"}:
-                    return {
-                        "scan_mode": "all",
-                        "taxonomy": taxonomy,
-                        "taxonomy_profile": taxonomy_profile,
-                        "source_path": package_path,
-                        "applications": applications,
-                    }
+                    step += 1
+                    continue
 
-                self.files = applications
+                if step == 3:
+                    mode = self.validate_user_choice(
+                        {"single", "s", "all", "a"},
+                        self.get_user_input,
+                        "Select scan mode [single | all]: ",
+                    )
+                    state["scan_mode"] = "all" if mode in {"all", "a"} else "single"
+                    if state["scan_mode"] == "all":
+                        result = {
+                            "scan_mode": "all",
+                            "taxonomy": state["taxonomy"],
+                            "taxonomy_profile": state["taxonomy_profile"],
+                            "source_path": state["source_path"],
+                            "applications": state["applications"],
+                        }
+                        self.domain_variables = result
+                        return result
+                    step += 1
+                    continue
+
+                self.files = state.get("applications", [])
                 self._display_file_options()
                 selected_app = self.index_out_of_range_display(
                     "Select the application to scan: ", self.files
                 )
                 app = dict(self.files[selected_app])
-                app["taxonomy"] = taxonomy
-                app["taxonomy_profile"] = taxonomy_profile
+                app["taxonomy"] = state["taxonomy"]
+                app["taxonomy_profile"] = state["taxonomy_profile"]
+                state["selected_application"] = app["filename"]
+                self.domain_variables = app
                 return app
 
+            except BackToPreviousMenu:
+                step = self._go_to_previous_step(step)
+            except BackToMainMenu:
+                self._clear_all_menu_state()
+                raise
             except (ValueError, FileExistsError, FileNotFoundError) as error:
                 self.print_error_message(error)
 
     def va_ui_handler(self):
+        state = self._get_menu_state("va")
         self.start_domain_helper(self.helper_.vulnerability_helper)
+        step = 0
+
         while True:
-
             try:
-                # Select Scanner [ Nessus | Rapid7 ]
-                scanner_index = self.create_menu_selection(
-                    menu_selection=f" {self.HEADER}Select Vulnerability Scanner used:{self.ENDC} \n\n",
-                    options=self.vulnerability_scanners,
-                    check_range_string="Scanner: ",
-                    check_range_function=self.index_out_of_range_display,
-                    start_color=self.HEADER,
-                    end_color=self.ENDC,
-                    scanner=True
-                )
-                selected_scanner = self.vulnerability_scanners[scanner_index]["alias"]
-
-                # File format of the files [CSV or XLSX ]
-                file_format_index = self.create_menu_selection(
-                    menu_selection=f" \n {self.WARNING} Select the file "
-                    f"format of the Scanned File(s):{self.ENDC} \n",
-                    options=self.SCAN_FILE_FORMAT,
-                    check_range_string="File Format: ",
-                    check_range_function=self.index_out_of_range_display,
-                    start_color=self.WARNING,
-                    end_color=self.ENDC
-                )
-
-                file_extension = self.SCAN_FILE_FORMAT[file_format_index]
-            
-
-                self.print_info_message(
-                    f"Scanning {file_extension.upper()} file extensions")
-                # file extension ensures we display the correct file extensions
-
-                search_dir = self.get_file_path(
-                    "\nEnter Location Where your Scan files are located \n",
-                    self.check_folder_exists
-                )
-
-                files_tuple = self.display_files_onscreen(
-                    # display files depending on a user selected extension
-                    search_dir, self.display_saved_files, scan_extension=file_extension
-                )
-                if not files_tuple:
-                    self.print_warning_message(
-                        "No valid scan files were selected. Please choose another location."
+                if step == 0:
+                    scanner_index = self.create_menu_selection(
+                        menu_selection=f" {self.HEADER}Select Vulnerability Scanner used:{self.ENDC} \n\n",
+                        options=self.vulnerability_scanners,
+                        check_range_string="Scanner: ",
+                        check_range_function=self.index_out_of_range_display,
+                        start_color=self.HEADER,
+                        end_color=self.ENDC,
+                        scanner=True,
                     )
+                    state["scanner"] = self.vulnerability_scanners[scanner_index]["alias"]
+                    step += 1
                     continue
 
-                output_filename = self.get_output_filename()
+                if step == 1:
+                    file_format_index = self.create_menu_selection(
+                        menu_selection=f" \n {self.WARNING} Select the file "
+                        f"format of the Scanned File(s):{self.ENDC} \n",
+                        options=self.SCAN_FILE_FORMAT,
+                        check_range_string="File Format: ",
+                        check_range_function=self.index_out_of_range_display,
+                        start_color=self.WARNING,
+                        end_color=self.ENDC,
+                    )
+                    state["file_extension"] = self.SCAN_FILE_FORMAT[file_format_index]
+                    self.print_info_message(
+                        f"Scanning {state['file_extension'].upper()} file extensions"
+                    )
+                    step += 1
+                    continue
 
-                return {
-                    "input_file": files_tuple,
-                    "output": output_filename,
-                    "scanner": selected_scanner,
+                if step == 2:
+                    state["search_dir"] = self.get_file_path(
+                        "\nEnter Location Where your Scan files are located \n",
+                        self.check_folder_exists,
+                    )
+                    step += 1
+                    continue
+
+                if step == 3:
+                    files_tuple = self.display_files_onscreen(
+                        state["search_dir"],
+                        self.display_saved_files,
+                        scan_extension=state["file_extension"],
+                    )
+                    if not files_tuple:
+                        self.print_warning_message(
+                            "No valid scan files were selected. Please choose another location."
+                        )
+                        step = 2
+                        continue
+                    state["input_file"] = files_tuple
+                    step += 1
+                    continue
+
+                state["output"] = self.get_output_filename()
+                result = {
+                    "input_file": state["input_file"],
+                    "output": state["output"],
+                    "scanner": state["scanner"],
                 }
+                self.domain_variables = result
+                return result
 
+            except BackToPreviousMenu:
+                step = self._go_to_previous_step(step)
+            except BackToMainMenu:
+                self._clear_all_menu_state()
+                raise
             except (FileExistsError, FileNotFoundError, ValueError) as error:
                 self.print_error_message(
-                    message="Error in VA UI handler", exception_error=error)
-                return None
+                    message="Error in VA UI handler", exception_error=error
+                )
 
     def external_ui_handler(self):
+        state = self._get_menu_state("external")
         self.start_domain_helper(self.helper_.external_helper)
         from utils.external.external_constants import (
             DEFAULT_PHASES,
             SAFE_OPERATOR_TAG_DEFAULT,
         )
+        step = 0
 
-        try:
-            while True:
-                raw = self.get_user_input(
-                    "Enter domain to enumerate (example.domain.com)"
-                )
-                domain = raw.replace("https://", "").replace("http://", "").strip("/")
-                if self.validate_domain(domain):
-                    break
-                self.print_warning_message(
-                    f"'{raw}' is not a valid domain. Try again.")
+        while True:
+            try:
+                if step == 0:
+                    raw = self.get_user_input(
+                        "Enter domain to enumerate (example.domain.com): "
+                    )
+                    domain = raw.replace("https://", "").replace("http://", "").strip("/")
+                    if not self.validate_domain(domain):
+                        self.print_warning_message(
+                            f"'{raw}' is not a valid domain. Try again."
+                        )
+                        continue
+                    state["target_domain"] = domain
+                    step += 1
+                    continue
 
-            phase_text = (
-                f"\n[+] Phases to run (comma-separated). "
-                f"Press Enter for ALL.\n    Available: {', '.join(DEFAULT_PHASES)}\n"
-            )
-            raw_phases = self.prompt_format(phase_text).strip()
-            phases = tuple(
-                p.strip().lower() for p in raw_phases.split(",") if p.strip()
-            ) or DEFAULT_PHASES
-            unknown = [p for p in phases if p not in DEFAULT_PHASES]
-            if unknown:
-                self.print_warning_message(
-                    f"Ignoring unknown phase(s): {unknown}. Falling back to ALL."
-                )
-                phases = DEFAULT_PHASES
+                if step == 1:
+                    phase_text = (
+                        f"\n[+] Phases to run (comma-separated). "
+                        f"Press Enter for ALL.\n    Available: {', '.join(DEFAULT_PHASES)}\n"
+                    )
+                    raw_phases = self.prompt_format(phase_text).strip()
+                    phases = tuple(
+                        p.strip().lower() for p in raw_phases.split(",") if p.strip()
+                    ) or DEFAULT_PHASES
+                    unknown = [p for p in phases if p not in DEFAULT_PHASES]
+                    if unknown:
+                        self.print_warning_message(
+                            f"Ignoring unknown phase(s): {unknown}. Falling back to ALL."
+                        )
+                        phases = DEFAULT_PHASES
+                    state["phases"] = phases
+                    step += 1
+                    continue
 
-            safe_mode_choice = self.validate_user_choice(
-                {"yes", "y", "no", "n"},
-                self.get_user_input,
-                "Enable safe mode (lower-impact external profile)? [yes|no]: ",
-            )
-            safe_mode = safe_mode_choice in {"yes", "y"}
-            operator_tag = ""
-            if safe_mode:
-                tag_prompt = (
+                if step == 2:
+                    safe_mode_choice = self.validate_user_choice(
+                        {"yes", "y", "no", "n"},
+                        self.get_user_input,
+                        "Enable safe mode (lower-impact external profile)? [yes|no]: ",
+                    )
+                    state["safe_mode"] = safe_mode_choice in {"yes", "y"}
+                    if not state["safe_mode"]:
+                        state["operator_tag"] = ""
+                        result = {
+                            "target_domain": state["target_domain"],
+                            "phases": state["phases"],
+                            "safe_mode": False,
+                            "operator_tag": "",
+                        }
+                        self.domain_variables = result
+                        return result
+                    step += 1
+                    continue
+
+                operator_tag = self.prompt_format(
                     "Operator tag for audit headers/metadata "
-                    f"[default: {SAFE_OPERATOR_TAG_DEFAULT}]: "
+                    f"[default: {SAFE_OPERATOR_TAG_DEFAULT}]: ",
+                    path=True,
                 )
-                operator_tag = (self.get_user_input(tag_prompt) or "").strip() or SAFE_OPERATOR_TAG_DEFAULT
+                state["operator_tag"] = operator_tag or SAFE_OPERATOR_TAG_DEFAULT
 
-            return {
-                "target_domain": domain,
-                "phases": phases,
-                "safe_mode": safe_mode,
-                "operator_tag": operator_tag,
-            }
-        except Exception as error:
-            self.print_error_message(error)
+                result = {
+                    "target_domain": state["target_domain"],
+                    "phases": state["phases"],
+                    "safe_mode": bool(state["safe_mode"]),
+                    "operator_tag": state["operator_tag"],
+                }
+                self.domain_variables = result
+                return result
+
+            except BackToPreviousMenu:
+                step = self._go_to_previous_step(step)
+            except BackToMainMenu:
+                self._clear_all_menu_state()
+                raise
+            except Exception as error:
+                self.print_error_message(error)
 
     @staticmethod
     def match_password(
@@ -334,6 +445,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         }
 
     def password_ui_handler(self):
+        state = self._get_menu_state("password")
         self.start_domain_helper(
             self.helper_.internal_helper, helper_text="hashfunction")
         target_text = "[-] Enter the IP address of your target [ 10.10.10.3 ] \n"
@@ -342,69 +454,151 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         operation_text = (
             f"Type ({self.OKGREEN}generate{self.ENDC}) to Generate password list\n"
             f"Type ({self.OKGREEN}test{self.ENDC}) to test out your passwords \n")
+        step = 0
 
-        operation = self.validate_user_choice(valid_operations,
-                                              self.get_user_input,
-                                              operation_text)
-        pass_handler = {
-            "generate": lambda: self.match_password(self.get_file_path,
-                                                    self.file_exists,
-                                                    self.get_output_filename,
-                                                    operation),
-            "test": lambda: self.test_user_password(self.get_user_input,
-                                                    self.get_valid_ip_addr,
-                                                    self.validate_ip_addr,
-                                                    self.get_file_path,
-                                                    self.file_exists,
-                                                    target_text,
-                                                    domain_text,
-                                                    operation)
-        }
-        start_handler = pass_handler.get(operation)
-        if start_handler:
-            return start_handler()
+        while True:
+            try:
+                if step == 0:
+                    state["action"] = self.validate_user_choice(
+                        valid_operations,
+                        self.get_user_input,
+                        operation_text,
+                    )
+                    step += 1
+                    continue
+
+                if state["action"] == "generate":
+                    if step == 1:
+                        state["hashes"] = self.get_file_path(
+                            "\n[-] Enter full path to your cracked hashes \n",
+                            self.file_exists,
+                        )
+                        step += 1
+                        continue
+                    if step == 2:
+                        state["dumps"] = self.get_file_path(
+                            "\n[-] Enter full path to your dump [ntds] \n",
+                            self.file_exists,
+                        )
+                        step += 1
+                        continue
+                    state["filename"] = self.get_output_filename()
+                    result = {
+                        "hashes": state["hashes"],
+                        "dumps": state["dumps"],
+                        "filename": state["filename"],
+                        "action": "generate",
+                    }
+                    self.domain_variables = result
+                    return result
+
+                if step == 1:
+                    ip_error = "Invalid ip provided. Please enter a valid one"
+                    state["target"] = self.get_valid_ip_addr(
+                        self.get_user_input,
+                        target_text,
+                        self.validate_ip_addr,
+                        ip_error,
+                    )
+                    step += 1
+                    continue
+                if step == 2:
+                    state["domain"] = self.get_user_input(domain_text)
+                    step += 1
+                    continue
+                state["pass_file"] = self.get_file_path(
+                    "\n[-] Enter full path to your Password List file \n",
+                    self.file_exists,
+                )
+                result = {
+                    "target": state["target"],
+                    "domain": state["domain"],
+                    "pass_file": state["pass_file"],
+                    "filename": "Successful_Logins.txt",
+                    "action": "test",
+                }
+                self.domain_variables = result
+                return result
+
+            except BackToPreviousMenu:
+                step = self._go_to_previous_step(step)
+            except BackToMainMenu:
+                self._clear_all_menu_state()
+                raise
 
     def internal_ui_handler(self):
         """Handle internal assessment UI interactions"""
 
+        state = self._get_menu_state("internal")
         self.start_domain_helper(
             self.helper_.internal_helper, helper_text="scanner")
-        try:
-            subnet = ""
-            output_file = ""
-            interface = ""
-            valid_actions = {"scan", "resume"}
-            # [Performance] Reuse a single NetworkHandler instance for all checks
-            # instead of creating a new one per interface.
-            _nh = NetworkHandler()
-            valid_interfaces = [
-                iface
-                for iface in get_network_interfaces()
-                if _nh._is_interface_active(iface)
-                and not iface.startswith(("br-", "docker", "veth", "lo"))
-            ]
-            if self.debug:
-                print(f"DEBUG: Available active interfaces={valid_interfaces}")
-                
-            action = self.validate_user_choice(
-                valid_actions,
-                self.get_user_input,
-                self.internal_mode_choice)
+        step = 0
+        valid_actions = {"scan", "resume"}
 
-            if action == "resume":
-                resume_ip = self.display_saved_files(
-                    self.output_directory,
-                    resume_scan=True
-                )
+        # [Performance] Reuse a single NetworkHandler instance for all checks
+        # instead of creating a new one per interface.
+        _nh = NetworkHandler()
+        valid_interfaces = [
+            iface
+            for iface in get_network_interfaces()
+            if _nh._is_interface_active(iface)
+            and not iface.startswith(("br-", "docker", "veth", "lo"))
+        ]
+        if self.debug:
+            print(f"DEBUG: Available active interfaces={valid_interfaces}")
 
-                if resume_ip is None:
-                    self.print_warning_message(
-                        "No previous scan files found. Defaulting to scan mode.")
-                    action = "scan"
-                else:
-                    output_file = self.filepath
+        while True:
+            try:
+                if step == 0:
+                    state["action"] = self.validate_user_choice(
+                        valid_actions,
+                        self.get_user_input,
+                        self.internal_mode_choice,
+                    )
+                    state.pop("resume_requires_manual", None)
+                    step += 1
+                    continue
+
+                if state["action"] == "scan":
+                    if step == 1:
+                        state["interface"] = self.validate_user_choice(
+                            set(valid_interfaces),
+                            self.get_user_input,
+                            f"Enter a network interface to run your scan \n{valid_interfaces} ",
+                        )
+                        step += 1
+                        continue
+                    if step == 2:
+                        state["subnet"] = self.get_user_subnet()
+                        step += 1
+                        continue
+
+                    state["output"] = self.get_output_filename()
+                    result = {
+                        "subnet": state["subnet"],
+                        "action": "scan",
+                        "output": state["output"],
+                        "interface": state["interface"],
+                    }
+                    self.domain_variables = result
+                    return result
+
+                if step == 1:
+                    resume_ip = self.display_saved_files(
+                        self.output_directory,
+                        resume_scan=True,
+                    )
+                    if resume_ip is None:
+                        self.print_warning_message(
+                            "No previous scan files found. Returning to action selection."
+                        )
+                        step = 0
+                        continue
+
+                    state["resume_ip"] = resume_ip
+                    state["output"] = self.filepath
                     session_store = ScanSessionStore(self.output_directory)
-                    session = session_store.get_session_by_unresponsive_file(output_file)
+                    session = session_store.get_session_by_unresponsive_file(state["output"])
 
                     if session:
                         saved_subnet = session.get("subnet_cidr")
@@ -421,64 +615,63 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                                 "Resume blocked: no similar active interface detected "
                                 "for the saved scan session."
                             )
-                        subnet = saved_subnet
-                        interface = matched_interface
+                        state["subnet"] = saved_subnet
+                        state["interface"] = matched_interface
                         self.print_info_message(
                             "Resume metadata loaded from saved scan session"
                         )
                         self.print_info_message(
-                            "Using subnet", file_path=subnet
+                            "Using subnet", file_path=state["subnet"]
                         )
                         self.print_info_message(
-                            "Using interface", file_path=interface
+                            "Using interface", file_path=state["interface"]
                         )
-                    else:
-                        self.print_warning_message(
-                            "No saved session metadata found for this file. "
-                            "Falling back to manual CIDR resume."
-                        )
-                        interface = self.validate_user_choice(
-                            valid_interfaces,
-                            self.get_user_input,
-                            f"Enter a network interface to run your scan \n{valid_interfaces} "
-                        )
-                        while True:
-                            cidr = self.get_cidr()
-                            if cidr:
-                                subnet = f"{resume_ip}/{cidr}"
-                                break
-                            self.print_warning_message(
-                                "Please enter a valid CIDR")
+                        result = {
+                            "subnet": state["subnet"],
+                            "action": "resume",
+                            "output": state["output"],
+                            "interface": state["interface"],
+                        }
+                        self.domain_variables = result
+                        return result
 
-            # If mode is scan or defaulted to scan
-            if action == "scan":
-                interface = self.validate_user_choice(
-                    valid_interfaces,
-                    self.get_user_input,
-                    f"Enter a network interface to run your scan \n{valid_interfaces} "
+                    self.print_warning_message(
+                        "No saved session metadata found for this file. "
+                        "Falling back to manual CIDR resume."
+                    )
+                    state["resume_requires_manual"] = True
+                    step += 1
+                    continue
+
+                if step == 2:
+                    state["interface"] = self.validate_user_choice(
+                        set(valid_interfaces),
+                        self.get_user_input,
+                        f"Enter a network interface to run your scan \n{valid_interfaces} ",
+                    )
+                    step += 1
+                    continue
+
+                cidr = self.get_cidr()
+                state["subnet"] = f"{state['resume_ip']}/{cidr}"
+                result = {
+                    "subnet": state["subnet"],
+                    "action": "resume",
+                    "output": state["output"],
+                    "interface": state["interface"],
+                }
+                self.domain_variables = result
+                return result
+
+            except BackToPreviousMenu:
+                step = self._go_to_previous_step(step)
+            except BackToMainMenu:
+                self._clear_all_menu_state()
+                raise
+            except Exception as error:
+                self.print_error_message(
+                    message="An error occurred", exception_error=error
                 )
-                subnet = self.get_user_subnet()
-                output_file = self.get_output_filename()
-
-            return {
-                "subnet": subnet,
-                "action": action,
-                "output": output_file,
-                "interface": interface
-            }
-
-        except Exception as error:
-
-            self.print_error_message(
-                message="An error occurred", exception_error=error)
-            mode = "scan"
-            subnet = self.get_user_subnet()
-            output_file = self.get_output_filename()
-            return {
-                "subnet": subnet,
-                "mode": mode,
-                "output": output_file,
-            }
 
     @staticmethod
     def exit_program():
@@ -503,6 +696,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                         message=f"❌ Invalid choice. Please enter a number between 1 and {len(self.default_test_domains)}"
                     )
 
+            except (BackToMainMenu, BackToPreviousMenu):
+                self.print_warning_message("You are already at Main Menu (Menu 1).")
             except ValueError:
                 self.print_error_message(
                     message="❌ Invalid choice. Please enter a valid number")
@@ -593,6 +788,9 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     f"No variables returned for domain: {test_domain}")
             return self.domain_variables
 
+        except (BackToMainMenu, BackToPreviousMenu):
+            self.domain_variables = ""
+            raise
         except Exception as error:
             error_msg = f"Error in {test_domain} domain: {str(error)}"
             self.print_error_message(
