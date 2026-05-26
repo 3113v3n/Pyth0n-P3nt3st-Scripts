@@ -111,7 +111,6 @@ class MobileApiKeyChecksMixin:
     @classmethod
     def _render_api_key_report_blocks(cls, records: dict[str, dict]) -> list[str]:
         blocks: list[str] = []
-        block_index = 0
 
         for key in sorted(records):
             record = records[key]
@@ -119,14 +118,12 @@ class MobileApiKeyChecksMixin:
             if not tests:
                 continue
 
-            block_index += 1
             failed_checks = sorted(record.get("failed_checks", set()))
             accessible_apis = sorted(record.get("accessible_apis", set()))
             poc_cmd = record.get("poc_cmd") or "N/A"
             poc_response = record.get("poc_response") or "N/A"
 
             lines = [
-                f"******************** API_KEY {block_index} *********************************",
                 f"KEY: {record.get('key', key)}",
                 "VULNERABLE_STATUS: Vulnerable",
                 f"CHECKLIST: {record.get('checklist', 'hardcoded-key-exposure')}",
@@ -152,7 +149,6 @@ class MobileApiKeyChecksMixin:
 
             lines.append(f"POC: {poc_cmd}")
             lines.append(f"     {poc_response}")
-            lines.append("************************************************************************")
             blocks.append("\n".join(lines))
 
         return blocks

@@ -14,6 +14,8 @@ class MobileReportingMixin:
 
     REPORT_WRAP_WIDTH = 108
     BASE64_WRAP_WIDTH = 84
+    INLINE_NAME_COL = 44
+    INLINE_WRAP_WIDTH = 108
 
     @classmethod
     def _header(cls, title: str) -> str:
@@ -32,6 +34,11 @@ class MobileReportingMixin:
     ) -> None:
         field_value = "" if value is None else str(value)
         width = wrap_width or cls.REPORT_WRAP_WIDTH - len(subsequent_indent)
+        field_value = cls._chunk_long_tokens(
+            field_value,
+            width=width,
+            content_width=max(20, width - len(subsequent_indent)),
+        )
         wrapped = wrap_text_block(
             field_value,
             width=width,
@@ -43,6 +50,26 @@ class MobileReportingMixin:
             fh.write(f"{wrapped}\n")
         else:
             fh.write(f"{indent}<empty>\n")
+
+    @staticmethod
+    def _chunk_long_tokens(content: str, *, width: int, content_width: int) -> str:
+        lines: list[str] = []
+        max_token = max(20, min(width, content_width))
+        for raw_line in str(content).replace("\r", "").splitlines() or [str(content)]:
+            if not raw_line:
+                lines.append("")
+                continue
+            pieces = re.split(r"(\s+)", raw_line)
+            normalized: list[str] = []
+            for piece in pieces:
+                if not piece:
+                    continue
+                if piece.isspace() or len(piece) <= max_token:
+                    normalized.append(piece)
+                    continue
+                normalized.append(" ".join(piece[i: i + max_token] for i in range(0, len(piece), max_token)))
+            lines.append("".join(normalized))
+        return "\n".join(lines)
 
     @classmethod
     def _format_quoted_base64(cls, encoded_text: str, indent: str = "  ") -> str:
@@ -335,6 +362,63 @@ class MobileReportingMixin:
                 )
         return len(deduped_findings)
 
+    @classmethod
+    def _slugify_token(cls, value: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
+        return normalized or "finding"
+
+    @classmethod
+    def _compact_evidence(cls, evidence: str, limit: int = 180) -> str:
+        flattened = " ".join(str(evidence or "").split())
+        if len(flattened) <= limit:
+            return flattened
+        return f"{flattened[: limit - 3]}..."
+
+    @classmethod
+    def _format_inline_integrity_line(cls, finding: Finding) -> str:
+        token = cls._slugify_token(finding.title)
+        severity = str(finding.severity or "info").strip().lower() or "info"
+        file_path = str(finding.file or "global").strip() or "global"
+        evidence = cls._compact_evidence(finding.evidence)
+
+        prefix = f"[{token}]".ljust(cls.INLINE_NAME_COL) + f"[file] [{severity}] "
+        lines = [
+            wrap_text_block(
+                file_path,
+                width=max(20, cls.INLINE_WRAP_WIDTH - len(prefix)),
+                initial_indent=prefix,
+                subsequent_indent=" " * len(prefix),
+            )
+        ]
+        if evidence:
+            lines.append(
+                wrap_text_block(
+                    f"[{evidence}]",
+                    width=cls.INLINE_WRAP_WIDTH,
+                    initial_indent=" " * len(prefix),
+                    subsequent_indent=" " * len(prefix),
+                )
+            )
+        return "\n".join(lines)
+
+    def _write_integrity_report(self, path: Path, findings: list[Finding]) -> int:
+        seen_values = set()
+        deduped_findings: list[Finding] = []
+        for finding in findings:
+            value_key = (finding.category.lower(), finding.title.lower(), finding.evidence.strip().lower())
+            if value_key in seen_values:
+                continue
+            seen_values.add(value_key)
+            deduped_findings.append(finding)
+
+        if not deduped_findings:
+            return 0
+
+        with path.open("w", encoding="utf-8") as fh:
+            for finding in deduped_findings:
+                fh.write(f"{self._format_inline_integrity_line(finding)}\n")
+        return len(deduped_findings)
+
     @staticmethod
     def _write_api_check_report(path: Path, lines: Iterable[str]) -> int:
         blocks = [str(line).strip("\n") for line in lines if str(line).strip()]
@@ -390,7 +474,6 @@ class MobileReportingMixin:
             for index, (encoded_decoded, files) in enumerate(sorted_entries, 1):
                 encoded_text, decoded_text, decoded_format = encoded_decoded
                 ordered_files = sorted(files)
-                fh.write(f"\n===== BASE64 FINDING {index} START =====\n")
                 fh.write(f"\n{MobileReportingMixin._header(f'Base64 Finding {index}')}\n")
                 MobileReportingMixin._write_field(
                     fh,
@@ -411,13 +494,21 @@ class MobileReportingMixin:
                 MobileReportingMixin._write_field(
                     fh,
                     "DECODED",
-                    decoded_text,
+                    MobileReportingMixin._indent_multiline_value(decoded_text),
                     wrap_width=100,
                     indent="    ",
                     subsequent_indent="      ",
                 )
-                fh.write(f"===== BASE64 FINDING {index} END =====\n")
         return len(sorted_entries)
+
+    @staticmethod
+    def _indent_multiline_value(value: str, pad: str = "  ") -> str:
+        lines = str(value or "").splitlines()
+        if len(lines) <= 1:
+            return str(value or "")
+        first, *rest = lines
+        normalized_rest = [line if line.startswith((" ", "\t")) else f"{pad}{line}" for line in rest]
+        return "\n".join([first, *normalized_rest])
 
     @staticmethod
     def _write_obfuscated_string_map(

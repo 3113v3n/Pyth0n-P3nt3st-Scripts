@@ -114,6 +114,14 @@ class MobileAssessment(MobileCommands):
         if entries:
             return entries
 
+        section_pattern = re.compile(
+            r"^=+\s+BASE64 FINDING\s+\d+\s+=+\n(?P<body>.*?)(?=^=+\s+BASE64 FINDING\s+\d+\s+=+|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        section_entries = [match.group("body").strip() for match in section_pattern.finditer(content)]
+        if section_entries:
+            return section_entries
+
         # Backward-compatible fallback for older one-line base64 reports.
         return [ln.strip() for ln in content.splitlines() if ln.strip()]
 

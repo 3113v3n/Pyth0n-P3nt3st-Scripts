@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
-import tempfile
 import zipfile
-from datetime import datetime
 from pathlib import Path
 
 
 class MobileExtractionMixin:
     """Package extraction and output-folder setup helpers."""
+    EXTRACTION_READY_MARKER = ".extraction_ready"
 
     def _get_folder_name(self, platform: str, package: str) -> str:
         self.templates_folder = f"{self.working_dir}/.tmp/mobile-nuclei-templates"
@@ -21,15 +21,58 @@ class MobileExtractionMixin:
 
         self.create_folder(platform_name, search_path=base_dir)
         self.mobile_output_dir = f"{base_dir}/{platform_name}"
-        return self._build_runtime_extraction_dir()
+        return self._build_runtime_extraction_dir(package)
 
-    def _build_runtime_extraction_dir(self) -> str:
+    @staticmethod
+    def _package_fingerprint(package: str) -> str:
+        target = Path(package).resolve()
+        stat = target.stat()
+        digest = hashlib.sha256()
+        digest.update(str(target).encode("utf-8", errors="ignore"))
+        digest.update(str(stat.st_size).encode("utf-8"))
+        digest.update(str(stat.st_mtime_ns).encode("utf-8"))
+        return digest.hexdigest()[:12]
+
+    def _prune_duplicate_extraction_dirs(self, runtime_root: Path, keep: Path) -> None:
+        """Remove same-app extraction duplicates while preserving the selected cache folder."""
+        keep_path = keep.resolve()
+        for candidate in runtime_root.glob(f"{self.file_name}_*"):
+            if not candidate.is_dir():
+                continue
+            try:
+                if candidate.resolve() == keep_path:
+                    continue
+            except OSError:
+                continue
+            shutil.rmtree(candidate, ignore_errors=True)
+
+    def _build_runtime_extraction_dir(self, package: str) -> str:
         runtime_root = Path(self.working_dir) / ".tmp" / "mobile-extraction"
         runtime_root.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        folder = tempfile.mkdtemp(prefix=f"{self.file_name}_{timestamp}_", dir=str(runtime_root))
-        return str(Path(folder))
+        fingerprint = self._package_fingerprint(package)
+        deterministic = runtime_root / f"{self.file_name}_{fingerprint}"
+        if deterministic.exists():
+            self._prune_duplicate_extraction_dirs(runtime_root, deterministic)
+            return str(deterministic)
+
+        # Fallback compatibility for legacy timestamped extraction folders.
+        legacy_candidates = sorted(runtime_root.glob(f"{self.file_name}_*"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for candidate in legacy_candidates:
+            if not candidate.is_dir():
+                continue
+            marker = candidate / self.EXTRACTION_READY_MARKER
+            if marker.exists():
+                target = candidate
+                try:
+                    candidate.rename(deterministic)
+                    target = deterministic
+                except OSError:
+                    target = candidate
+                self._prune_duplicate_extraction_dirs(runtime_root, target)
+                return str(target)
+
+        return str(deterministic)
 
     @staticmethod
     def _cleanup_legacy_extraction_folders(base_dir: str, platform_name: str) -> None:
@@ -88,7 +131,26 @@ class MobileExtractionMixin:
 
         platform = "android" if self.file_type == "apk" else "iOS"
         self.folder_name = self._get_folder_name(platform, package)
+
+        extraction_dir = Path(self.folder_name)
+        marker = extraction_dir / self.EXTRACTION_READY_MARKER
+        if extraction_dir.exists() and marker.exists():
+            self.print_info_message(
+                "Using cached extracted app folder",
+                file_path=str(extraction_dir),
+            )
+            return self.folder_name, "cached"
+
+        # Remove partial leftovers before extraction to avoid stale duplicates.
+        if extraction_dir.exists():
+            shutil.rmtree(extraction_dir, ignore_errors=True)
+        extraction_dir.mkdir(parents=True, exist_ok=True)
+
         method = self._unzip_package(package, self.folder_name)
+        try:
+            marker.write_text("ok", encoding="utf-8")
+        except OSError:
+            pass
         return self.folder_name, method
 
     def create_subfolder(self) -> None:

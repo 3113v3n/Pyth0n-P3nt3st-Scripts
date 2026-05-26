@@ -178,8 +178,8 @@ class MobileCommands(
                 self._android_obfuscated_resource_map,
                 obfuscated_refs,
             )
-            risk_count = self._write_findings_report(risk_file, risk_findings)
-            control_count = self._write_findings_report(control_file, control_findings)
+            risk_count = self._write_integrity_report(risk_file, risk_findings)
+            control_count = self._write_integrity_report(control_file, control_findings)
             taxonomy_report = self._build_masvs_mastg_report(
                 findings=combined_risk_findings,
                 platform=platform,

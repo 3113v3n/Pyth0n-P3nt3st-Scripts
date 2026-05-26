@@ -1,17 +1,86 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
+import textwrap
 import time
 from pathlib import Path
 
 
 class MobileNucleiMixin:
     """Optional nuclei template management and execution."""
+    INLINE_NAME_COL = 44
+    INLINE_WRAP_WIDTH = 108
 
     @staticmethod
-    def _dedupe_output_file(path: Path) -> int:
+    def _condense_result_path(path_value: str) -> str:
+        normalized = str(path_value or "").strip().replace("\\", "/")
+        cwd = os.getcwd().replace("\\", "/").rstrip("/")
+        if cwd and normalized.startswith(f"{cwd}/"):
+            return normalized[len(cwd) + 1:]
+        return normalized
+
+    @staticmethod
+    def _split_mobile_extraction_path(path_value: str) -> tuple[str, str]:
+        match = re.match(r"^(?P<root>\.?tmp/mobile-extraction/[^/]+/)(?P<tail>.+)$", path_value)
+        if not match:
+            return "", path_value
+        return match.group("root"), match.group("tail")
+
+    @classmethod
+    def _format_nuclei_result_line(cls, line: str) -> str:
+        value = str(line or "").strip()
+        if not value:
+            return ""
+
+        line_match = re.match(
+            r"^\[(?P<name>[^\]]+)\]\s+\[(?P<source>[^\]]+)\]\s+\[(?P<severity>[^\]]+)\]\s+(?P<rest>.+)$",
+            value,
+        )
+        if not line_match:
+            return value
+
+        name = str(line_match.group("name")).strip()
+        source = str(line_match.group("source")).strip() or "file"
+        severity = str(line_match.group("severity")).strip() or "info"
+        remainder = str(line_match.group("rest")).strip()
+
+        secret_suffix = ""
+        if remainder.endswith("]"):
+            split_at = remainder.rfind(" [")
+            if split_at > 0:
+                candidate = remainder[split_at + 1:].strip()
+                if candidate.startswith("[") and candidate.endswith("]"):
+                    secret_suffix = candidate
+                    remainder = remainder[:split_at].strip()
+
+        condensed_path = cls._condense_result_path(remainder)
+        root_path, tail_path = cls._split_mobile_extraction_path(condensed_path)
+        first_path_segment = root_path if root_path else condensed_path
+        prefix = f"[{name}]".ljust(cls.INLINE_NAME_COL) + f"[{source}] [{severity}] "
+        first_line = f"{prefix}{first_path_segment}".rstrip()
+        if secret_suffix:
+            first_line = f"{first_line} {secret_suffix}"
+
+        if not tail_path or tail_path == condensed_path:
+            return first_line
+
+        hanging_indent = " " * len(prefix)
+        wrapped_tail = textwrap.wrap(
+            tail_path,
+            width=cls.INLINE_WRAP_WIDTH,
+            initial_indent=hanging_indent,
+            subsequent_indent=hanging_indent,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        if not wrapped_tail:
+            return first_line
+        return "\n".join([first_line, *wrapped_tail])
+
+    def _dedupe_output_file(self, path: Path) -> int:
         if not path.exists():
             return 0
         lines = []
@@ -27,7 +96,9 @@ class MobileNucleiMixin:
         unique_lines = list(dict.fromkeys(lines))
         with path.open("w", encoding="utf-8") as fh:
             for line in unique_lines:
-                fh.write(f"{line}\n")
+                formatted = self._format_nuclei_result_line(line)
+                if formatted:
+                    fh.write(f"{formatted}\n")
         return len(unique_lines)
 
     @classmethod
