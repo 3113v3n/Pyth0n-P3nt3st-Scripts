@@ -1,0 +1,60 @@
+name: Security Gate
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Security Gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          PR_BODY_FILE=""
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            PR_BODY_FILE="$(mktemp)"
+            python - "${GITHUB_EVENT_PATH}" "${PR_BODY_FILE}" <<'PY'
+import json
+import sys
+
+event_path = sys.argv[1]
+output_path = sys.argv[2]
+
+with open(event_path, "r", encoding="utf-8") as f:
+    payload = json.load(f)
+
+pr_body = (payload.get("pull_request") or {}).get("body") or ""
+
+with open(output_path, "w", encoding="utf-8") as f:
+    f.write(pr_body)
+PY
+          fi
+
+          CMD=(python scripts/security_gate.py --diff-base "${BASE_SHA}" --check-commit-range-base "${BASE_SHA}")
+          if [[ -n "${PR_BODY_FILE}" ]]; then
+            CMD+=(--check-pr-body-file "${PR_BODY_FILE}")
+          fi
+          "${CMD[@]}"

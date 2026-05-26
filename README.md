@@ -11,6 +11,34 @@ python3 main.py
 By default, the script starts in `interactive` mode.
 In non-interactive environments (CI, pipes, cron, or redirected stdin), run with `-M cli_args ...`.
 
+### Security Gate (mandatory)
+
+All commits and PRs must pass the project security gate.
+
+Enable tracked git hooks once per clone:
+
+```shell
+git config core.hooksPath .githooks
+```
+
+Run the gate manually:
+
+```shell
+./.venv/bin/python scripts/security_gate.py --staged
+```
+
+Commit messages are also gated and must include:
+
+```text
+Security-Checklist: done
+Security-Impact: <summary>
+Security-Tests: <commands/results>
+```
+
+The PR template (`.github/pull_request_template.md`) is mandatory and requires a checked security checklist plus security impact/test notes.
+
+Security policy and checklist are documented in [`SECURITY.md`](SECURITY.md).
+
 ### Automatic first-run bootstrap
 
 - On first run, if `.venv` does not exist, the framework now:

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+MSG_FILE="${1:-}"
+if [[ -z "$MSG_FILE" ]]; then
+  echo "[SECURITY GATE] commit-msg hook missing commit message file path."
+  exit 1
+fi
+
+if [[ -x "$ROOT/.venv/bin/python" ]]; then
+  PYTHON_BIN="$ROOT/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python3)"
+else
+  echo "[SECURITY GATE] python3 not found; cannot validate commit metadata."
+  exit 1
+fi
+
+echo "[SECURITY GATE] Validating commit message security trailers..."
+"$PYTHON_BIN" "$ROOT/scripts/security_gate.py" --check-commit-msg-file "$MSG_FILE"
