@@ -32,8 +32,24 @@ class MobileStaticScanConstants:
         r"(?i)\b(?:ip|host|addr|address|src|source|dst|dest|destination|from|to|endpoint|server|dns)\b"
     )
     BASE64_TOKEN_RE = re.compile(r"\b(?:[A-Za-z0-9+/]{24,}={0,2})\b")
+    BASE64_DATA_URI_PREFIX_RE = re.compile(
+        r"(?i)data:(image|font|audio|video|application/(?:pdf|zip|gzip|octet-stream|x-font-ttf|x-font-woff|woff2?|vnd\.ms-fontobject))"
+        r"[^,\n]{0,120};base64,"
+    )
     BASE64_MAX_DECODE_DEPTH = 5
     MAX_BASE64_DECODE_BYTES = 8 * 1024 * 1024
+    ANDROID_INT_LITERAL_RE = re.compile(r"(?<![\w$])(0x[0-9a-fA-F]{6,10}|\d{8,10})(?![\w$])")
+    JAVA_STATIC_INT_ASSIGN_RE = re.compile(
+        r"\b(?:public|private|protected)?\s*(?:static\s+)?(?:final\s+)?int\s+"
+        r"([A-Za-z_$][\w$]*)\s*=\s*(0x[0-9a-fA-F]+|\d+)\s*;"
+    )
+    SMALI_STATIC_INT_ASSIGN_RE = re.compile(
+        r"\.field\s+[^\n]*\s+([A-Za-z_$][\w$]*)\s*:\s*I\s*=\s*(0x[0-9a-fA-F]+|\d+)"
+    )
+    JAVA_CLASS_RE = re.compile(r"\bclass\s+([A-Za-z_$][\w$]*)\b")
+    SMALI_CLASS_RE = re.compile(r"\.class[^\n]*\s+L([^;]+);")
+    QUALIFIED_SYMBOL_RE = re.compile(r"\b([A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*)\b")
+    SMALI_FIELD_REF_RE = re.compile(r"L([^;]+);->([A-Za-z_$][\w$]*)\s*:\s*I")
 
     TEXT_EXTENSIONS = {
         ".xml", ".json", ".txt", ".cfg", ".conf", ".ini", ".properties", ".yaml", ".yml",
@@ -117,6 +133,31 @@ class MobileStaticScanConstants:
         "default", "dummy", "sample", "example", "test", "none", "null", "undefined",
         "your_password", "your_token", "insert_here",
     }
+    OBFUSCATED_SECRET_KEYWORDS = (
+        "access_key",
+        "accesskey",
+        "apikey",
+        "api_key",
+        "auth",
+        "authorization",
+        "bearer",
+        "client_id",
+        "client_secret",
+        "credential",
+        "jwt",
+        "key",
+        "otp",
+        "pass",
+        "password",
+        "pin",
+        "private",
+        "refresh",
+        "salt",
+        "secret",
+        "seed",
+        "signing",
+        "token",
+    )
     SECRET_VALUE_RE = re.compile(
         r"(?i)\b(?:password|passwd|pwd|secret|token|api[_-]?key|client[_-]?secret|access[_-]?key)\b"
         r"\s*(?:[:=]|=>)\s*[\"']([^\"'\n]{6,})[\"']"

@@ -327,10 +327,23 @@ def _beautify_decoded_payload(payload: str) -> tuple[str, str]:
     return text, "text"
 
 
-def _decode_base64_if_interesting(cls, token: str) -> tuple[str, str] | None:
+def _is_noise_base64_context(cls, context_window: str) -> bool:
+    """Reject obvious base64 noise contexts (images/fonts/media/binary data URIs)."""
+    context = str(context_window or "")
+    return bool(cls.BASE64_DATA_URI_PREFIX_RE.search(context))
+
+
+def _decode_base64_if_interesting(
+    cls,
+    token: str,
+    *,
+    context_window: str = "",
+) -> tuple[str, str] | None:
     if len(token) < 24:
         return None
     if len(set(token)) < 8:
+        return None
+    if cls._is_noise_base64_context(context_window):
         return None
 
     def decode_once(candidate: str) -> str | None:
@@ -396,6 +409,21 @@ def _decode_base64_if_interesting(cls, token: str) -> tuple[str, str] | None:
         "googleapis",
         "jwt",
     )
+    has_sensitive_marker = any(marker in lowered for marker in sensitive_markers)
+
+    # Skip high-volume graphic/vector payloads (common in app bundles) unless they
+    # still contain explicit sensitive markers.
+    if not has_sensitive_marker:
+        if "<svg" in lowered or "http://www.w3.org/2000/svg" in lowered:
+            return None
+        if lowered.startswith("<?xml") and "<svg" in lowered:
+            return None
+        if any(tag in lowered for tag in ("<path", "<rect", "<circle", "<polygon")) and "<svg" in lowered:
+            return None
+
+    if len(analysis_text) > 20_000 and not has_sensitive_marker:
+        return None
+
     if any(marker in lowered for marker in sensitive_markers):
         return formatted_text, text_format
 
@@ -435,6 +463,294 @@ def _snippet_around(text: str, needle: str, radius: int = 80) -> str:
 
 def _normalize_line_no_truncate(text: str) -> str:
     return " ".join(str(text).strip().split())
+
+
+def _parse_android_resource_id_literal(token: str) -> int | None:
+    raw = str(token or "").strip().rstrip(",;)")
+    if not raw:
+        return None
+    try:
+        value = int(raw, 16) if raw.lower().startswith("0x") else int(raw, 10)
+    except ValueError:
+        return None
+    if value <= 0 or value > 0xFFFFFFFF:
+        return None
+    return value
+
+
+def _register_symbol_id(symbol_map: dict[str, set[int]], symbol: str, resource_id: int) -> None:
+    key = str(symbol or "").strip()
+    if not key:
+        return
+    symbol_map.setdefault(key, set()).add(resource_id)
+
+
+def _build_android_obfuscated_maps(self, root: Path) -> tuple[dict[int, dict], dict[str, set[int]]]:
+    res_root = root / "res"
+    if not res_root.exists():
+        return {}, {}
+
+    string_values: dict[str, str] = {}
+    string_sources: dict[str, str] = {}
+    for strings_file in sorted(
+        (path for path in res_root.glob("values*/strings*.xml") if path.is_file()),
+        key=lambda p: (0 if p.parent.name == "values" else 1, p.parent.name, p.name),
+    ):
+        try:
+            resources = ET.fromstring(strings_file.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, ET.ParseError):
+            continue
+        is_default_values_file = strings_file.parent.name == "values"
+        for node in resources.findall("string"):
+            name = str(node.attrib.get("name", "")).strip()
+            if not name:
+                continue
+            value = "".join(node.itertext()).strip()
+            if not value:
+                continue
+            if name not in string_values or is_default_values_file:
+                string_values[name] = value
+                string_sources[name] = self._safe_relpath(strings_file, root)
+
+    resource_map: dict[int, dict] = {}
+    for public_file in sorted(
+        (path for path in res_root.glob("values*/public.xml") if path.is_file()),
+        key=lambda p: (0 if p.parent.name == "values" else 1, p.parent.name, p.name),
+    ):
+        try:
+            resources = ET.fromstring(public_file.read_text(encoding="utf-8", errors="ignore"))
+        except (OSError, ET.ParseError):
+            continue
+        for node in resources.findall("public"):
+            if str(node.attrib.get("type", "")).strip().lower() != "string":
+                continue
+            name = str(node.attrib.get("name", "")).strip()
+            resource_id = self._parse_android_resource_id_literal(node.attrib.get("id", ""))
+            if not name or resource_id is None:
+                continue
+            value = string_values.get(name)
+            if not value:
+                continue
+            resource_map[resource_id] = {
+                "id": resource_id,
+                "hex": f"0x{resource_id:08x}",
+                "name": name,
+                "value": value,
+                "source": string_sources.get(name, self._safe_relpath(public_file, root)),
+            }
+
+    # Fallback mapping when public.xml is unavailable or incomplete.
+    if string_values:
+        r_symbol_files = set(root.rglob("R$*.smali")) | set(root.rglob("R$*.java")) | set(root.rglob("R.java"))
+        for symbol_file in sorted(r_symbol_files):
+            text = _read_text_if_possible(symbol_file)
+            if not text:
+                continue
+            for pattern in (self.JAVA_STATIC_INT_ASSIGN_RE, self.SMALI_STATIC_INT_ASSIGN_RE):
+                for match in pattern.finditer(text):
+                    symbol = match.group(1)
+                    resource_id = self._parse_android_resource_id_literal(match.group(2))
+                    if resource_id is None or resource_id in resource_map:
+                        continue
+                    value = string_values.get(symbol)
+                    if not value:
+                        continue
+                    resource_map[resource_id] = {
+                        "id": resource_id,
+                        "hex": f"0x{resource_id:08x}",
+                        "name": symbol,
+                        "value": value,
+                        "source": string_sources.get(symbol, self._safe_relpath(symbol_file, root)),
+                    }
+
+    symbol_map: dict[str, set[int]] = {}
+    code_suffixes = {".java", ".kt", ".smali"}
+    for code_file in root.rglob("*"):
+        if not code_file.is_file() or code_file.suffix.lower() not in code_suffixes:
+            continue
+        text = _read_text_if_possible(code_file)
+        if not text:
+            continue
+
+        class_name = ""
+        if code_file.suffix.lower() == ".smali":
+            class_match = self.SMALI_CLASS_RE.search(text)
+            if class_match:
+                class_name = class_match.group(1).split("/")[-1]
+            assignment_pattern = self.SMALI_STATIC_INT_ASSIGN_RE
+        else:
+            class_match = self.JAVA_CLASS_RE.search(text)
+            if class_match:
+                class_name = class_match.group(1)
+            assignment_pattern = self.JAVA_STATIC_INT_ASSIGN_RE
+
+        for match in assignment_pattern.finditer(text):
+            symbol = match.group(1)
+            resource_id = self._parse_android_resource_id_literal(match.group(2))
+            if resource_id is None or resource_id not in resource_map:
+                continue
+            self._register_symbol_id(symbol_map, symbol, resource_id)
+            if class_name:
+                self._register_symbol_id(symbol_map, f"{class_name}.{symbol}", resource_id)
+
+    return resource_map, symbol_map
+
+
+def _is_sensitive_obfuscated_resource_value(cls, resource_name: str, resource_value: str) -> bool:
+    value = " ".join(str(resource_value or "").split())
+    if not value:
+        return False
+
+    lower_value = value.lower()
+    lower_name = str(resource_name or "").strip().lower()
+    if lower_value in cls.NOISE_SECRET_VALUES:
+        return False
+    if lower_value.startswith(("@string/", "@xml/")):
+        return False
+
+    direct_secret_patterns = (
+        re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+        re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"),
+        re.compile(r"\bsk_live_[0-9A-Za-z]{16,}\b"),
+        re.compile(r"\bghp_[A-Za-z0-9]{36}\b"),
+        re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b"),
+        re.compile(
+            r"(?i)\b(?:api[_-]?key|token|secret|client[_-]?secret|access[_-]?key)\b\s*(?:[:=]|=>)\s*['\"][^'\"]{8,}['\"]"
+        ),
+    )
+    if any(pattern.search(value) for pattern in direct_secret_patterns):
+        return True
+
+    if re.match(r"(?i)^[a-z][a-z0-9+.\-]*://", value):
+        return bool(
+            re.search(
+                r"(?i)(?:api[_-]?key|token|secret|client[_-]?secret|access[_-]?key)=",
+                value,
+            )
+        )
+
+    if " " in value:
+        return False
+
+    strong_keywords = (
+        "access_key",
+        "apikey",
+        "api_key",
+        "bearer",
+        "client_secret",
+        "jwt",
+        "private_key",
+        "refresh_token",
+        "secret",
+        "signing",
+        "token",
+    )
+    if any(keyword in lower_value or keyword in lower_name for keyword in strong_keywords):
+        if len(value) >= 8:
+            return True
+
+    if (
+        len(value) >= 24
+        and cls._entropy(value) >= 3.6
+        and re.search(r"[A-Za-z]", value)
+        and re.search(r"[0-9]", value)
+    ):
+        return True
+    return False
+
+
+def _scan_obfuscated_resource_references(self, text: str, rel_file: str) -> tuple[list[dict], list[Finding]]:
+    resource_map = getattr(self, "_android_obfuscated_resource_map", {}) or {}
+    if not resource_map:
+        return [], []
+
+    symbol_map = getattr(self, "_android_obfuscated_symbol_map", {}) or {}
+    references: list[dict] = []
+    findings: list[Finding] = []
+    seen_ref_keys: set[tuple[int, str]] = set()
+    refs_by_id: dict[int, set[str]] = {}
+
+    def add_reference(resource_id: int, token: str) -> None:
+        entry = resource_map.get(resource_id)
+        if not entry:
+            return
+        ref_key = (resource_id, token)
+        if ref_key in seen_ref_keys:
+            return
+        seen_ref_keys.add(ref_key)
+        refs_by_id.setdefault(resource_id, set()).add(token)
+        references.append(
+            {
+                "id": resource_id,
+                "hex": entry.get("hex", f"0x{resource_id:08x}"),
+                "resource": entry.get("name", ""),
+                "value": entry.get("value", ""),
+                "file": rel_file,
+                "token": token,
+            }
+        )
+
+    for literal in self.ANDROID_INT_LITERAL_RE.findall(text):
+        resource_id = self._parse_android_resource_id_literal(literal)
+        if resource_id is None:
+            continue
+        add_reference(resource_id, literal)
+
+    if symbol_map:
+        for match in self.QUALIFIED_SYMBOL_RE.finditer(text):
+            token = match.group(1)
+            for symbol_key in (token, token.split(".", 1)[-1]):
+                for resource_id in symbol_map.get(symbol_key, set()):
+                    add_reference(resource_id, token)
+
+        for match in self.SMALI_FIELD_REF_RE.finditer(text):
+            class_simple = match.group(1).split("/")[-1]
+            field_name = match.group(2)
+            token = f"{class_simple}.{field_name}"
+            for symbol_key in (token, field_name):
+                for resource_id in symbol_map.get(symbol_key, set()):
+                    add_reference(resource_id, token)
+
+    high_signal_markers = (
+        "secret",
+        "token",
+        "apikey",
+        "api_key",
+        "client_secret",
+        "access_key",
+        "private",
+        "bearer",
+        "jwt",
+    )
+    for resource_id, tokens in refs_by_id.items():
+        entry = resource_map.get(resource_id, {})
+        value = str(entry.get("value", "")).strip()
+        name = str(entry.get("name", "")).strip()
+        if not self._is_sensitive_obfuscated_resource_value(name, value):
+            continue
+
+        value_summary = self._normalize_line_no_truncate(value.replace("\n", "\\n"))
+        if len(value_summary) > 220:
+            value_summary = f"{value_summary[:217]}..."
+        combined_lower = f"{name.lower()} {value.lower()}"
+        severity = "high" if any(marker in combined_lower for marker in high_signal_markers) else "medium"
+        tokens_summary = ", ".join(sorted(tokens)[:4])
+        if len(tokens) > 4:
+            tokens_summary = f"{tokens_summary}, ..."
+        findings.append(
+            Finding(
+                category="hardcoded_secret",
+                title="Obfuscated Resource ID Decodes to Sensitive String",
+                severity=severity,
+                file=rel_file,
+                evidence=(
+                    f"id={resource_id} hex={entry.get('hex', f'0x{resource_id:08x}')} "
+                    f"resource={name or '<unknown>'} value=\"{value_summary}\" refs={tokens_summary}"
+                ),
+            )
+        )
+
+    return references, findings
 
 
 def _scan_text_for_indicators(self, text: str, rel_file: str) -> tuple[list[Finding], list[Finding]]:
@@ -498,6 +814,7 @@ def _scan_single_file(self, file_path: Path, root: Path) -> dict:
         "urls": set(),
         "ips": set(),
         "hardcoded": [],
+        "obfuscated_refs": [],
         "base64": [],
         "risk_findings": [],
         "control_findings": [],
@@ -586,12 +903,25 @@ def _scan_single_file(self, file_path: Path, root: Path) -> dict:
                 )
             )
 
+    obfuscated_refs, obfuscated_findings = self._scan_obfuscated_resource_references(searchable, rel_file)
+    if obfuscated_refs:
+        result["obfuscated_refs"].extend(obfuscated_refs)
+    if obfuscated_findings:
+        result["hardcoded"].extend(obfuscated_findings)
+
     seen_b64 = set()
-    for token in self.BASE64_TOKEN_RE.findall(searchable):
+    for token_match in self.BASE64_TOKEN_RE.finditer(searchable):
+        token = token_match.group(0)
         if token in seen_b64:
             continue
         seen_b64.add(token)
-        decoded_payload = self._decode_base64_if_interesting(token)
+        context_start = max(0, token_match.start() - 160)
+        context_end = min(len(searchable), token_match.end() + 32)
+        context_window = searchable[context_start:context_end]
+        decoded_payload = self._decode_base64_if_interesting(
+            token,
+            context_window=context_window,
+        )
         if decoded_payload:
             decoded_text, decoded_format = decoded_payload
             result["base64"].append(

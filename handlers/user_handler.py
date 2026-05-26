@@ -91,7 +91,6 @@ class UserHandler(FileHandler, Config, ScreenHandler):
             helper_function(text)
         else:
             helper_function()
-        self.show_navigation_hint()
 
         input_text = (
             "[-] Would you like to start ? [ "

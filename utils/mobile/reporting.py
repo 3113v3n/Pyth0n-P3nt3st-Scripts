@@ -6,17 +6,72 @@ from pathlib import Path
 from typing import Iterable
 
 from .models import Finding
+from utils.shared.text_formatting import section_header, wrap_text_block
 
 
 class MobileReportingMixin:
     """Report writing and summary presentation helpers."""
+
+    REPORT_WRAP_WIDTH = 108
+    BASE64_WRAP_WIDTH = 84
+
+    @classmethod
+    def _header(cls, title: str) -> str:
+        return section_header(title, width=cls.REPORT_WRAP_WIDTH, fill="=")
+
+    @classmethod
+    def _write_field(
+        cls,
+        fh,
+        label: str,
+        value: object,
+        *,
+        wrap_width: int | None = None,
+        indent: str = "  ",
+        subsequent_indent: str = "      ",
+    ) -> None:
+        field_value = "" if value is None else str(value)
+        width = wrap_width or cls.REPORT_WRAP_WIDTH - len(subsequent_indent)
+        wrapped = wrap_text_block(
+            field_value,
+            width=width,
+            initial_indent=indent,
+            subsequent_indent=subsequent_indent,
+        )
+        fh.write(f"{label}:\n")
+        if wrapped.strip():
+            fh.write(f"{wrapped}\n")
+        else:
+            fh.write(f"{indent}<empty>\n")
+
+    @classmethod
+    def _format_quoted_base64(cls, encoded_text: str, indent: str = "  ") -> str:
+        normalized = re.sub(r"\s+", "", str(encoded_text))
+        chunks = [
+            normalized[idx: idx + cls.BASE64_WRAP_WIDTH]
+            for idx in range(0, len(normalized), cls.BASE64_WRAP_WIDTH)
+        ] or [""]
+        if len(chunks) == 1:
+            return f'{indent}"{chunks[0]}"'
+
+        lines = [f'{indent}"{chunks[0]}']
+        for chunk in chunks[1:-1]:
+            lines.append(f"{indent} {chunk}")
+        lines.append(f'{indent} {chunks[-1]}"')
+        return "\n".join(lines)
 
     @staticmethod
     def _format_kv_block(heading: str, fields: list[tuple[str, object]]) -> str:
         """Render a heading with indented key/value lines for console output."""
         lines = [f"{heading}:"]
         for key, value in fields:
-            lines.append(f"        {key}={value}")
+            wrapped = wrap_text_block(
+                f"{key}={value}",
+                width=96,
+                initial_indent="        ",
+                subsequent_indent="          ",
+            )
+            lines.extend(wrapped.splitlines())
         return "\n".join(lines)
 
     @staticmethod
@@ -250,17 +305,35 @@ class MobileReportingMixin:
         return count
 
     def _write_findings_report(self, path: Path, findings: list[Finding]) -> int:
-        rows = []
         seen_values = set()
+        deduped_findings: list[Finding] = []
         for finding in findings:
             value_key = (finding.category.lower(), finding.title.lower(), finding.evidence.strip().lower())
             if value_key in seen_values:
                 continue
             seen_values.add(value_key)
-            rows.append(
-                f"[{finding.severity.upper()}] {finding.category} | {finding.title} | {finding.file} | {finding.evidence}"
-            )
-        return self._write_lines(path, rows)
+            deduped_findings.append(finding)
+
+        if not deduped_findings:
+            return 0
+
+        with path.open("w", encoding="utf-8") as fh:
+            fh.write(f"{self._header('Findings Report')}\n")
+            for index, finding in enumerate(deduped_findings, 1):
+                fh.write(f"\n{self._header(f'Finding {index}')}\n")
+                self._write_field(fh, "SEVERITY", finding.severity)
+                self._write_field(fh, "CATEGORY", finding.category)
+                self._write_field(fh, "TITLE", finding.title)
+                self._write_field(fh, "FILE", finding.file)
+                self._write_field(
+                    fh,
+                    "EVIDENCE",
+                    finding.evidence,
+                    wrap_width=self.REPORT_WRAP_WIDTH - 8,
+                    indent="    ",
+                    subsequent_indent="    ",
+                )
+        return len(deduped_findings)
 
     @staticmethod
     def _write_api_check_report(path: Path, lines: Iterable[str]) -> int:
@@ -271,8 +344,16 @@ class MobileReportingMixin:
         unique_blocks = list(dict.fromkeys(blocks))
 
         with path.open("w", encoding="utf-8") as fh:
+            fh.write(f"{MobileReportingMixin._header('API Key Checklist')}\n")
             for index, block in enumerate(unique_blocks, 1):
-                fh.write(f"{block}\n")
+                fh.write(f"\n{MobileReportingMixin._header(f'API Check {index}')}\n")
+                wrapped = wrap_text_block(
+                    block,
+                    width=100,
+                    initial_indent="  ",
+                    subsequent_indent="    ",
+                )
+                fh.write(f"{wrapped}\n")
                 if index < len(unique_blocks):
                     fh.write("\n")
         return len(unique_blocks)
@@ -305,25 +386,118 @@ class MobileReportingMixin:
         )
 
         with path.open("w", encoding="utf-8") as fh:
-            for encoded_decoded, files in sorted_entries:
+            fh.write(f"{MobileReportingMixin._header('Base64 Findings')}\n")
+            for index, (encoded_decoded, files) in enumerate(sorted_entries, 1):
                 encoded_text, decoded_text, decoded_format = encoded_decoded
                 ordered_files = sorted(files)
+                fh.write(f"\n===== BASE64 FINDING {index} START =====\n")
+                fh.write(f"\n{MobileReportingMixin._header(f'Base64 Finding {index}')}\n")
+                MobileReportingMixin._write_field(
+                    fh,
+                    "FILES",
+                    "\n".join(f"- {name}" for name in ordered_files),
+                    indent="    ",
+                    subsequent_indent="    ",
+                )
+                MobileReportingMixin._write_field(
+                    fh, "FILE COUNT", len(ordered_files), indent="    ", subsequent_indent="    "
+                )
+                MobileReportingMixin._write_field(
+                    fh, "FORMAT", decoded_format, indent="    ", subsequent_indent="    "
+                )
 
-                fh.write("============================== BASE64 FINDING START ===========================================\n\n")
-                fh.write("FILE:\n")
-                for file_name in ordered_files:
-                    fh.write(f"  - {file_name}\n")
-                fh.write(f"FILE COUNT: {len(ordered_files)}\n")
-                fh.write(f"FORMAT: {decoded_format}\n")
                 fh.write("ENCODED:\n")
-                fh.write(f"  {encoded_text}\n")
-                fh.write("DECODED:\n")
-                decoded_lines = decoded_text.splitlines() or [decoded_text]
-                for line in decoded_lines:
-                    fh.write(f"  {line}\n")
-                fh.write("\n")
-                fh.write("============================== BASE64 FINDING END ===========================================\n\n")
+                fh.write(f"{MobileReportingMixin._format_quoted_base64(encoded_text, indent='    ')}\n")
+                MobileReportingMixin._write_field(
+                    fh,
+                    "DECODED",
+                    decoded_text,
+                    wrap_width=100,
+                    indent="    ",
+                    subsequent_indent="      ",
+                )
+                fh.write(f"===== BASE64 FINDING {index} END =====\n")
         return len(sorted_entries)
+
+    @staticmethod
+    def _write_obfuscated_string_map(
+        path: Path,
+        resource_map: dict[int, dict],
+        references: Iterable[dict],
+    ) -> int:
+        if not resource_map:
+            return 0
+
+        usage: dict[int, dict[str, set[str]]] = {}
+        for ref in references:
+            if not isinstance(ref, dict):
+                continue
+            try:
+                resource_id = int(ref.get("id"))
+            except (TypeError, ValueError):
+                continue
+            if resource_id not in resource_map:
+                continue
+            usage.setdefault(resource_id, {"files": set(), "tokens": set()})
+            source_file = str(ref.get("file", "")).strip()
+            token = str(ref.get("token", "")).strip()
+            if source_file:
+                usage[resource_id]["files"].add(source_file)
+            if token:
+                usage[resource_id]["tokens"].add(token)
+
+        if not usage:
+            return 0
+
+        written = 0
+        with path.open("w", encoding="utf-8") as fh:
+            fh.write(f"{MobileReportingMixin._header('Obfuscated String References')}\n")
+            for resource_id in sorted(usage):
+                meta = resource_map.get(resource_id, {})
+                value = str(meta.get("value", "")).replace("\r", "").replace("\n", "\\n").strip()
+                if not value:
+                    continue
+                resource_name = str(meta.get("name", "")).strip() or "<unknown>"
+                hex_value = str(meta.get("hex", f"0x{resource_id:08x}")).strip()
+                source = str(meta.get("source", "")).strip()
+                files = sorted(usage[resource_id]["files"])
+                tokens = sorted(usage[resource_id]["tokens"])
+
+                fh.write(f"\n{MobileReportingMixin._header(f'Resource {resource_id}')}\n")
+                MobileReportingMixin._write_field(
+                    fh,
+                    "RESOURCE",
+                    f"id={resource_id} hex={hex_value} name={resource_name}",
+                    indent="    ",
+                    subsequent_indent="      ",
+                )
+                if source:
+                    MobileReportingMixin._write_field(
+                        fh, "SOURCE", source, indent="    ", subsequent_indent="      "
+                    )
+                MobileReportingMixin._write_field(
+                    fh, "VALUE", value, indent="    ", subsequent_indent="      "
+                )
+                MobileReportingMixin._write_field(
+                    fh, "REFERENCE COUNT", len(files), indent="    ", subsequent_indent="      "
+                )
+                if files:
+                    display_files = "\n".join(f"- {name}" for name in files[:8])
+                    if len(files) > 8:
+                        display_files = f"{display_files}\n- ... ({len(files) - 8} more)"
+                    MobileReportingMixin._write_field(
+                        fh, "FILES", display_files, indent="    ", subsequent_indent="      "
+                    )
+                if tokens:
+                    display_tokens = "\n".join(f"- {token}" for token in tokens[:8])
+                    if len(tokens) > 8:
+                        display_tokens = f"{display_tokens}\n- ... ({len(tokens) - 8} more)"
+                    MobileReportingMixin._write_field(
+                        fh, "TOKENS", display_tokens, indent="    ", subsequent_indent="      "
+                    )
+                written += 1
+
+        return written
 
     @staticmethod
     def _cleanup_previous_reports(output_dir: str, app_name: str, platform: str) -> None:
@@ -352,6 +526,7 @@ class MobileReportingMixin:
                 ("api_key_checks", summary.get("api_key_assessment_count", 0)),
                 ("api_key_issues", summary.get("api_key_issue_count", 0)),
                 ("base64", summary["base64_count"]),
+                ("obfuscated_string_refs", summary.get("obfuscated_string_refs_count", 0)),
                 ("risk_findings", summary["risk_count"]),
                 ("integrity_controls", summary["control_count"]),
                 ("taxonomy_tagged", summary.get("taxonomy_tagged_count", 0)),

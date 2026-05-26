@@ -8,7 +8,7 @@ import time
 import textwrap
 from pathlib import Path
 
-from handlers.navigation import BackToMainMenu
+from handlers.navigation import BackToMainMenu, sanitize_dialog_input
 from utils.shared.colors import Bcolors
 from utils.shared.commands import Commands
 
@@ -33,11 +33,15 @@ class FrameworkRuntimeMixin:
             try:
                 flush_input_output()
                 time.sleep(0.1)
+                print(
+                    f"\n{Bcolors.MUTED}[Navigation] Up/Down=history | Ctrl+C=exit gracefully{Bcolors.ENDC}"
+                )
 
                 choice = input(
                     f"\n[*] Would you like to {Bcolors.WARNING}EXIT the program{Bcolors.ENDC} "
                     f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
-                ).strip().lower()
+                )
+                choice = sanitize_dialog_input(choice).lower()
                 if choice in {"y", "yes", "n", "no"}:
                     return choice
             except EOFError:

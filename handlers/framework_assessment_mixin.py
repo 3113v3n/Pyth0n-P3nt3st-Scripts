@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 
+from handlers.navigation import sanitize_dialog_input
 from utils.shared.commands import Commands, StrictModeViolation
 
 
@@ -30,9 +31,13 @@ class FrameworkAssessmentMixin:
 
         self.print_warning_message(str(error))
         try:
+            self.print_info_message(
+                "Navigation: back=previous | main=Menu 1 | Ctrl+C=cancel prompt"
+            )
             choice = input(
                 f"[?] Allow temporary relaxed mode for '{phase}' only? [y/N]: "
-            ).strip().lower()
+            )
+            choice = sanitize_dialog_input(choice).lower()
         except (EOFError, KeyboardInterrupt):
             return False
         return choice in {"y", "yes"}

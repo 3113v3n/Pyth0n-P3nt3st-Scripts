@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 
 BACK_COMMANDS = {"b", "back"}
 MAIN_MENU_COMMANDS = {"m", "main", "main menu", "main-menu", "menu", "home"}
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 class MenuNavigation(Exception):
@@ -26,3 +29,10 @@ def check_navigation_command(value: str) -> None:
         raise BackToPreviousMenu()
     if token in MAIN_MENU_COMMANDS:
         raise BackToMainMenu()
+
+
+def sanitize_dialog_input(value: str) -> str:
+    """Strip terminal escape/control sequences from interactive input."""
+    text = str(value or "")
+    text = _ANSI_ESCAPE_RE.sub("", text)
+    return text.strip()

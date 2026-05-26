@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from handlers.navigation import check_navigation_command
+from handlers.navigation import check_navigation_command, sanitize_dialog_input
 
 
 class FileSelectionMixin:
@@ -167,9 +167,14 @@ class FileSelectionMixin:
         """Prompt for a numeric selection and return its 0-based index."""
         while True:
             try:
-                raw_value = input(f"\n{input_str}").strip()
-                check_navigation_command(raw_value)
-                selected_value = int(raw_value)
+                if hasattr(self, "show_navigation_hint"):
+                    self.show_navigation_hint()
+                raw_value = input(f"\n{input_str}")
+                sanitized = sanitize_dialog_input(raw_value)
+                if not sanitized and str(raw_value).startswith("\x1b"):
+                    continue
+                check_navigation_command(sanitized)
+                selected_value = int(sanitized)
                 if 0 < selected_value < len(data_list) + 1:
                     break
                 self.print_error_message(

@@ -188,7 +188,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         prepared = self._prepare_text_for_write(
             content,
             beautify_structured=True,
-            wrap_long_lines=False,
+            wrap_long_lines=True,
         )
         with self._open_secure_output_file(target_path, append=True) as file:
             file.write(prepared)
@@ -587,7 +587,7 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
         prepared = FileHandler._prepare_text_for_write(
             content,
             beautify_structured=True,
-            wrap_long_lines=False,
+            wrap_long_lines=True,
         )
         with FileHandler._open_secure_output_file(Path(filename), append=True) as file:
             file.write(prepared)

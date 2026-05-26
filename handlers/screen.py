@@ -1,10 +1,24 @@
+try:
+    import readline  # noqa: F401  # Enables history/arrow navigation in input()
+except Exception:  # pragma: no cover - platform dependent
+    readline = None
+else:  # pragma: no cover - runtime capability
+    try:
+        readline.parse_and_bind("set editing-mode emacs")
+        readline.parse_and_bind(r'"\e[A": previous-history')
+        readline.parse_and_bind(r'"\e[B": next-history')
+    except Exception:
+        pass
+
 from .messages import DisplayHandler
-from .navigation import check_navigation_command
+from .navigation import check_navigation_command, sanitize_dialog_input
 from utils.shared.loader import Loader
 
 
 class ScreenHandler(DisplayHandler):
-    NAVIGATION_HINT = "Type 'back' to return to previous menu or 'main' for Main Menu."
+    NAVIGATION_HINT = (
+        "Navigation: back=previous menu | main=Menu 1 | Up/Down=history | Ctrl+C=exit"
+    )
 
     def __init__(self):
         super().__init__()
@@ -99,10 +113,17 @@ class ScreenHandler(DisplayHandler):
         dotted_lines = f"{self.MUTED}{decorator}{self.ENDC}"
 
         def not_lower():
-            user_input = input(prompt).strip()
-            check_navigation_command(user_input)
-            print(dotted_lines)
-            return user_input
+            while True:
+                self.show_navigation_hint()
+                raw_input = input(prompt)
+                user_input = sanitize_dialog_input(raw_input)
+                # Ignore raw arrow-key escape sequences when readline is unavailable.
+                if not user_input and str(raw_input).startswith("\x1b"):
+                    print(dotted_lines)
+                    continue
+                check_navigation_command(user_input)
+                print(dotted_lines)
+                return user_input
 
         if kwargs.get('path'):
             return not_lower()
@@ -110,11 +131,17 @@ class ScreenHandler(DisplayHandler):
         if kwargs.get('filename'):
             return not_lower()
 
-        raw_input = input(prompt).strip()
-        check_navigation_command(raw_input)
-        user_input = raw_input.lower()
-        print(dotted_lines)
-        return user_input
+        while True:
+            self.show_navigation_hint()
+            raw_input = input(prompt)
+            sanitized = sanitize_dialog_input(raw_input)
+            if not sanitized and str(raw_input).startswith("\x1b"):
+                print(dotted_lines)
+                continue
+            check_navigation_command(sanitized)
+            user_input = sanitized.lower()
+            print(dotted_lines)
+            return user_input
 
     def validate_user_choice(
             self,

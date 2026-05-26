@@ -15,3 +15,16 @@ All notable project changes should be recorded in this file.
 - Converted interactive module flows (`mobile`, `internal`, `external`, `va`, `password`) into step-based wizards that preserve selected values when going back, unless the user explicitly returns to Main Menu.
 - Updated runtime loop to handle Main Menu navigation without exiting the program.
 - Updated numeric/file selection menus to accept navigation commands alongside numeric input.
+
+### Refactor Improvements
+- Navigation guidance is now shown above interactive prompts with concise shortcut help:
+  - `back` for previous step, `main` for Menu 1, `Up/Down` for input history, `Ctrl+C` for graceful exit.
+- Interactive prompt handling now sanitizes terminal escape sequences to avoid noisy input artifacts such as `^[[A` appearing as invalid input.
+- Base64 analysis now applies stricter relevance checks:
+  - skips common media/data-URI payloads (for example SVG/image/font embedded blobs),
+  - retains decoded payloads that are likely security-relevant (tokens, secrets, auth material, suspicious URLs/keys).
+- Reporting output wrappers were enhanced for readability:
+  - consistent section headers,
+  - wrapped long lines,
+  - indented key/value blocks,
+  - structured finding sections for easier review of large outputs.
