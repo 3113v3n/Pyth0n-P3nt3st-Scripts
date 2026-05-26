@@ -607,6 +607,11 @@ class Commands:
         Returns:
             Exit code from the system clear/cls command.
         """
+        try:
+            from handlers.screen import ScreenHandler
+            ScreenHandler.note_screen_cleared()
+        except Exception:
+            pass
         # [Security] Constant string — no user input involved.
         return os.system("cls" if os.name == "nt" else "clear")
 

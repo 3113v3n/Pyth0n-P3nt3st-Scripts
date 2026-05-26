@@ -19,6 +19,15 @@ class DisplayHandler(Bcolors):
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _note_screen_output(output: str | int) -> None:
+        """Best-effort bridge to ScreenHandler visibility tracking."""
+        try:
+            from handlers.screen import ScreenHandler
+            ScreenHandler.note_output_rendered(output)
+        except Exception:
+            pass
+
+    @staticmethod
     def _format_message(
         prefix: str,
         color_start: str,
@@ -51,10 +60,12 @@ class DisplayHandler(Bcolors):
         Args:
             message: Debug text to display.
         """
-        print(
+        debug_msg = (
             f" {Bcolors.DEBUG}[#] DEBUG:{Bcolors.ENDC} "
             f"\n{Bcolors.MUTED}{message}{Bcolors.ENDC}"
         )
+        print(debug_msg)
+        DisplayHandler._note_screen_output(debug_msg)
 
     @staticmethod
     def print_success_message(message: str, **kwargs) -> None:
@@ -80,9 +91,12 @@ class DisplayHandler(Bcolors):
         elif kwargs.get("flush"):
             extra_data = kwargs.get("extras", "")
             msg = f"{msg}{extra_data}"
-            return print(msg, flush=kwargs["flush"])
+            print(msg, flush=kwargs["flush"])
+            DisplayHandler._note_screen_output(msg)
+            return
 
         print(msg)
+        DisplayHandler._note_screen_output(msg)
 
     @staticmethod
     def print_error_message(message: str = "Error", **kwargs) -> None:
@@ -99,6 +113,7 @@ class DisplayHandler(Bcolors):
         else:
             msg = f"\n{Bcolors.FAIL}[!] Error: {message} {Bcolors.ENDC}"
         print(msg)
+        DisplayHandler._note_screen_output(msg)
 
     @staticmethod
     def print_warning_message(message: str, **kwargs) -> None:
@@ -116,12 +131,15 @@ class DisplayHandler(Bcolors):
         if kwargs.get("flush"):
             msg = f"\n{Bcolors.HIGHLIGHT}[#] Summary: {message} {Bcolors.ENDC}\n"
             ip_list = kwargs["data"]
-            return print(msg, ip_list, flush=kwargs["flush"])
+            print(msg, ip_list, flush=kwargs["flush"])
+            DisplayHandler._note_screen_output(f"{msg}\n{ip_list}")
+            return
 
         if kwargs.get("file_path"):
             msg = f"{msg}{kwargs['file_path']}"
 
         print(msg)
+        DisplayHandler._note_screen_output(msg)
 
     @staticmethod
     def print_trace_message(message: str) -> None:
@@ -130,7 +148,9 @@ class DisplayHandler(Bcolors):
         Args:
             message: Trace text to display.
         """
-        print(f"\n {Bcolors.TRACE}[TRACE]{Bcolors.ENDC} {message}")
+        trace_msg = f"\n {Bcolors.TRACE}[TRACE]{Bcolors.ENDC} {message}"
+        print(trace_msg)
+        DisplayHandler._note_screen_output(trace_msg)
 
     @staticmethod
     def print_info_message(message: str, **kwargs) -> None:
@@ -149,7 +169,9 @@ class DisplayHandler(Bcolors):
         if kwargs.get("flush"):
             encoded_string = kwargs.get("encoded_string", "")
             msg = f"{msg}{encoded_string}"
-            return print(msg, flush=kwargs["flush"])
+            print(msg, flush=kwargs["flush"])
+            DisplayHandler._note_screen_output(msg)
+            return
 
         if kwargs.get("file_path"):
             path = kwargs["file_path"]
@@ -158,6 +180,7 @@ class DisplayHandler(Bcolors):
             msg = f"{msg}{kwargs['file']}"
 
         print(msg)
+        DisplayHandler._note_screen_output(msg)
 
     @staticmethod
     def print_selection_items(file: dict, index: int) -> None:
@@ -173,3 +196,4 @@ class DisplayHandler(Bcolors):
             f"{filename}"
         )
         print(display_str)
+        DisplayHandler._note_screen_output(display_str)

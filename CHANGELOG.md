@@ -20,6 +20,9 @@ All notable project changes should be recorded in this file.
 - Navigation guidance is now shown above interactive prompts with concise shortcut help:
   - `back` for previous step, `main` for Menu 1, `Up/Down` for input history, `Ctrl+C` for graceful exit.
 - Interactive prompt handling now sanitizes terminal escape sequences to avoid noisy input artifacts such as `^[[A` appearing as invalid input.
+- Navigation hint rendering is now viewport-aware:
+  - the hint is shown once while still visible on-screen,
+  - it is re-shown only after enough output likely pushed it off-screen or after an explicit terminal clear.
 - Base64 analysis now applies stricter relevance checks:
   - skips common media/data-URI payloads (for example SVG/image/font embedded blobs),
   - retains decoded payloads that are likely security-relevant (tokens, secrets, auth material, suspicious URLs/keys).
