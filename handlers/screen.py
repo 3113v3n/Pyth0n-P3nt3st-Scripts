@@ -135,8 +135,14 @@ class ScreenHandler(DisplayHandler):
 
         return None
 
-    def get_file_path(self, prompt: str, check_exists: callable):
-        """Get and validate a file path from user"""
+    def get_file_path(
+        self,
+        prompt: str,
+        check_exists: callable,
+        *,
+        require_file: bool = False,
+    ):
+        """Get and validate a filesystem path from user."""
 
         while True:
             file_path = self.prompt_format(prompt, path=True)
@@ -145,6 +151,11 @@ class ScreenHandler(DisplayHandler):
                 continue
             if not check_exists(file_path):
                 self.print_error_message("No such file/folder exists")
+                continue
+            if require_file and not self.isfile_and_exists(file_path):
+                self.print_error_message(
+                    f"Expected a file path, but got a directory: {file_path}"
+                )
                 continue
             return file_path
 
@@ -158,7 +169,7 @@ class ScreenHandler(DisplayHandler):
                 continue
             return filename
 
-    def get_user_input(self, prompt: str):
+    def get_user_input(self, prompt: str, default: str | None = None):
         """Get user input
         :param prompt: Text to display to user
         : return user input
@@ -166,6 +177,8 @@ class ScreenHandler(DisplayHandler):
 
         while True:
             user_input = self.prompt_format(prompt)
+            if not user_input and default is not None:
+                return default
             if not user_input:
                 self.print_warning_message("Input cannot be empty")
                 continue
@@ -218,11 +231,18 @@ class ScreenHandler(DisplayHandler):
             self,
             options: set,
             get_user_input: callable,
-            text: str
+            text: str,
+            *,
+            default: str | None = None,
     ):
         valid_options = options
         while True:
-            response = get_user_input(text)
+            try:
+                response = get_user_input(text, default=default)
+            except TypeError:
+                response = get_user_input(text)
+                if not response and default is not None:
+                    response = default
 
             if response in valid_options:
                 break  # Exit loop if response is valid

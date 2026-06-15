@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from handlers import DisplayHandler
 from utils.internal.hash_util import HashUtil
 from utils.internal.password_output import build_password_output_path, read_passwords_from_output
@@ -17,6 +19,16 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         # [AI] Set by PentestFramework.initialize_classes(); None means disabled
         self.ai = None
 
+    @staticmethod
+    def _require_input_file(path: str, label: str) -> None:
+        """Raise a clear error when a password input path is not a regular file."""
+        candidate = Path(path)
+        if candidate.is_file():
+            return
+        if candidate.is_dir():
+            raise ValueError(f"{label} must be a file, not a directory: {path}")
+        raise ValueError(f"{label} file does not exist: {path}")
+
     def generate_password_list_from_hashes(
             self,
             domain_variables: dict,
@@ -31,6 +43,8 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
             print("Getting cracked hashes")
             self.cracked_hashes = domain_variables["hashes"]
             self.dumped_hashes = domain_variables["dumps"]
+            self._require_input_file(self.cracked_hashes, "Cracked hashes")
+            self._require_input_file(self.dumped_hashes, "NTDS dump")
         self.output_file = build_password_output_path(
             save_dir=save_dir,
             output_basename=domain_variables["filename"],
@@ -81,6 +95,7 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         """
 
         self.pass_list = domain_variables["pass_file"]
+        self._require_input_file(self.pass_list, "Password list")
         self.output_file = build_password_output_path(
             save_dir=save_dir,
             output_basename=domain_variables["filename"],

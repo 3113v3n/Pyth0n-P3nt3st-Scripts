@@ -396,6 +396,16 @@ class InteractionHandler:
 
     # Handlers for each module
 
+    @staticmethod
+    def _validate_required_file(path: str, label: str) -> None:
+        """Validate that a module argument points to a regular file."""
+        candidate = Path(path)
+        if candidate.is_file():
+            return
+        if candidate.is_dir():
+            raise ValueError(f"{label} must be a file, not a directory: {path}")
+        raise ValueError(f"{label} file does not exist: {path}")
+
     def handle_mobile_arguments(self, args, module):
         """Handle Mobile arguments"""
         path = args.path
@@ -546,8 +556,7 @@ class InteractionHandler:
                 raise ValueError(
                     "For Test mode, --ip, --domain, and --pass_file are required"
                 )
-            if not self.validator.isfile_and_exists(pass_file):
-                raise ValueError(f"File {pass_file} does not exist")
+            self._validate_required_file(pass_file, "Password list")
             if not self.validator.validate_ip_addr(ip):
                 raise ValueError(
                     f"IP {ip} is not valid. Ensure it is a valid IP address"
@@ -575,11 +584,8 @@ class InteractionHandler:
                 raise ValueError(
                     "For Generate mode, --crack, --output and --dump are required"
                 )
-            if not (
-                    self.validator.isfile_and_exists(hashes)
-                    and self.validator.isfile_and_exists(dump)
-            ):
-                raise ValueError(f"File {hashes} or {dump} does not exist")
+            self._validate_required_file(hashes, "Cracked hashes")
+            self._validate_required_file(dump, "NTDS dump")
             print(
                 f"\n[-] Generating Password List from {hashes} and {dump} files")
             return {

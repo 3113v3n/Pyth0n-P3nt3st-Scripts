@@ -95,12 +95,13 @@ class UserHandler(FileHandler, Config, ScreenHandler):
         input_text = (
             "[-] Would you like to start ? [ "
             f"{self.OKGREEN}yes{self.ENDC} | {self.WARNING}no{self.ENDC} ] "
+            f"(default: {self.OKGREEN}yes{self.ENDC}) "
         )
         valid_options = {"yes", "y", "no", "n"}
 
         try:
             response = self.validate_user_choice(
-                valid_options, self.get_user_input, input_text
+                valid_options, self.get_user_input, input_text, default="yes"
             )
         except BackToPreviousMenu as error:
             raise BackToMainMenu() from error
@@ -360,7 +361,8 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     safe_mode_choice = self.validate_user_choice(
                         {"yes", "y", "no", "n"},
                         self.get_user_input,
-                        "Enable safe mode (lower-impact external profile)? [yes|no]: ",
+                        "Enable safe mode (lower-impact external profile)? [Y/n]: ",
+                        default="yes",
                     )
                     state["safe_mode"] = safe_mode_choice in {"yes", "y"}
                     if not state["safe_mode"]:
@@ -485,6 +487,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                         state["hashes"] = self.get_file_path(
                             "\n[-] Enter full path to your cracked hashes \n",
                             self.file_exists,
+                            require_file=True,
                         )
                         step += 1
                         continue
@@ -492,6 +495,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                         state["dumps"] = self.get_file_path(
                             "\n[-] Enter full path to your dump [ntds] \n",
                             self.file_exists,
+                            require_file=True,
                         )
                         step += 1
                         continue
@@ -522,6 +526,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                 state["pass_file"] = self.get_file_path(
                     "\n[-] Enter full path to your Password List file \n",
                     self.file_exists,
+                    require_file=True,
                 )
                 result = {
                     "target": state["target"],

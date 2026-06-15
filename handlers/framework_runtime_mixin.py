@@ -24,7 +24,7 @@ class FrameworkRuntimeMixin:
             """Flush any pending input and output."""
             try:
                 termios.tcflush(sys.stdin, termios.TCIFLUSH)
-            except (ImportError, AttributeError):
+            except (ImportError, AttributeError, OSError, termios.error):
                 pass
             finally:
                 sys.stdout.flush()
@@ -39,9 +39,11 @@ class FrameworkRuntimeMixin:
 
                 choice = input(
                     f"\n[*] Would you like to {Bcolors.WARNING}EXIT the program{Bcolors.ENDC} "
-                    f"{Bcolors.BOLD}('y' | 'n') ?{Bcolors.ENDC} "
+                    f"{Bcolors.BOLD}('Y' | 'n', default: Y) ?{Bcolors.ENDC} "
                 )
                 choice = sanitize_dialog_input(choice).lower()
+                if not choice:
+                    return "y"
                 if choice in {"y", "yes", "n", "no"}:
                     return choice
             except EOFError:

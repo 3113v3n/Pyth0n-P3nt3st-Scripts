@@ -9,8 +9,11 @@ Bug fix applied:
 """
 
 import os
+import shutil
+import subprocess
 import time
 from datetime import datetime
+from pathlib import Path
 from ..shared import Commands
 from ..shared.colors import Bcolors
 from .password_output import parse_credentials_from_output
@@ -29,6 +32,11 @@ class CredentialsUtil(Bcolors):
         "STATUS_PASSWORD_EXPIRED",
     ]
     LOGON_SUCCESS_TEXT = ["(Pwn3d!)", "", "(nla:True)"]
+    NXC_SCHEMA_MISMATCH_MARKERS = (
+        "Schema mismatch detected",
+        "newer version of nxc is being run on an old DB schema",
+    )
+    NXC_COMMAND_TIMEOUT_SECONDS = 45
 
     def __init__(self):
         super().__init__()
@@ -43,6 +51,8 @@ class CredentialsUtil(Bcolors):
         self.tested_accounts: dict[str, bool] = {}
         self.output_file = ""
         self.run_command = Commands()
+        self._nxc_schema_mismatch_seen = False
+        self._nxc_env: dict[str, str] | None = None
 
     @staticmethod
     def _open_private_output(path: str, append: bool = True):
@@ -93,6 +103,8 @@ class CredentialsUtil(Bcolors):
         self.domain = domain
         self.output_file = output_file
         self.creds_file = passlist
+        self._nxc_schema_mismatch_seen = False
+        self._nxc_env = self._build_nxc_env(save_dir)
 
         user_pass_list = self.split_pass_file()
         date = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
@@ -110,10 +122,54 @@ class CredentialsUtil(Bcolors):
             return
 
         for username, password in user_pass_list.items():
+            if self._nxc_schema_mismatch_seen:
+                break
             if username in self.tested_accounts:
                 continue
             self.run_nxc(username, password, self.domain, save_dir)
             self.tested_accounts[username] = True
+
+        if self._nxc_schema_mismatch_seen:
+            print(
+                "[!] NetExec SMB database schema mismatch detected. "
+                "Credential testing stopped to avoid repeating the same error."
+            )
+
+    @staticmethod
+    def _build_nxc_env(save_dir: str) -> dict[str, str]:
+        """Use a project-local NetExec home to avoid stale user DB schemas."""
+        base_dir = Path(save_dir) / ".nxc_home"
+        base_dir.mkdir(parents=True, exist_ok=True)
+        xdg_config = base_dir / ".config"
+        xdg_data = base_dir / ".local" / "share"
+        xdg_config.mkdir(parents=True, exist_ok=True)
+        xdg_data.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(base_dir, 0o700)
+        except OSError:
+            pass
+        return {
+            "HOME": str(base_dir.resolve()),
+            "XDG_CONFIG_HOME": str((base_dir / ".config").resolve()),
+            "XDG_DATA_HOME": str((base_dir / ".local" / "share").resolve()),
+        }
+
+    def _is_nxc_schema_mismatch(self, line: str) -> bool:
+        return any(marker in line for marker in self.NXC_SCHEMA_MISMATCH_MARKERS)
+
+    def _reset_nxc_home(self) -> None:
+        """Remove the module-local NetExec home after a schema mismatch."""
+        if not self._nxc_env:
+            return
+        home = self._nxc_env.get("HOME")
+        if not home:
+            return
+        home_path = Path(home)
+        try:
+            if home_path.exists() and ".nxc_home" in home_path.parts:
+                shutil.rmtree(home_path, ignore_errors=True)
+        except OSError:
+            pass
 
     def run_nxc(self, user: str, passwd: str, domain: str, save_dir: str) -> None:
         """Execute a single NetExec credential test and log the result.
@@ -129,11 +185,43 @@ class CredentialsUtil(Bcolors):
         if domain:
             command.extend(["-d", domain])
 
-        process = self.run_command.run_nxc_command(command)
+        env = self._nxc_env or self._build_nxc_env(save_dir)
 
         with self._open_private_output(f"{save_dir}/{self.log_file}", append=True) as logfile:
-            for line in process.stdout:
+            try:
+                completed = self.run_command.run_nxc_command(
+                    command,
+                    env=env,
+                    timeout=self.NXC_COMMAND_TIMEOUT_SECONDS,
+                )
+            except subprocess.TimeoutExpired as error:
+                output = error.stdout or ""
+                if isinstance(output, bytes):
+                    output = output.decode("utf-8", errors="replace")
+                for line in str(output).splitlines():
+                    logfile.write(f"{line}\n")
+                    print(self.format_text_output(line.strip()))
+                message = (
+                    f"[!] nxc timed out after {self.NXC_COMMAND_TIMEOUT_SECONDS}s "
+                    f"for user '{user}' against {self.target}; continuing."
+                )
+                print(message)
+                logfile.write(f"{message}\n")
+                return
+
+            for line in completed.stdout.splitlines():
                 line = line.strip()
+                if self._is_nxc_schema_mismatch(line):
+                    self._nxc_schema_mismatch_seen = True
+                    logfile.write(f"{line}\n")
+                    print(
+                        "[!] NetExec reported an SMB DB schema mismatch. "
+                        "The module-local NetExec home will be reset; retry the "
+                        "password test."
+                    )
+                    self._reset_nxc_home()
+                    break
+
                 formatted_line = self.format_text_output(line)
                 print(formatted_line)
 
@@ -143,9 +231,10 @@ class CredentialsUtil(Bcolors):
 
                 logfile.write(f"{line}\n")
 
-        process.wait()
-        if process.returncode != 0:
-            print(f"[!] nxc exited with error code {process.returncode}")
+        if completed.returncode != 0:
+            if self._nxc_schema_mismatch_seen:
+                return
+            print(f"[!] nxc exited with error code {completed.returncode}")
 
     @staticmethod
     def get_string_from_list(word_list: list, sentence: str) -> bool:

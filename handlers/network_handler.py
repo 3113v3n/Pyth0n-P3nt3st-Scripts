@@ -9,7 +9,7 @@ import signal
 import sys
 import threading
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from tqdm import tqdm
 
@@ -65,6 +65,7 @@ class NetworkHandler(FileHandler, Commands):
         self.current_scan_session: dict | None = None
         self.last_scanned_ip: str | None = None
         self.resume_scanned_ips: set[str] = set()
+        self._shutdown_notice_displayed = False
 
     def reset_state(self) -> None:
         """Reset instance state to defaults between runs."""
@@ -86,6 +87,7 @@ class NetworkHandler(FileHandler, Commands):
         self.current_scan_session = None
         self.last_scanned_ip = None
         self.resume_scanned_ips = set()
+        self._shutdown_notice_displayed = False
 
     @classmethod
     def reset_class_states(cls):
@@ -108,6 +110,7 @@ class NetworkHandler(FileHandler, Commands):
         cls.current_scan_session = None
         cls.last_scanned_ip = None
         cls.resume_scanned_ips = set()
+        cls._shutdown_notice_displayed = False
 
     def initialize_network_variables(self, variables, test_domain, progress_bar):
         """Initialize scan variables from user/domain input."""
@@ -272,14 +275,26 @@ class NetworkHandler(FileHandler, Commands):
         if mode == "resume":
             self._load_resume_scanned_ips(output_file)
 
+        def display_shutdown_notice() -> None:
+            if self._shutdown_notice_displayed:
+                return
+            self._shutdown_notice_displayed = True
+            try:
+                stdscr.addstr(4, 0, "Shutting down... cancelling pending hosts")
+                stdscr.refresh()
+            except curses.error:
+                pass
+
+        previous_sigint_handler = signal.getsignal(signal.SIGINT)
+
         def signal_handler(sig, frame):
             self.shutdown_event.set()
-            stdscr.addstr(4, 0, "Shutting down...")
-            stdscr.refresh()
-            curses.napms(250)
 
         signal.signal(signal.SIGINT, signal_handler)
 
+        executor: ThreadPoolExecutor | None = None
+        futures: dict = {}
+        interrupted = False
         try:
             self.mode = mode
             total = (
@@ -303,28 +318,44 @@ class NetworkHandler(FileHandler, Commands):
             )
             self.monitor_thread.start()
 
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                with tqdm(total=total, desc="Scanning", file=sys.stdout, leave=False) as pbar:
-                    for ip_batch in self.generate_ip_in_batches():
+            executor = ThreadPoolExecutor(max_workers=max_workers)
+            with tqdm(total=total, desc="Scanning", file=sys.stdout, leave=False) as pbar:
+                for ip_batch in self.generate_ip_in_batches():
+                    if self.shutdown_event.is_set():
+                        interrupted = True
+                        display_shutdown_notice()
+                        break
+
+                    futures = {
+                        executor.submit(
+                            self.set_progressbar,
+                            mode,
+                            output_file,
+                            ip,
+                            stdscr,
+                        ): ip
+                        for ip in ip_batch
+                    }
+                    pending = set(futures)
+
+                    while pending:
                         if self.shutdown_event.is_set():
+                            interrupted = True
+                            display_shutdown_notice()
+                            for future in pending:
+                                future.cancel()
                             break
 
-                        futures = {
-                            executor.submit(
-                                self.set_progressbar,
-                                mode,
-                                output_file,
-                                ip,
-                                stdscr,
-                            ): ip
-                            for ip in ip_batch
-                        }
+                        done, pending = wait(
+                            pending,
+                            timeout=0.2,
+                            return_when=FIRST_COMPLETED,
+                        )
+                        if not done:
+                            continue
 
-                        for _ in as_completed(futures):
-                            if self.shutdown_event.is_set():
-                                break
-
-                            ip = futures[_]
+                        for future in done:
+                            ip = futures[future]
                             self.last_scanned_ip = ip
                             processed += 1
                             if self.current_scan_session and self.session_store:
@@ -346,8 +377,11 @@ class NetworkHandler(FileHandler, Commands):
                                     pbar.update(delta)
                                     committed_progress = processed
 
-                    if processed > committed_progress:
-                        pbar.update(processed - committed_progress)
+                    if interrupted:
+                        break
+
+                if processed > committed_progress:
+                    pbar.update(processed - committed_progress)
 
             self.scan_complete = not self.shutdown_event.is_set()
         except Exception as error:
@@ -356,7 +390,17 @@ class NetworkHandler(FileHandler, Commands):
             curses.napms(1000)
             self.scan_complete = False
         finally:
-            print("Final cleanup...")
+            signal.signal(signal.SIGINT, previous_sigint_handler)
+            if executor is not None:
+                for future in futures:
+                    future.cancel()
+                executor.shutdown(
+                    wait=True,
+                    cancel_futures=True,
+                )
+            if self.shutdown_event.is_set():
+                display_shutdown_notice()
+                curses.napms(250)
             self.shutdown_event.set()
             if self.monitor_thread:
                 self.monitor_thread.join(timeout=2)
@@ -421,6 +465,8 @@ class NetworkHandler(FileHandler, Commands):
 
         try:
             is_alive = self.start_async_ping(ip)
+            if self.shutdown_event.is_set():
+                return
             with self.lock:
                 self.progress_bar.update_ips(
                     filename,
@@ -454,15 +500,35 @@ class NetworkHandler(FileHandler, Commands):
     def monitor_interface(self, stdscr):
         """Stop scan if interface drops or changes IP during execution."""
         while not self.shutdown_event.is_set():
-            if not is_interface_active(self.interface, self.initial_interface_ip):
+            try:
+                active = is_interface_active(self.interface, self.initial_interface_ip)
+            except Exception as error:
                 with self.lock:
                     if stdscr:
-                        stdscr.addstr(
-                            5,
-                            0,
-                            f"Interface {self.interface} dropped or changed. Stopping scan.",
-                        )
-                        stdscr.refresh()
+                        try:
+                            stdscr.addstr(
+                                5,
+                                0,
+                                f"Interface monitor failed. Stopping scan: {error}",
+                            )
+                            stdscr.refresh()
+                        except curses.error:
+                            pass
+                    self.shutdown_event.set()
+                break
+
+            if not active:
+                with self.lock:
+                    if stdscr:
+                        try:
+                            stdscr.addstr(
+                                5,
+                                0,
+                                f"Interface {self.interface} dropped or changed. Stopping scan.",
+                            )
+                            stdscr.refresh()
+                        except curses.error:
+                            pass
                     self.shutdown_event.set()
                 break
             self.shutdown_event.wait(INTERFACE_POLL_INTERVAL_SECONDS)

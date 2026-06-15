@@ -35,11 +35,13 @@ class FrameworkAssessmentMixin:
                 "Navigation: back=previous | main=Menu 1 | Ctrl+C=cancel prompt"
             )
             choice = input(
-                f"[?] Allow temporary relaxed mode for '{phase}' only? [y/N]: "
+                f"[?] Allow temporary relaxed mode for '{phase}' only? [Y/n]: "
             )
             choice = sanitize_dialog_input(choice).lower()
         except (EOFError, KeyboardInterrupt):
             return False
+        if not choice:
+            return True
         return choice in {"y", "yes"}
 
     def _run_with_strict_fallback(self, phase: str, runner: callable):

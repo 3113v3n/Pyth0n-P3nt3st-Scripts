@@ -418,25 +418,32 @@ class Commands:
         return self._execute_shell_string(command, **kwargs)
 
     @staticmethod
-    def run_nxc_command(cmd: list[str]) -> subprocess.Popen:
-        """Stream output from NetExec (nxc) using a list-form command.
+    def run_nxc_command(
+        cmd: list[str],
+        env: dict | None = None,
+        timeout: float | None = None,
+    ) -> subprocess.CompletedProcess:
+        """Run NetExec (nxc) using a list-form command.
 
         Args:
             cmd: nxc command as a list, e.g. ["nxc", "smb", "10.0.0.1", ...].
+            env: Optional environment overrides for the child process.
+            timeout: Optional process timeout in seconds.
 
         Returns:
-            Popen instance with stdout available for line-by-line reading.
+            CompletedProcess with combined stdout/stderr.
         """
         # [Security] List form — no shell expansion.
         Commands._guard_command_policy(cmd)
-        env = Commands._with_project_tmp_env()
-        return subprocess.Popen(
+        env = Commands._with_project_tmp_env(env)
+        return subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             shell=False,
             text=True,
             env=env,
+            timeout=timeout,
         )
 
     @staticmethod
@@ -522,8 +529,10 @@ class Commands:
             True if host is reachable, False otherwise.
         """
         # [Security] Host is a list element — no shell injection possible.
-        param = "-n" if platform.system().lower() == "windows" else "-c"
-        command = ["ping", param, "1", host]
+        if platform.system().lower() == "windows":
+            command = ["ping", "-n", "1", "-w", "1000", host]
+        else:
+            command = ["ping", "-c", "1", "-W", "1", host]
         try:
             subprocess.run(
                 command,
@@ -531,9 +540,10 @@ class Commands:
                 stderr=subprocess.DEVNULL,
                 check=True,
                 shell=False,
+                timeout=2,
             )
             return True
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return False
         except Exception as error:
             print(error)
