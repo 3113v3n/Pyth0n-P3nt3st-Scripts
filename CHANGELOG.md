@@ -18,6 +18,10 @@ All notable project changes should be recorded in this file.
 - Updated Rapid7 formatting to filter actionable findings by severity or CVSS score when available and sort by severity.
 - Made VA reporting scanner-aware so shared summary and executive rollups work across Nessus and Rapid7.
 - Fixed CLI VA scanner propagation so the selected scanner is passed into the analysis handler.
+- Updated vulnerable dependency pins flagged by dependency audit:
+  - `idna` from `3.11` to `3.15`.
+  - `pyarrow` from `19.0.1` to `23.0.1`.
+  - `urllib3` from `2.6.3` to `2.7.0`.
 
 ### Validation
 - Verified module compilation with `python -m py_compile` across touched VA and handler modules.
