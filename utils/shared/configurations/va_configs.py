@@ -7,6 +7,7 @@ class VAConfigs:
 
     def __init__(self):
         self._compiled_patterns = {
+            "cvss_network": self._compile_regex(self.CVSS_NETWORK_VECTOR),
             "ssl": self._compile_regex(self.SSL_FILTER_STRINGS),
             "software": self._compile_regex(self.UPGRADE_FILTER_STRINGS),
             "reboot": self._compile_regex(self.REBOOT_FILTER_STRINGS),
@@ -32,6 +33,7 @@ class VAConfigs:
         return re.compile(string_pattern)
 
     NESSUS_HEADERS = [
+        "Plugin ID",
         "CVE",
         "Risk",
         "Host",
@@ -43,6 +45,23 @@ class VAConfigs:
         "Solution",
         "See Also",
         "Plugin Output",
+    ]
+    NESSUS_OPTIONAL_HEADERS = [
+        "CVSS Vector",
+        "CVSS3 Vector",
+        "CVSS4 Vector",
+        "CVSS v2.0 Vector",
+        "CVSS v3.0 Vector",
+        "CVSS v4.0 Vector",
+        "CVSS v2.0 Base Score",
+        "CVSS v3.0 Base Score",
+    ]
+    EXECUTIVE_SUMMARY_HEADERS = [
+        "S.No",
+        "Issue Discovered",
+        "Affected IPs",
+        "Plugin IDs Grouped",
+        "Finding Rows",
     ]
     SUMMARY_SHEET_HEADERS = [
         "S.No",
@@ -58,18 +77,21 @@ class VAConfigs:
     RAPID7_HEADERS = [
         "Vulnerability Title",
         "Asset Names",
-        "Custom Tag",
         "Asset IP Address",
+        "Service Name",
+        "Service Port",
+        "Vulnerability Description",
+        "Vulnerability CVSS Score",
+        "Vulnerability Solution",
+    ]
+    RAPID7_OPTIONAL_HEADERS = [
+        "Custom Tag",
         "Asset Alternate IPv4 Addresses",
         "Asset OS Name",
         "Asset OS Family",
-        "Service Name",
         "Asset OS Version",
-        "Service Port",
-        "Vulnerability Description",
         "Vulnerability CVE IDs",
-        "Vulnerability CVSS Score",
-        "Vulnerability Solution",
+        "Vulnerability CVSSv3 Score",
         "Exploit Count",
         "Exploit URLs",
         "Malware Kit Count",
@@ -90,9 +112,9 @@ class VAConfigs:
 
     NESSUS_VULN_CATEGORIES = {
         
+        "Remote Code Execution": "rce_condition",
         "Missing Patches": "missing_patch_condition",
         "Unsupported Software": "unsupported_software_condition",
-        "Remote Code Execution": "rce_condition",
         "SSL Misconfigurations": "ssl_condition",
         "Insecure Service": "insecure_condition",
         "WinVerifyTrust": "winverify_condition",
@@ -113,11 +135,15 @@ class VAConfigs:
     }
     RAPID7_VULN_CATEGORIES = {
         
+        "Remote Code Execution": "rce_condition",
         "Missing Patches": "missing_patch_condition",
         "Unsupported Software": "unsupported_software_condition",
+        "RDP Misconfig": "rdp_condition",
         "Database Misconfigurations": "database_condition",
         "SSL Misconfigurations": "ssl_condition",
         "SSH Misconfig": "ssh_condition",
+        "Information Disclosure": "information_condition",
+        "Windows Update Reboot": "reboot_condition",
         "Web Application Issues": "web_condition",
         "Compliance": "compliance_condition",
     }
@@ -141,6 +167,7 @@ class VAConfigs:
     WEB_IGNORE_FILTER = "TLS|SSL"
     RISK_RATING_STRINGS = "Critical|High|Medium"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
+    CVSS_NETWORK_VECTOR = r"(?:CVSS:\d(?:\.\d)?/[^\s),;]*AV:N(?:/|$)|(?:^|[\s,;])AV:N/)"
     RCE_STRING = (
         r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b|"
         r"\b[Rr]emote [Cc]ommand [Ee]xecution\b|"
@@ -150,6 +177,7 @@ class VAConfigs:
         r"\b[Aa]rbitrary [Cc]ode [Ee]xecution\b|"
         r"\b[Cc]ode [Ee]xecution [Vv]ulnerability\b|"
         r"\b[Aa]rbitrary [Cc]ode can be executed on the remote host\b|"
+        r"\b[Aa] (?:unauthenticated )?[Rr]emote attacker .* execute\b|"
         r"\b[Aa]n (?:unauthenticated )?[Rr]emote attacker .* execute\b|"
         r"\b[Cc]an be exploited remotely\b|"
         r"\b[Rr]emotely exploitable\b"
@@ -187,12 +215,19 @@ class VAConfigs:
             "description": "Description",
             "synopsis": "Synopsis",
             "risk": "Risk",
+            "host": "Host",
         },
         "rapid": {
             "title": "Vulnerability Title",
             "solution": "Vulnerability Solution",
+            "description": "Vulnerability Description",
             "service": "Service Name",
             "pci_status": "Vulnerability PCI Compliance Status",
+            "host": "Asset IP Address",
+            "cvss_score": "Vulnerability CVSS Score",
+            "cvss_v3_score": "Vulnerability CVSSv3 Score",
+            "severity": "Vulnerability Severity Level",
+            "exploit_count": "Exploit Count",
         },
     }
     HEADLINE = f"\n{color.HEADER}[*]INFO[*]{color.ENDC}\n"
