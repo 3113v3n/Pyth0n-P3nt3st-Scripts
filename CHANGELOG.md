@@ -2,6 +2,28 @@
 
 All notable project changes should be recorded in this file.
 
+## 2026-06-15
+
+### Added
+- Added a VA commit runbook covering pre-commit review, focused staging, changelog updates, verification, and push steps.
+- Added a Nessus executive summary sheet with plugin-level rollups for affected IP counts, grouped plugin IDs, and finding rows.
+- Added Nessus `CVSS Vector` output normalization so reports include a stable vector column even when source exports use CVSS variant headers.
+- Added Rapid7 support for both full exports and slimmer report exports through required core columns plus optional export fields.
+- Added Rapid7 VA categories for remote code execution, RDP misconfiguration, information disclosure, and reboot findings.
+- Added CLI and interactive VA credentialed/uncredentialed selection, defaulting to credentialed checks.
+
+### Changed
+- Improved VA scan ingestion by reading only required and scanner-specific optional columns for CSV and Excel inputs.
+- Improved VA filtering performance by caching repeated regex masks during category resolution.
+- Updated Rapid7 formatting to filter actionable findings by severity or CVSS score when available and sort by severity.
+- Made VA reporting scanner-aware so shared summary and executive rollups work across Nessus and Rapid7.
+- Fixed CLI VA scanner propagation so the selected scanner is passed into the analysis handler.
+
+### Validation
+- Verified module compilation with `python -m py_compile` across touched VA and handler modules.
+- Verified Nessus and Rapid7 smoke paths, including credentialed and uncredentialed Nessus execution.
+- Verified Rapid7 report writing with the bundled CSV sample.
+
 ## 2026-05-26
 
 ### Added
