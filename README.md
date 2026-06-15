@@ -25,6 +25,8 @@ By default, the script starts in interactive mode. In non-interactive environmen
 python3 main.py -M cli_args <module> [options]
 ```
 
+![Interactive start screen](images/docs/script_start.png)
+
 ## First-Run Bootstrap
 
 On first run, if `.venv` does not exist, the framework:
@@ -75,30 +77,16 @@ See [SECURITY.md](SECURITY.md) and [docs/commit_runbook.md](docs/commit_runbook.
 | `password` | Complete | Password list generation from cracked hashes and NTDS dumps; credential testing via NetExec |
 | `external` | Complete | Recon, probing, screenshots, takeover checks, historical URLs, nuclei, and nmap phases |
 
-## Screenshots
-
-The screenshots below were regenerated from current command output and sample files in `test-data/`.
-
-![Internal CLI options](images/docs/internal_cli.png)
-
-![Vulnerability analysis CLI options](images/docs/va_cli.png)
-
-![Rapid7 sample analysis](images/docs/va_rapid7_sample.png)
-
-![Mobile CLI options](images/docs/mobile_cli.png)
-
-![Password CLI options](images/docs/password_cli.png)
-
-![Password sample generation](images/docs/password_generate_sample.png)
-
-![External CLI options](images/docs/external_cli.png)
-
 ## Internal Penetration Testing
 
 The internal module enumerates hosts in a target CIDR and writes two CSV artifacts:
 
 - live hosts
 - unresponsive hosts for later resume
+
+![Internal CLI options](images/docs/internal_cli.png)
+
+![Internal mode selection](images/docs/internal_mode_selection.png)
 
 ### Scan
 
@@ -109,6 +97,10 @@ python main.py -M cli_args internal \
   --ip 10.0.0.3/24 \
   -o internal_scan
 ```
+
+![Internal scan start](images/docs/internal_scan_start.png)
+
+![Internal scan result](images/docs/internal_scan_result.png)
 
 ### Resume
 
@@ -140,6 +132,10 @@ Current report behavior:
 - Supports credentialed and uncredentialed Nessus processing
 - Builds an executive summary sheet before detailed category sheets
 - Produces category sheets such as RCE, missing patches, unsupported software, SSL/SSH/web issues, compliance, and unfiltered findings
+
+![Vulnerability analysis CLI options](images/docs/va_cli.png)
+
+![VA Scanner Selection](images/docs/va_scanner_selection.png)
 
 ### Nessus
 
@@ -173,6 +169,8 @@ python main.py -M cli_args va \
 
 The Rapid7 path supports both the bundled `Vulnerability_Scan_Output.csv` and `Kingdom Bank Credentialed Scans for in-scope servers.xlsx` sample formats.
 
+![VA scan output](images/docs/va_scan_result.png)
+
 ## Mobile Penetration Testing
 
 The mobile module performs static analysis on APK/IPA files.
@@ -185,6 +183,10 @@ It can identify:
 - base64 payloads
 - obfuscated Android string-resource references
 - optional MASVS/MASTG taxonomy mappings
+
+![Mobile CLI options](images/docs/mobile_cli.png)
+
+![Mobile Interactive options](images/docs/mobile_summary.png)
 
 Scan one app:
 
@@ -206,6 +208,10 @@ Decompiled/extracted app folders are retained under `.tmp/mobile-extraction/` fo
 
 ## Password Operations
 
+![Password CLI options](images/docs/password_cli.png)
+
+![Password UI helper](images/docs/password_module_helper.png)
+
 Generate a password list from cracked hashes and an NTDS dump:
 
 ```sh
@@ -216,6 +222,12 @@ python main.py -M cli_args password \
   -o generated_passwords
 ```
 
+![Password generation run](images/docs/password_generated.png)
+
+![Password generation result](images/docs/password_generate_sample.png)
+
+![Generated password list sample](images/docs/password_list_sample.png)
+
 Test credentials against a target over SMB via NetExec:
 
 ```sh
@@ -225,6 +237,8 @@ python main.py -M cli_args password \
   --domain example.local \
   --pass_file output_directory/Password/generated_passwords.txt
 ```
+
+![Password credential test](images/docs/password_test.png)
 
 ## External Penetration Testing
 
@@ -239,6 +253,8 @@ The external module chains these phases:
 | 5 | `urls` | gauplus, waybackurls | historical and sensitive URL lists |
 | 6 | `vulns` | nuclei | nuclei findings |
 | 7 | `ports` | nmap | nmap output |
+
+![External CLI options](images/docs/external_cli.png)
 
 Run every phase:
 
