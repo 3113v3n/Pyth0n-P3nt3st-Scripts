@@ -107,12 +107,10 @@ python main.py -M cli_args internal \
 ```sh
 python main.py -M cli_args internal \
   -a resume \
-  -I eth0 \
-  -r output_directory/Internal/internal_scan_unresponsive_hosts.csv \
-  -m 24
+  -r output_directory/Internal/internal_scan_unresponsive_hosts.csv
 ```
 
-Resume mode sorts the unresponsive IP list, identifies the last saved IP, and continues from there. Session metadata is stored under `output_directory/Internal/.scan_state/` to support safer continuation.
+Resume mode uses saved scan-session metadata to recover the subnet and matching active interface automatically, so normal CLI resume does not require `-I/--interface` or `-m/--mask`. Session metadata is stored under `output_directory/Internal/.scan_state/` to support safer continuation. Legacy unresponsive-host files without metadata can still be resumed by passing `-I/--interface` and `-m/--mask`.
 
 ## Vulnerability Analysis
 

@@ -48,8 +48,8 @@ This is a custom CLI tool for Penetration Testing.
                 --ip                 IP_CIDR            : Ip address to scan in format (10.0.0.0/24)
             <resume>
                 -r, --resume_file    FILE               : File with unresponsive hosts
-                -m, --mask           MASK               : Subnet mask used for previous scan
-        -I, --interface              INTERFACE          : The network interface to use on the scan (eth0,wlan0)
+                -m, --mask           MASK               : Legacy-only subnet mask when no saved scan metadata exists
+        -I, --interface              INTERFACE          : Required for scan; optional for metadata-backed resume
 
     {self.color.OKCYAN}[mobile]{self.color.ENDC}
         -P, --path                   FILE/FOLDER        : Path to mobile app file (apk|ipa) or directory with apps
@@ -99,7 +99,8 @@ This is a custom CLI tool for Penetration Testing.
             Scan:
                 main.py -M cli_args internal -a scan  -I eth0 --ip 10.10.10.2/24 -o scan_results.txt
             Resume:
-                main.py -M cli_args internal -a resume -I eth0  -r unresponsive_hosts.txt -m 24
+                main.py -M cli_args internal -a resume -r output_directory/Internal/scan_results_unresponsive_hosts.csv
+                main.py -M cli_args internal -a resume -I eth0 -r legacy_unresponsive_hosts.txt -m 24
         
         3.{self.color.WARNING}Password:{self.color.ENDC}
             test:

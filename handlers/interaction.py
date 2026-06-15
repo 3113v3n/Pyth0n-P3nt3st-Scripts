@@ -364,7 +364,10 @@ class InteractionHandler:
 
         interface_kwargs = {
             "required": False,
-            "help": interface_help,
+            "help": (
+                f"{interface_help}. Required for scan mode. Optional for resume mode; "
+                "saved scan metadata is used when available."
+            ),
         }
         if interface_choices:
             interface_kwargs["choices"] = interface_choices
@@ -384,14 +387,20 @@ class InteractionHandler:
             "-r",
             "--resume_file",
             dest="resume",
-            help="File with unresponsive hosts - required for resume",
+            help=(
+                "File with unresponsive hosts - required for resume. "
+                "When saved scan metadata exists, --interface and --mask are not required."
+            ),
         )
         mode_group.add_argument(
             "-m",
             "--mask",
             type=int,
             choices=range(1, 33),
-            help="Subnet mask used for previous scan (0-32) - required for resume",
+            help=(
+                "Subnet mask used for legacy resume files without saved metadata "
+                "(0-32). Not required for normal metadata-backed resume."
+            ),
         )
 
     # Handlers for each module
@@ -654,7 +663,9 @@ class InteractionHandler:
                         "Resume blocked: no similar active interface detected for "
                         f"{os.path.basename(resume_file)}."
                     )
-                print(matched_interface)
+                print("\n[-] Resume metadata loaded from saved scan session")
+                print(f"[-] Using interface: {matched_interface}")
+                print(f"[-] Using subnet: {subnet}")
                 print(
                     f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} "
                     f"using saved subnet {subnet}"
@@ -669,8 +680,10 @@ class InteractionHandler:
 
             if not (interface and mask):
                 raise ValueError(
-                    "No saved session metadata found. Provide --interface and --mask "
-                    "for legacy resume mode."
+                    "No saved session metadata found for this resume file. "
+                    "Normal CLI resume does not require --interface or --mask when "
+                    "the unresponsive-host file was created by a metadata-backed scan. "
+                    "For legacy files only, provide --interface and --mask."
                 )
 
             print(
