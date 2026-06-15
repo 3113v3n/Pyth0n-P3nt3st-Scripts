@@ -76,6 +76,8 @@ This is a custom CLI tool for Penetration Testing.
         -s, --scanner               SCANNER             : Scanner used for analysis e.g( nessus | rapid )
         -o, --output                FILE                : Output file for your Vulnerability analysis report
         -P, --path                  FOLDER              : Path to your scanned files
+            --credentialed-check                       : Enforce credentialed-host filtering (default)
+            --uncredentialed-check                     : Analyze without credentialed-host filtering
 
     {self.color.OKCYAN}[external]{self.color.ENDC}
         -d, --domain                DOMAIN              : Target domain (e.g., example.com)
@@ -107,6 +109,7 @@ This is a custom CLI tool for Penetration Testing.
         
         4.{self.color.WARNING}Vulnerability Analysis:{self.color.ENDC}
                 main.py -M cli_args va -s nessus -o report.txt -P /path/to/scanned-files
+                main.py -M cli_args va -s nessus -o report.txt -P /path/to/scanned-files --uncredentialed-check
 
         5.{self.color.WARNING}External:{self.color.ENDC}
                 main.py -M cli_args external -d example.com

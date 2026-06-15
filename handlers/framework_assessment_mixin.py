@@ -135,8 +135,10 @@ class FrameworkAssessmentMixin:
             if kwargs.get("user_data"):
                 _vars = kwargs.get("user_data")
                 test_domain: str = _vars["module"]
+                scanner_type = _vars.get("scanner", scanner_type)
                 output_file: str = _vars["output_file"]
                 all_files = _vars["scan_files"]
+                credentialed_check = bool(_vars.get("credentialed_check", True))
 
                 if not all_files:
                     raise ValueError("No files found in the specified scan folder")
@@ -146,8 +148,12 @@ class FrameworkAssessmentMixin:
                 input_files = user.domain_variables.get("input_file")
                 test_domain = user.domain
                 output_file = user.domain_variables.get("output")
+                credentialed_check = bool(
+                    user.domain_variables.get("credentialed_check", True)
+                )
 
             vulnerability_analysis.set_scanner(scanner_type)
+            vulnerability_analysis.skip_credential_check = not credentialed_check
             vulnerability_analysis.analyze_scan_files(
                 test_domain,
                 input_files,

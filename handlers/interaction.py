@@ -260,6 +260,20 @@ class InteractionHandler:
         parser.add_argument(
             "-P", "--path", required=True, type=str, help="Path to your scanned files"
         )
+        credential_group = parser.add_mutually_exclusive_group()
+        credential_group.add_argument(
+            "--credentialed-check",
+            dest="credentialed_check",
+            action="store_true",
+            default=True,
+            help="Run VA analysis as a credentialed check (default).",
+        )
+        credential_group.add_argument(
+            "--uncredentialed-check",
+            dest="credentialed_check",
+            action="store_false",
+            help="Run VA analysis without enforcing Nessus credentialed-host filtering.",
+        )
 
     @staticmethod
     def _add_password_arguments(subparsers):
@@ -498,6 +512,7 @@ class InteractionHandler:
         scanner = args.scanner
         path = args.path
         file = args.output
+        credentialed_check = bool(getattr(args, "credentialed_check", True))
         print(f"\n[-] Running {scanner.title()} Vulnerability Analysis ")
 
         if not self.validator.check_folder_exists(path):
@@ -515,8 +530,10 @@ class InteractionHandler:
             file_collection, extension="both")
 
         return {"module": module,
+                "scanner": scanner,
                 "output_file": file,
-                "scan_files": valid_files}
+                "scan_files": valid_files,
+                "credentialed_check": credentialed_check}
 
     def handle_password_arguments(self, args, module):
         """Handle Password arguments"""

@@ -239,6 +239,19 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     continue
 
                 if step == 1:
+                    credential_choice = self.prompt_format(
+                        "\nRun as credentialed check? [Y/n] "
+                    ).strip()
+                    if not credential_choice:
+                        credential_choice = "y"
+                    if credential_choice not in {"y", "yes", "n", "no"}:
+                        self.print_warning_message("Invalid choice. Please enter 'y' or 'n'.")
+                        continue
+                    state["credentialed_check"] = credential_choice in {"y", "yes"}
+                    step += 1
+                    continue
+
+                if step == 2:
                     file_format_index = self.create_menu_selection(
                         menu_selection=f" \n {self.WARNING} Select the file "
                         f"format of the Scanned File(s):{self.ENDC} \n",
@@ -255,7 +268,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     step += 1
                     continue
 
-                if step == 2:
+                if step == 3:
                     state["search_dir"] = self.get_file_path(
                         "\nEnter Location Where your Scan files are located \n",
                         self.check_folder_exists,
@@ -263,7 +276,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     step += 1
                     continue
 
-                if step == 3:
+                if step == 4:
                     files_tuple = self.display_files_onscreen(
                         state["search_dir"],
                         self.display_saved_files,
@@ -284,6 +297,7 @@ class UserHandler(FileHandler, Config, ScreenHandler):
                     "input_file": state["input_file"],
                     "output": state["output"],
                     "scanner": state["scanner"],
+                    "credentialed_check": state.get("credentialed_check", True),
                 }
                 self.domain_variables = result
                 return result
