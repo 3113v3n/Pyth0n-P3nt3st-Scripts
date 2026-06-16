@@ -8,6 +8,7 @@ class VAConfigs:
     def __init__(self):
         self._compiled_patterns = {
             "cvss_network": self._compile_regex(self.CVSS_NETWORK_VECTOR),
+            "cvss3_network": self._compile_regex(self.CVSS3_NETWORK_VECTOR),
             "ssl": self._compile_regex(self.SSL_FILTER_STRINGS),
             "software": self._compile_regex(self.UPGRADE_FILTER_STRINGS),
             "reboot": self._compile_regex(self.REBOOT_FILTER_STRINGS),
@@ -168,6 +169,11 @@ class VAConfigs:
     RISK_RATING_STRINGS = "Critical|High|Medium"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     CVSS_NETWORK_VECTOR = r"(?:CVSS:\d(?:\.\d)?/[^\s),;]*AV:N(?:/|$)|(?:^|[\s,;])AV:N/)"
+    CVSS3_NETWORK_VECTOR = r"(?:CVSS:3(?:\.\d)?/[^\s),;]*AV:N(?:/|$)|(?:^|[\s,;])AV:N/)"
+    CVSS3_VECTOR_COLUMNS = [
+        "CVSS3 Vector",
+        "CVSS v3.0 Vector",
+    ]
     RCE_STRING = (
         r"\b[Rr]emote [Cc]ode [Ee]xecution\b|\b[Rr][Cc][Ee]\b|"
         r"\b[Rr]emote [Cc]ommand [Ee]xecution\b|"
