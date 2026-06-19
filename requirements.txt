@@ -32,6 +32,7 @@ netifaces2==0.0.22      # Handle network interfaces
 numpy==2.0.1; python_version < "3.13"   # For numerical operations
 numpy==2.1.0; python_version >= "3.13"
 openpyxl==3.1.5         # For Excel file handling
+opentui==0.1.2          # Modern terminal UI for interactive workflows
 packaging==26.0
 pandas==2.2.2; python_version < "3.13"  # For data manipulation
 pandas==2.2.3; python_version >= "3.13"

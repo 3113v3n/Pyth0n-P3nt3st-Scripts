@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Create virtual environment
+        run: python -m venv .venv
+
+      - name: Install project and dev dependencies
+        run: |
+          .venv/bin/python -m pip install --upgrade pip setuptools wheel
+          .venv/bin/python -m pip install -r requirements.txt
+          .venv/bin/python -m pip install pytest ruff
+
+      - name: Compile Python sources
+        run: .venv/bin/python -m compileall -q .
+
+      - name: Run focused Ruff checks
+        run: |
+          .venv/bin/ruff check \
+            handlers/file_selection_mixin.py \
+            handlers/argument_validation.py \
+            handlers/framework_assessment_mixin.py \
+            handlers/opentui_menu.py \
+            handlers/interaction.py \
+            handlers/screen.py \
+            domains/password_module.py \
+            domains/vulnerability_module.py \
+            handlers/user_flow_mixin.py \
+            handlers/user_handler.py \
+            utils/shared/errors.py \
+            tests
+
+      - name: Run test suite
+        run: .venv/bin/python -m pytest -q

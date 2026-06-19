@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sys
 
-from handlers.navigation import sanitize_dialog_input
+from handlers.navigation import BackToMainMenu, BackToPreviousMenu, sanitize_dialog_input
 from utils.shared.commands import Commands, StrictModeViolation
+from utils.shared.errors import VulnerabilityAnalysisError
 
 
 class FrameworkAssessmentMixin:
@@ -30,15 +31,42 @@ class FrameworkAssessmentMixin:
             return False
 
         self.print_warning_message(str(error))
+        prompt_owner = self if hasattr(self, "prompt_for_choice") else None
+        if prompt_owner is None:
+            user_handler = getattr(self, "classes", {}).get("user") if hasattr(self, "classes") else None
+            if hasattr(user_handler, "prompt_for_choice"):
+                prompt_owner = user_handler
         try:
             self.print_info_message(
                 "Navigation: back=previous | main=Menu 1 | Ctrl+C=cancel prompt"
             )
-            choice = input(
-                f"[?] Allow temporary relaxed mode for '{phase}' only? [Y/n]: "
-            )
-            choice = sanitize_dialog_input(choice).lower()
-        except (EOFError, KeyboardInterrupt):
+            if prompt_owner is not None:
+                choice = getattr(prompt_owner, "prompt_for_choice")(
+                    title="Strict Mode",
+                    prompt=f"Allow temporary relaxed mode for '{phase}' only?",
+                    choices=[
+                        {
+                            "value": "yes",
+                            "label": "Allow Temporary Relaxation",
+                            "description": "Retry just this blocked phase with temporary relaxed mode.",
+                            "aliases": ("y",),
+                        },
+                        {
+                            "value": "no",
+                            "label": "Keep Strict Mode",
+                            "description": "Do not retry; keep current strict-project enforcement.",
+                            "aliases": ("n",),
+                        },
+                    ],
+                    default="yes",
+                    footer="↑/↓ or j/k navigate • Enter confirms • Esc keeps strict mode",
+                )
+            else:
+                choice = input(
+                    f"[?] Allow temporary relaxed mode for '{phase}' only? [Y/n]: "
+                )
+                choice = sanitize_dialog_input(choice).lower()
+        except (BackToMainMenu, BackToPreviousMenu, EOFError, KeyboardInterrupt):
             return False
         if not choice:
             return True
@@ -167,9 +195,15 @@ class FrameworkAssessmentMixin:
             return True
         except StrictModeViolation:
             raise
-        except Exception as error:
+        except VulnerabilityAnalysisError as error:
             self.print_error_message(
                 message="Error in vulnerability assessment",
+                exception_error=error,
+            )
+            return False
+        except Exception as error:
+            self.print_error_message(
+                message="Unexpected vulnerability assessment error",
                 exception_error=error,
             )
             return False

@@ -10,14 +10,25 @@ else:  # pragma: no cover - runtime capability
     except Exception:
         pass
 
-import shutil
-import textwrap
 import os
 import re
+import shutil
+import textwrap
+from collections.abc import Callable
+
+from utils.shared.loader import Loader
 
 from .messages import DisplayHandler
-from .navigation import check_navigation_command, sanitize_dialog_input
-from utils.shared.loader import Loader
+from .navigation import BackToPreviousMenu, check_navigation_command, sanitize_dialog_input
+from .opentui_menu import (
+    build_menu_options,
+    ensure_opentui_menu_enabled,
+    run_opentui_menu,
+    run_opentui_multi_select,
+    run_opentui_progress_display,
+    run_opentui_text_input,
+    run_opentui_text_viewer,
+)
 
 
 class ScreenHandler(DisplayHandler):
@@ -27,6 +38,7 @@ class ScreenHandler(DisplayHandler):
     _nav_hint_visible = False
     _lines_since_nav_hint = 10**9
     _ansi_escape_re = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    _output_transcript: list[str] = []
 
     def __init__(self):
         super().__init__()
@@ -56,6 +68,12 @@ class ScreenHandler(DisplayHandler):
     def note_output_rendered(cls, text_or_line_count: str | int) -> None:
         """Track approximate output line usage to infer hint visibility."""
         state_cls = ScreenHandler
+        if isinstance(text_or_line_count, str):
+            sanitized = state_cls._ansi_escape_re.sub("", str(text_or_line_count or "")).strip()
+            if sanitized:
+                state_cls._output_transcript.append(sanitized)
+                if len(state_cls._output_transcript) > 400:
+                    state_cls._output_transcript = state_cls._output_transcript[-400:]
         if not state_cls._nav_hint_visible:
             return
         if isinstance(text_or_line_count, int):
@@ -68,6 +86,16 @@ class ScreenHandler(DisplayHandler):
         viewport_rows = max(6, state_cls._terminal_size().lines)
         if state_cls._lines_since_nav_hint >= max(2, viewport_rows - 2):
             state_cls._nav_hint_visible = False
+
+    @classmethod
+    def clear_output_transcript(cls) -> None:
+        ScreenHandler._output_transcript = []
+
+    @classmethod
+    def consume_output_transcript(cls) -> str:
+        transcript = "\n\n".join(ScreenHandler._output_transcript).strip()
+        ScreenHandler._output_transcript = []
+        return transcript
 
     @classmethod
     def note_screen_cleared(cls) -> None:
@@ -95,19 +123,34 @@ class ScreenHandler(DisplayHandler):
             start_color: str,
             end_color: str,
             **kwargs):
-        print(menu_selection)
-        ScreenHandler.note_output_rendered(menu_selection)
-        for option in options:
-            # Ensure both scanner menu and file extension are sorted for
-            display_option = option["name"] if "scanner" in kwargs else option.upper(
-            )
-            option_line = (
-                f" {start_color}[{options.index(option) + 1}]{end_color}"
-                f" {display_option}"
-            )
-            print(option_line)
-            ScreenHandler.note_output_rendered(option_line)
-        return check_range_function(f"\n {check_range_string}", options)
+        if not options:
+            raise ValueError("create_menu_selection requires at least one option")
+        ensure_opentui_menu_enabled(context="interactive menu selection")
+        tui_options = build_menu_options(
+            list(options),
+            label_getter=lambda option, _index: (
+                option["name"] if "scanner" in kwargs else str(option).upper()
+            ),
+            value_getter=lambda _option, index: index,
+            description_getter=lambda option, _index: (
+                option.get("alias", "") if "scanner" in kwargs else ""
+            ),
+            badge_getter=lambda _option, index: str(index + 1),
+            meta_getter=lambda option, _index: (
+                f"Scanner alias: {option.get('alias', '')}" if "scanner" in kwargs else ""
+            ),
+        )
+        selected = run_opentui_menu(
+            title="Selection",
+            prompt=sanitize_dialog_input(menu_selection) or check_range_string,
+            options=tui_options,
+            footer="↑/↓ or j/k navigate • number keys jump • Enter selects • Esc goes back",
+            subtitle="Choose an item from the active workflow with a richer OpenTUI selector",
+            cancel_raises=BackToPreviousMenu,
+        )
+        if selected is None:
+            raise RuntimeError("OpenTUI selection ended without a choice")
+        return int(selected.value)
 
     @staticmethod
     def show_loader(
@@ -134,6 +177,46 @@ class ScreenHandler(DisplayHandler):
         #     return loader  # return loader only for continuous loading
 
         return None
+
+    @staticmethod
+    def show_text_viewer(
+        *,
+        title: str,
+        prompt: str,
+        body: str,
+        subtitle: str = "",
+        footer: str = "↑/↓ or j/k scroll • PgUp/PgDn page • Enter/Esc close",
+    ) -> None:
+        ensure_opentui_menu_enabled(context=f"the '{title}' helper viewer")
+        run_opentui_text_viewer(
+            title=title,
+            prompt=prompt,
+            body=body,
+            subtitle=subtitle,
+            footer=footer,
+        )
+
+    @staticmethod
+    def show_progress_viewer(
+        *,
+        title: str,
+        prompt: str,
+        subtitle: str,
+        snapshot_getter: Callable[[], dict],
+        worker: Callable[[], object],
+        footer: str = "Esc/q requests a graceful stop • final results open after completion",
+        cancel: Callable[[], object] | None = None,
+    ) -> dict:
+        ensure_opentui_menu_enabled(context=f"the '{title}' progress viewer")
+        return run_opentui_progress_display(
+            title=title,
+            prompt=prompt,
+            subtitle=subtitle,
+            snapshot_getter=snapshot_getter,
+            worker=worker,
+            footer=footer,
+            cancel=cancel,
+        )
 
     def get_file_path(
         self,
@@ -184,48 +267,140 @@ class ScreenHandler(DisplayHandler):
                 continue
             return user_input
 
-    def prompt_format(self, prompt, **kwargs):
-        decorator = "..." * 30
-        dotted_lines = f"{self.MUTED}{decorator}{self.ENDC}"
+    def prompt_for_choice(
+            self,
+            *,
+            title: str,
+            prompt: str,
+            choices: list[dict],
+            default: str | None = None,
+            footer: str = "↑/↓ or j/k navigate • number keys jump • Enter selects • Esc goes back",
+    ) -> str:
+        """Return a canonical value for a small fixed set of keyword choices."""
+        if not choices:
+            raise ValueError("prompt_for_choice requires at least one choice")
 
-        def not_lower():
-            while True:
-                self.show_navigation_hint()
-                raw_input = input(prompt)
-                self.note_output_rendered(prompt)
-                self.note_output_rendered(raw_input)
-                user_input = sanitize_dialog_input(raw_input)
-                # Ignore raw arrow-key escape sequences when readline is unavailable.
-                if not user_input and str(raw_input).startswith("\x1b"):
-                    print(dotted_lines)
-                    self.note_output_rendered(dotted_lines)
-                    continue
-                check_navigation_command(user_input)
-                print(dotted_lines)
-                self.note_output_rendered(dotted_lines)
-                return user_input
+        aliases_to_value: dict[str, str] = {}
+        option_records: list[dict[str, str]] = []
+
+        for index, choice in enumerate(choices, start=1):
+            value = str(choice["value"]).strip().lower()
+            label = str(choice.get("label", value)).strip()
+            description = str(choice.get("description", "")).strip()
+            aliases = {value}
+            aliases.update(
+                str(alias).strip().lower() for alias in choice.get("aliases", ()) if str(alias).strip()
+            )
+            for alias in aliases:
+                aliases_to_value[alias] = value
+            option_records.append(
+                {
+                    "value": value,
+                    "label": label,
+                    "description": description,
+                    "badge": str(choice.get("badge", index)),
+                }
+            )
+
+        ensure_opentui_menu_enabled(context=f"the '{title}' choice prompt")
+        tui_options = build_menu_options(
+            option_records,
+            label_getter=lambda option, _index: option["label"],
+            value_getter=lambda option, _index: option["value"],
+            description_getter=lambda option, _index: option["description"],
+            badge_getter=lambda option, _index: option["badge"],
+            meta_getter=lambda option, _index: f"Keyword: {option['value']}",
+        )
+        selected = run_opentui_menu(
+            title=title,
+            prompt=sanitize_dialog_input(prompt) or prompt,
+            options=tui_options,
+            footer=footer,
+            subtitle="Use the selector to review descriptions before committing to a branch in the workflow",
+            cancel_raises=BackToPreviousMenu,
+        )
+        if selected is None:
+            raise RuntimeError(f"OpenTUI prompt '{title}' ended without a selection")
+        return aliases_to_value[str(selected.value).strip().lower()]
+
+    def prompt_for_multi_choice(
+            self,
+            *,
+            title: str,
+            prompt: str,
+            choices: list[dict],
+            default_values: tuple[str, ...] = (),
+            footer: str = "↑/↓ move • Space toggle • a select all • Enter confirm • Esc goes back",
+    ) -> tuple[str, ...]:
+        """Return canonical values for a multi-select choice set."""
+        if not choices:
+            raise ValueError("prompt_for_multi_choice requires at least one choice")
+
+        option_records: list[dict[str, str]] = []
+        for index, choice in enumerate(choices, start=1):
+            option_records.append(
+                {
+                    "value": str(choice["value"]).strip().lower(),
+                    "label": str(choice.get("label", choice["value"])).strip(),
+                    "description": str(choice.get("description", "")).strip(),
+                    "badge": str(choice.get("badge", index)),
+                    "meta": str(choice.get("meta", "")).strip(),
+                }
+            )
+
+        ensure_opentui_menu_enabled(context=f"the '{title}' multi-select prompt")
+        tui_options = build_menu_options(
+            option_records,
+            label_getter=lambda option, _index: option["label"],
+            value_getter=lambda option, _index: option["value"],
+            description_getter=lambda option, _index: option["description"],
+            badge_getter=lambda option, _index: option["badge"],
+            meta_getter=lambda option, _index: option["meta"],
+        )
+        selected = run_opentui_multi_select(
+            title=title,
+            prompt=sanitize_dialog_input(prompt) or prompt,
+            options=tui_options,
+            selected_values=tuple(str(value).strip().lower() for value in default_values if str(value).strip()),
+            footer=footer,
+            subtitle="Toggle multiple workflow phases before continuing with the execution plan",
+            cancel_raises=BackToPreviousMenu,
+        )
+        if selected is None:
+            raise RuntimeError(f"OpenTUI multi-select '{title}' ended without a selection")
+        return tuple(str(value).strip().lower() for value in selected)
+
+    def prompt_format(self, prompt, **kwargs):
+        prompt_text = sanitize_dialog_input(prompt) or str(prompt or "")
+        ensure_opentui_menu_enabled(context=f"the prompt '{prompt_text[:32] or 'input'}'")
+
+        title = "Input"
+        subtitle = "Capture freeform text for the active workflow step."
+        preserve_case = False
+        footer = "Type to edit • ←/→ move • Enter submit • Esc go back"
 
         if kwargs.get('path'):
-            return not_lower()
+            title = "Path Input"
+            subtitle = "Enter a filesystem path for the current workflow step."
+            preserve_case = True
+        elif kwargs.get('filename'):
+            title = "Filename Input"
+            subtitle = "Enter an output filename for the current workflow step."
+            preserve_case = True
 
-        if kwargs.get('filename'):
-            return not_lower()
+        user_input = run_opentui_text_input(
+            title=title,
+            prompt=prompt_text,
+            subtitle=subtitle,
+            footer=footer,
+            cancel_raises=BackToPreviousMenu,
+        )
+        if user_input is None:
+            raise RuntimeError(f"OpenTUI prompt '{title}' ended without input")
 
-        while True:
-            self.show_navigation_hint()
-            raw_input = input(prompt)
-            self.note_output_rendered(prompt)
-            self.note_output_rendered(raw_input)
-            sanitized = sanitize_dialog_input(raw_input)
-            if not sanitized and str(raw_input).startswith("\x1b"):
-                print(dotted_lines)
-                self.note_output_rendered(dotted_lines)
-                continue
-            check_navigation_command(sanitized)
-            user_input = sanitized.lower()
-            print(dotted_lines)
-            self.note_output_rendered(dotted_lines)
-            return user_input
+        sanitized = sanitize_dialog_input(user_input)
+        check_navigation_command(sanitized)
+        return sanitized if preserve_case else sanitized.lower()
 
     def validate_user_choice(
             self,

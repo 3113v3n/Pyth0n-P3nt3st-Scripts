@@ -9,12 +9,19 @@ called directly at the two call sites instead.
 """
 
 import os
-from pathlib import Path
 from argparse import RawTextHelpFormatter
+from pathlib import Path
 
-from utils.internal.scan_session import ScanSessionStore
-from utils.shared.validators import Validator
+from handlers.argument_validation import (
+    normalize_domain,
+    parse_phase_selection,
+    require_regular_file,
+    resolve_safe_operator_tag,
+)
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
+from utils.internal.scan_session import ScanSessionStore
+from utils.shared.errors import ModuleArgumentError
+from utils.shared.validators import Validator
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -128,7 +135,6 @@ class InteractionHandler:
         if _mode == "interactive":
             # Run Script with user interaction
             self.argument_mode = False
-            print("Running in interactive mode...")
             return
         elif _mode == "cli_args":
             # Module is required in arguments mode
@@ -408,12 +414,7 @@ class InteractionHandler:
     @staticmethod
     def _validate_required_file(path: str, label: str) -> None:
         """Validate that a module argument points to a regular file."""
-        candidate = Path(path)
-        if candidate.is_file():
-            return
-        if candidate.is_dir():
-            raise ValueError(f"{label} must be a file, not a directory: {path}")
-        raise ValueError(f"{label} file does not exist: {path}")
+        require_regular_file(path, label)
 
     def handle_mobile_arguments(self, args, module):
         """Handle Mobile arguments"""
@@ -494,25 +495,24 @@ class InteractionHandler:
         """Handle External arguments"""
         from utils.external.external_constants import DEFAULT_PHASES, SAFE_OPERATOR_TAG_DEFAULT
 
-        domain = args.domain.replace("https://", "").replace("http://", "").strip("/")
+        domain = normalize_domain(args.domain)
         if not self.validator.validate_domain(domain):
-            raise ValueError(
+            raise ModuleArgumentError(
                 f"Domain {args.domain} is not valid. Ensure it is a valid domain name"
             )
 
-        requested_phases = tuple(
-            phase.strip().lower() for phase in (args.phases or "").split(",") if phase.strip()
-        ) or DEFAULT_PHASES
-        unknown = [phase for phase in requested_phases if phase not in DEFAULT_PHASES]
-        if unknown:
-            raise ValueError(
-                f"Unknown phase(s): {unknown}. Valid phases: {', '.join(DEFAULT_PHASES)}"
-            )
+        requested_phases = parse_phase_selection(
+            raw_phases=args.phases,
+            default_phases=DEFAULT_PHASES,
+            valid_phases=DEFAULT_PHASES,
+        )
 
         safe_mode = bool(getattr(args, "safe_mode", False))
-        operator_tag = str(getattr(args, "operator_tag", "") or "").strip()
-        if safe_mode and not operator_tag:
-            operator_tag = SAFE_OPERATOR_TAG_DEFAULT
+        operator_tag = resolve_safe_operator_tag(
+            safe_mode=safe_mode,
+            operator_tag=getattr(args, "operator_tag", ""),
+            default_tag=SAFE_OPERATOR_TAG_DEFAULT,
+        )
 
         print(
             f"\n[-] Running External Assessment on {domain} domain "

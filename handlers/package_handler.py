@@ -10,7 +10,6 @@ It also provides first-run virtualenv bootstrapping for the project.
 
 from __future__ import annotations
 
-import hashlib
 import os
 import platform
 import shutil
@@ -20,9 +19,33 @@ from collections import defaultdict
 from importlib import metadata
 from pathlib import Path
 from typing import Dict, List
-from urllib.parse import urlparse
 
 from handlers.messages import DisplayHandler
+from handlers.package_bootstrap import (
+    install_requirements_into_venv,
+    is_running_in_project_venv,
+    requirements_hash,
+    requirements_stamp_matches,
+    requirements_stamp_path,
+    resolve_bootstrap_paths,
+    write_requirements_stamp,
+)
+from handlers.package_downloads import build_download_action, validate_download_url
+from handlers.package_env import (
+    build_tool_install_env,
+    ensure_tools_dirs,
+    prepend_paths_to_env,
+)
+from handlers.package_paths import (
+    build_search_path,
+    is_macos_system_ruby_path,
+    resolve_tools_root,
+)
+from handlers.package_runtime_tools import (
+    homebrew_ruby_bin_dirs,
+    pipx_command,
+    preferred_gem_executable,
+)
 from utils.shared import Commands, Config
 
 
@@ -261,14 +284,18 @@ class PackageHandler(Config, DisplayHandler, Commands):
         if os.environ.get("PENTEST_SKIP_VENV_BOOTSTRAP") == "1":
             return True
 
-        root = Path(project_root or Path(__file__).resolve().parents[1]).resolve()
-        venv_dir = root / venv_name
-        venv_python = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        req_file = root / requirements_file
+        paths = resolve_bootstrap_paths(
+            project_root=project_root or Path(__file__).resolve().parents[1],
+            venv_name=venv_name,
+            requirements_file=requirements_file,
+            os_name=os.name,
+        )
+        venv_dir = paths.venv_dir
+        venv_python = paths.venv_python
+        req_file = paths.requirements_file
 
         try:
-            current_prefix = Path(sys.prefix).resolve()
-            in_project_venv = current_prefix == venv_dir or venv_dir in current_prefix.parents
+            in_project_venv = is_running_in_project_venv(sys.prefix, venv_dir)
         except Exception:
             in_project_venv = False
 
@@ -308,29 +335,19 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     @classmethod
     def _requirements_hash(cls, requirements_file: Path) -> str:
-        return hashlib.sha256(requirements_file.read_bytes()).hexdigest()
+        return requirements_hash(requirements_file)
 
     @classmethod
     def _requirements_stamp_path(cls, venv_dir: Path) -> Path:
-        return venv_dir / cls._REQ_STAMP_FILE
+        return requirements_stamp_path(venv_dir, cls._REQ_STAMP_FILE)
 
     @classmethod
     def _requirements_stamp_matches(cls, venv_dir: Path, requirements_file: Path) -> bool:
-        if not requirements_file.exists():
-            return True
-        stamp_file = cls._requirements_stamp_path(venv_dir)
-        if not stamp_file.exists():
-            return False
-        try:
-            recorded_hash = stamp_file.read_text(encoding="utf-8").strip()
-        except OSError:
-            return False
-        return recorded_hash == cls._requirements_hash(requirements_file)
+        return requirements_stamp_matches(venv_dir, requirements_file, cls._REQ_STAMP_FILE)
 
     @classmethod
     def _write_requirements_stamp(cls, venv_dir: Path, requirements_file: Path) -> None:
-        stamp_file = cls._requirements_stamp_path(venv_dir)
-        stamp_file.write_text(f"{cls._requirements_hash(requirements_file)}\n", encoding="utf-8")
+        write_requirements_stamp(venv_dir, requirements_file, cls._REQ_STAMP_FILE)
 
     @classmethod
     def _install_requirements_into_venv(
@@ -339,11 +356,12 @@ class PackageHandler(Config, DisplayHandler, Commands):
         requirements_file: Path,
         venv_dir: Path,
     ) -> None:
-        subprocess.run(
-            [str(venv_python), "-m", "pip", "install", "-r", str(requirements_file)],
-            check=True,
+        install_requirements_into_venv(
+            venv_python,
+            requirements_file,
+            venv_dir,
+            cls._REQ_STAMP_FILE,
         )
-        cls._write_requirements_stamp(venv_dir, requirements_file)
 
     def _detect_os_family(self) -> str:
         if self.operating_system == "linux":
@@ -398,7 +416,6 @@ class PackageHandler(Config, DisplayHandler, Commands):
             return True
 
     def _build_search_path(self) -> str:
-        path_entries = os.environ.get("PATH", "").split(os.pathsep)
         extras = [
             str(Path(sys.executable).resolve().parent),
             str(self._tools_bin_dir()),
@@ -408,16 +425,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
             str(Path.home() / "go" / "bin"),
             str(Path.home() / "AppData" / "Roaming" / "Python" / "Scripts"),
         ]
-
-        merged: list[str] = []
-        seen = set()
-        for entry in [*path_entries, *extras]:
-            cleaned = str(entry).strip()
-            if not cleaned or cleaned in seen:
-                continue
-            seen.add(cleaned)
-            merged.append(cleaned)
-        return os.pathsep.join(merged)
+        return build_search_path(os.environ.get("PATH", ""), extras)
 
     # ------------------------------------------------------------------
     # Project-local tool directory (avoids sudo / SIP issues on macOS)
@@ -425,7 +433,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     def _resolve_tools_root(self) -> Path:
         """Return <repo>/tools/. Created lazily before installs run."""
-        return Path(__file__).resolve().parents[1] / self._TOOLS_DIR_NAME
+        return resolve_tools_root(Path(__file__).resolve().parents[1], self._TOOLS_DIR_NAME)
 
     def _tools_bin_dir(self) -> Path:
         return self.tools_root / "bin"
@@ -436,74 +444,35 @@ class PackageHandler(Config, DisplayHandler, Commands):
         macOS ships an old system Ruby whose SDK headers can be incomplete for
         native extensions. Homebrew's Ruby is preferred for gem-based tools.
         """
-        if self.os_family != "macos":
-            return []
-
-        dirs: list[str] = []
-        try:
-            brew = shutil.which("brew")
-            if brew:
-                result = self.execute_command([brew, "--prefix", "ruby"], timeout=5)
-                if result.returncode == 0:
-                    prefix = result.stdout.strip()
-                    if prefix:
-                        dirs.append(str(Path(prefix) / "bin"))
-        except Exception:
-            pass
-
-        dirs.extend([
-            "/opt/homebrew/opt/ruby/bin",
-            "/usr/local/opt/ruby/bin",
-        ])
-        return dirs
+        return homebrew_ruby_bin_dirs(
+            os_family=self.os_family,
+            which_fn=shutil.which,
+            execute_command=self.execute_command,
+        )
 
     @staticmethod
     def _is_macos_system_ruby_path(path: str | None) -> bool:
-        if not path:
-            return False
-        resolved = str(Path(path).resolve())
-        return resolved.startswith("/usr/bin/") or resolved.startswith("/System/Library/Frameworks/Ruby.framework/")
+        return is_macos_system_ruby_path(path)
 
     def _preferred_gem_executable(self) -> str | None:
         """Return a usable gem executable, preferring Homebrew Ruby on macOS."""
-        candidates: list[str] = []
-
-        configured = os.environ.get("PENTEST_GEM")
-        if configured:
-            candidates.append(configured)
-
-        if self.os_family == "macos":
-            for bin_dir in self._homebrew_ruby_bin_dirs():
-                candidates.append(str(Path(bin_dir) / "gem"))
-
-        resolved = shutil.which("gem", path=self._search_path)
-        if resolved:
-            candidates.append(resolved)
-
-        seen: set[str] = set()
-        for candidate in candidates:
-            if not candidate or candidate in seen:
-                continue
-            seen.add(candidate)
-            if self.os_family == "macos" and self._is_macos_system_ruby_path(candidate):
-                continue
-            try:
-                result = self.execute_command([candidate, "--version"], timeout=5)
-            except Exception:
-                continue
-            if result.returncode == 0:
-                return candidate
-
-        if self.os_family != "macos":
-            return resolved
-        return None
+        return preferred_gem_executable(
+            os_family=self.os_family,
+            search_path=self._search_path,
+            configured_gem=os.environ.get("PENTEST_GEM"),
+            ruby_bin_dirs=self._homebrew_ruby_bin_dirs(),
+            which_fn=shutil.which,
+            execute_command=self.execute_command,
+            is_system_ruby_path=self._is_macos_system_ruby_path,
+        )
 
     def _pipx_command(self) -> list[str]:
         """Return a pipx invocation that works before and after bootstrap."""
-        resolved = shutil.which("pipx", path=self._search_path)
-        if resolved:
-            return [resolved]
-        return [sys.executable, "-m", "pipx"]
+        return pipx_command(
+            search_path=self._search_path,
+            sys_executable=sys.executable,
+            which_fn=shutil.which,
+        )
 
     def _pipx_available(self) -> bool:
         try:
@@ -526,7 +495,8 @@ class PackageHandler(Config, DisplayHandler, Commands):
             *self._MACPORTS_BIN_DIRS,
             *self._homebrew_ruby_bin_dirs(),
         ]
-        self._prepend_paths_to_env(bin_paths)
+        updated_env = prepend_paths_to_env(dict(os.environ), bin_paths)
+        os.environ["PATH"] = updated_env["PATH"]
 
         gems_dir = str(self.tools_root / "gems")
         os.environ.setdefault("GEM_HOME", gems_dir)
@@ -536,36 +506,21 @@ class PackageHandler(Config, DisplayHandler, Commands):
 
     @staticmethod
     def _prepend_paths_to_env(paths: list[str]) -> None:
-        current = os.environ.get("PATH", "")
-        path_entries = current.split(os.pathsep) if current else []
-        for bin_path in reversed(paths):
-            if bin_path and bin_path not in path_entries:
-                path_entries.insert(0, bin_path)
-        os.environ["PATH"] = os.pathsep.join(path_entries)
+        updated_env = prepend_paths_to_env(dict(os.environ), paths)
+        os.environ["PATH"] = updated_env["PATH"]
 
     def _ensure_tools_dirs(self) -> None:
         """Create the per-toolchain subdirectories. Called before installs."""
-        for sub in self._TOOLS_SUBDIRS:
-            (self.tools_root / sub).mkdir(parents=True, exist_ok=True)
+        ensure_tools_dirs(self.tools_root, self._TOOLS_SUBDIRS)
 
     def _tool_install_env(self) -> dict[str, str]:
         """Env vars that redirect go/gem/pipx installs into ``<repo>/tools/``."""
-        env = os.environ.copy()
-        bin_dir = str(self._tools_bin_dir())
-        gems_dir = str(self.tools_root / "gems")
-        env["GOBIN"] = bin_dir
-        env["GOPATH"] = str(self.tools_root / "go")
-        env["GEM_HOME"] = gems_dir
-        env["GEM_PATH"] = gems_dir
-        env["PIPX_HOME"] = str(self.tools_root / "pipx")
-        env["PIPX_BIN_DIR"] = bin_dir
-        # Make sure bindir is on PATH for any post-install hook (e.g. pipx ensurepath).
-        env["PATH"] = os.pathsep.join([
-            bin_dir,
-            *self._homebrew_ruby_bin_dirs(),
-            env.get("PATH", ""),
-        ])
-        return env
+        return build_tool_install_env(
+            base_env=os.environ.copy(),
+            tools_root=self.tools_root,
+            bin_dir=self._tools_bin_dir(),
+            ruby_bin_dirs=self._homebrew_ruby_bin_dirs(),
+        )
 
     def _direct_download_url(self, tool_name: str) -> str | None:
         """Resolve a prebuilt-binary download URL for ``tool_name``.
@@ -637,14 +592,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
     @classmethod
     def _validate_download_url(cls, url: str) -> str:
         """Allow only trusted HTTPS download locations for binary artifacts."""
-        parsed = urlparse(url)
-        if parsed.scheme.lower() != "https":
-            raise ValueError(f"Blocked non-HTTPS download URL: {url}")
-
-        hostname = (parsed.hostname or "").lower()
-        if hostname not in cls._ALLOWED_DOWNLOAD_HOSTS:
-            raise ValueError(f"Blocked untrusted download host: {hostname or 'unknown'}")
-        return url
+        return validate_download_url(url, cls._ALLOWED_DOWNLOAD_HOSTS)
 
     def _build_download_action(self, tool_name: str, url: str) -> Dict[str, object]:
         """Return an action that fetches a prebuilt binary into ``tools/bin/``.
@@ -653,48 +601,15 @@ class PackageHandler(Config, DisplayHandler, Commands):
         download when available; always uses Python's ``zipfile`` for extraction
         so there is no dependency on a system ``unzip``.
         """
-        if Path(tool_name).name != tool_name or any(part in tool_name for part in ("/", "\\")):
-            raise ValueError(f"Invalid tool name for download action: {tool_name}")
-
-        safe_url = self._validate_download_url(url)
-        dest_path = self._tools_bin_dir() / tool_name
-        if dest_path.exists() and dest_path.is_symlink():
-            raise ValueError(f"Refusing to overwrite symlink destination: {dest_path}")
-        dest = str(dest_path)
-        is_zip = urlparse(safe_url).path.lower().endswith(".zip")
-
-        if is_zip:
-            # Single Python call: download zip into a temp file, extract the
-            # binary (matched by name), place it in tools/bin/, then clean up.
-            extract_script = (
-                "import os, tempfile, urllib.request, zipfile; "
-                "tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.zip'); "
-                "tmp_path = tmp.name; tmp.close(); "
-                f"urllib.request.urlretrieve({safe_url!r}, tmp_path); "
-                "z = zipfile.ZipFile(tmp_path); "
-                f"members = [m for m in z.namelist() if os.path.basename(m).split('.')[0] == {tool_name!r}]; "
-                "if not members: raise RuntimeError('No matching binary asset in archive'); "
-                "data = z.open(members[0]).read(); "
-                f"open({dest!r}, 'wb').write(data); "
-                f"os.chmod({dest!r}, 0o755); "
-                "z.close(); "
-                "os.unlink(tmp_path)"
-            )
-            commands: list[list[str]] = [[sys.executable, "-c", extract_script]]
-        elif shutil.which("curl"):
-            commands = [
-                ["curl", "--proto", "=https", "--tlsv1.2", "-fsSL", "--output", dest, safe_url],
-                ["chmod", "+x", dest],
-            ]
-        else:
-            # Pure-Python fallback for bare binaries when curl is absent.
-            commands = [
-                [
-                    sys.executable, "-c",
-                    f"import urllib.request, os; urllib.request.urlretrieve({safe_url!r}, {dest!r}); os.chmod({dest!r}, 0o755)",
-                ]
-            ]
-        return self._action(f"download:{tool_name}", commands, [tool_name])
+        return build_download_action(
+            tool_name=tool_name,
+            url=url,
+            tools_bin_dir=self._tools_bin_dir(),
+            sys_executable=sys.executable,
+            validate_url=self._validate_download_url,
+            curl_available=bool(shutil.which("curl")),
+            action_builder=self._action,
+        )
 
     def _system_install_env(self, package_manager: str | None = None) -> dict[str, str]:
         """Env vars for non-language system package managers."""

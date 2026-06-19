@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from handlers.navigation import check_navigation_command, sanitize_dialog_input
+from handlers.navigation import BackToPreviousMenu, sanitize_dialog_input
+from handlers.opentui_menu import build_menu_options, ensure_opentui_menu_enabled, run_opentui_menu
 
 
 class FileSelectionMixin:
@@ -42,7 +43,6 @@ class FileSelectionMixin:
         if len(self.files) == 1:
             return self._auto_select_single_file(**kwargs)
 
-        self._display_file_options()
         return self._handle_analysis(**kwargs)
 
     def _get_filtered_files(self, **kwargs) -> list:
@@ -114,9 +114,8 @@ class FileSelectionMixin:
         return filtered_files
 
     def _display_file_options(self):
-        """Display available file options to user."""
-        for index, file in enumerate(self.files, 1):
-            self.print_selection_items(file, index)
+        """Backward-compatible no-op: selection details are rendered in OpenTUI."""
+        return list(self.files)
 
     def _handle_analysis(self, **kwargs):
         """Route selection flow to the correct analysis action."""
@@ -165,30 +164,37 @@ class FileSelectionMixin:
 
     def index_out_of_range_display(self, input_str, data_list) -> int:
         """Prompt for a numeric selection and return its 0-based index."""
-        while True:
-            try:
-                if hasattr(self, "show_navigation_hint"):
-                    self.show_navigation_hint()
-                raw_value = input(f"\n{input_str}")
-                sanitized = sanitize_dialog_input(raw_value)
-                if not sanitized and str(raw_value).startswith("\x1b"):
-                    continue
-                check_navigation_command(sanitized)
-                selected_value = int(sanitized)
-                if 0 < selected_value < len(data_list) + 1:
-                    break
-                self.print_error_message(
-                    "The selected number is out of range."
-                    f" Please enter a valid number between 1 & {len(data_list)}"
-                )
-            except ValueError:
-                self.print_error_message("Invalid input. Please enter a number.")
-        return selected_value - 1
+        if not data_list:
+            raise ValueError("index_out_of_range_display requires at least one selectable item")
+        ensure_opentui_menu_enabled(context="interactive file selection")
+        tui_options = build_menu_options(
+            list(data_list),
+            label_getter=lambda item, _index: (
+                item.get("filename", str(item)) if isinstance(item, dict) else str(item)
+            ),
+            value_getter=lambda _item, index: index,
+            description_getter=lambda item, _index: (
+                item.get("full_path", "") if isinstance(item, dict) else ""
+            ),
+            badge_getter=lambda _item, index: str(index + 1),
+            meta_getter=lambda item, _index: (
+                f"Path selector • {item.get('filename', '')}" if isinstance(item, dict) else ""
+            ),
+        )
+        selected = run_opentui_menu(
+            title="Select an item",
+            prompt=sanitize_dialog_input(input_str),
+            options=tui_options,
+            footer="↑/↓ or j/k navigate • number keys jump • Enter selects • Esc goes back",
+            subtitle="Review filenames and paths before choosing an artifact to analyze",
+            cancel_raises=BackToPreviousMenu,
+        )
+        if selected is None:
+            raise RuntimeError("OpenTUI file selection ended without a choice")
+        return int(selected.value)
 
     def select_and_analyze_file(self, to_analyze: str = "") -> tuple | str | None:
         """Prompt user to choose an item and return the scan context."""
-        print(f"\n{self.INFO}Analyzing {to_analyze}...{self.ENDC}")
-
         if not self.files:
             self.print_error_message("No files available for selection.")
             return None

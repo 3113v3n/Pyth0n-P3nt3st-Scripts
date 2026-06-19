@@ -21,6 +21,12 @@ python3 main.py
 
 By default, the script starts in interactive mode. In non-interactive environments such as CI, cron, pipes, or redirected stdin, use `-M cli_args`.
 
+Interactive mode now prefers an OpenTUI-powered menu/selection experience when the terminal supports it. To force the classic prompt-based interface, disable it for a run with:
+
+```sh
+export PENTEST_USE_OPENTUI=0
+```
+
 ```sh
 python3 main.py -M cli_args <module> [options]
 ```

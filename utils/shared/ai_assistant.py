@@ -28,7 +28,6 @@ from __future__ import annotations
 import importlib
 import os
 import textwrap
-from typing import Optional
 
 try:
     import pandas as pd
@@ -54,22 +53,23 @@ class PentestAI:
     def __init__(self, model: str = DEFAULT_MODEL) -> None:
         self.model = model
         self._client = None
+        self.startup_notice: tuple[str, str] | None = None
 
         try:
             anthropic_module = importlib.import_module("anthropic")
         except ImportError:
-            print(
-                "[AI] anthropic package not installed. "
-                "Run `pip install anthropic` to enable AI features."
+            self.startup_notice = (
+                "warning",
+                "[AI] anthropic package not installed. Run `pip install anthropic` to enable AI features.",
             )
             self.enabled = False
             return
 
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
-            print(
-                "[AI] ANTHROPIC_API_KEY environment variable not set. "
-                "AI features are disabled. Export the key to enable them."
+            self.startup_notice = (
+                "warning",
+                "[AI] ANTHROPIC_API_KEY environment variable not set. AI features are disabled. Export the key to enable them.",
             )
             self.enabled = False
             return

@@ -8,11 +8,17 @@ from importlib import import_module
 
 
 _EXPORTS = {
+    "AssessmentError": (".errors", "AssessmentError"),
     "Bcolors": (".colors", "Bcolors"),
     "Commands": (".commands", "Commands"),
     "Config": (".config", "Config"),
+    "DomainError": (".errors", "DomainError"),
     "ProgressBar": (".progress_bar", "ProgressBar"),
+    "MissingRequiredFileError": (".errors", "MissingRequiredFileError"),
+    "ModuleArgumentError": (".errors", "ModuleArgumentError"),
+    "PentestFrameworkError": (".errors", "PentestFrameworkError"),
     "Validator": (".validators", "Validator"),
+    "VulnerabilityAnalysisError": (".errors", "VulnerabilityAnalysisError"),
     "Loader": (".loader", "Loader"),
     "VAConfigs": (".configurations.va_configs", "VAConfigs"),
     "CustomDecorators": (".decorators", "CustomDecorators"),

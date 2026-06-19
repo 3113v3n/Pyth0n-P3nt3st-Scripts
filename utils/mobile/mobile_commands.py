@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
-
-import hashlib
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from handlers import FileHandler, ScreenHandler
 from utils.shared import Commands, Config, CustomDecorators
 
 from .api_key_checks import MobileApiKeyChecksMixin
 from .extraction import MobileExtractionMixin
+from .finding_pipeline_helpers import finalize_mobile_findings
 from .legacy_ops import MobileLegacyOpsMixin
 from .models import Finding
 from .nuclei import MobileNucleiMixin
+from .report_artifact_helpers import build_artifact_paths, write_taxonomy_report
 from .reporting import MobileReportingMixin
+from .scan_aggregation_helpers import aggregate_scan_results
 from .static_scan import MobileStaticScanMixin
+from .summary_helpers import build_reports_map, build_scan_summary, summarize_findings
 
 
 class MobileCommands(
@@ -92,28 +94,24 @@ class MobileCommands(
             risk_findings: list[Finding] = []
             control_findings: list[Finding] = []
 
-            bytes_scanned = 0
-            files_skipped = 0
             self.file_count = 0
 
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 all_files = [path for path in root.rglob("*") if path.is_file()]
                 self.file_count = len(all_files)
                 futures = [executor.submit(self._scan_single_file, path, root) for path in all_files]
-                for future in as_completed(futures):
-                    scanned = future.result()
-                    if scanned["skipped"]:
-                        files_skipped += 1
-                        continue
+                scanned_results = [future.result() for future in as_completed(futures)]
 
-                    bytes_scanned += scanned["bytes_scanned"]
-                    urls.update(scanned["urls"])
-                    ips.update(scanned["ips"])
-                    hardcoded.extend(scanned["hardcoded"])
-                    obfuscated_refs.extend(scanned.get("obfuscated_refs", []))
-                    base64_entries.extend(scanned["base64"])
-                    risk_findings.extend(scanned["risk_findings"])
-                    control_findings.extend(scanned["control_findings"])
+            aggregated = aggregate_scan_results(scanned_results)
+            urls = aggregated["urls"]
+            ips = aggregated["ips"]
+            hardcoded = aggregated["hardcoded"]
+            obfuscated_refs = aggregated["obfuscated_refs"]
+            base64_entries = aggregated["base64_entries"]
+            risk_findings = aggregated["risk_findings"]
+            control_findings = aggregated["control_findings"]
+            bytes_scanned = aggregated["bytes_scanned"]
+            files_skipped = aggregated["files_skipped"]
 
             if platform == "android":
                 m_risks, m_controls = self._scan_android_manifest(root)
@@ -122,30 +120,20 @@ class MobileCommands(
             risk_findings.extend(m_risks)
             control_findings.extend(m_controls)
 
-            hardcoded = self._dedupe_findings(hardcoded)
-            risk_findings = self._dedupe_findings(risk_findings)
-            control_findings = self._dedupe_findings(control_findings)
-
-            api_key_findings, api_key_report_lines = self._assess_discovered_api_keys(hardcoded)
-            if api_key_findings:
-                risk_findings.extend(api_key_findings)
-                risk_findings = self._dedupe_findings(risk_findings)
-
-            has_https_endpoint = any(url.lower().startswith("https://") for url in urls)
-            has_pinning_signal = any(f.category == "pinning" for f in control_findings)
-            if has_https_endpoint and not has_pinning_signal:
-                risk_findings.append(
-                    Finding(
-                        category="pinning",
-                        title="No Certificate Pinning Signal Detected (Heuristic)",
-                        severity="low",
-                        file="global",
-                        evidence="HTTPS endpoints discovered, but no static pinning signal matched.",
-                    )
-                )
-                risk_findings = self._dedupe_findings(risk_findings)
-
-            combined_risk_findings = self._dedupe_findings(risk_findings + hardcoded)
+            finalized = finalize_mobile_findings(
+                hardcoded=hardcoded,
+                risk_findings=risk_findings,
+                control_findings=control_findings,
+                urls=urls,
+                assess_discovered_api_keys=self._assess_discovered_api_keys,
+                dedupe_findings=self._dedupe_findings,
+            )
+            hardcoded = finalized["hardcoded"]
+            risk_findings = finalized["risk_findings"]
+            control_findings = finalized["control_findings"]
+            api_key_findings = finalized["api_key_findings"]
+            api_key_report_lines = finalized["api_key_report_lines"]
+            combined_risk_findings = finalized["combined_risk_findings"]
 
             nuclei_meta = self.scan_with_nuclei(
                 folder_name,
@@ -154,16 +142,17 @@ class MobileCommands(
                 use_cached_results=(extraction_method == "cached"),
             )
 
-            urls_file = Path(f"{basename}_urls.txt")
-            ips_file = Path(f"{basename}_ips.txt")
-            hardcoded_file = Path(f"{basename}_hardcoded.txt")
-            api_key_report_file = Path(f"{basename}_api_key_checklist.txt")
-            base64_file = Path(f"{basename}_base64.txt")
-            obfuscated_map_file = Path(f"{basename}_obfuscated_string_map.txt")
-            risk_file = Path(f"{basename}_integrity_findings.txt")
-            control_file = Path(f"{basename}_integrity_controls.txt")
-            summary_file = Path(f"{basename}_summary.json")
-            taxonomy_file = Path(f"{basename}_masvs_mastg.json")
+            artifact_paths = build_artifact_paths(Path(basename))
+            urls_file = artifact_paths["urls"]
+            ips_file = artifact_paths["ips"]
+            hardcoded_file = artifact_paths["hardcoded"]
+            api_key_report_file = artifact_paths["api_key_checklist"]
+            base64_file = artifact_paths["base64"]
+            obfuscated_map_file = artifact_paths["obfuscated_string_map"]
+            risk_file = artifact_paths["integrity_findings"]
+            control_file = artifact_paths["integrity_controls"]
+            summary_file = artifact_paths["summary"]
+            taxonomy_file = artifact_paths["taxonomy"]
 
             sorted_urls = self._collapse_urls_to_common_bases(urls)
             sorted_ips = sorted(ips, key=lambda x: tuple(int(part) for part in x.split(".")))
@@ -188,75 +177,58 @@ class MobileCommands(
                 taxonomy_profile=self.taxonomy_profile,
                 application=os.path.basename(application),
             )
-            taxonomy_tagged_count = 0
-            if taxonomy_report.get("entries"):
-                taxonomy_file.write_text(
-                    json.dumps(taxonomy_report, indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
-                taxonomy_tagged_count = len(taxonomy_report["entries"])
-            reports = {}
-            if url_count:
-                reports["urls"] = str(urls_file)
-            if ip_count:
-                reports["ips"] = str(ips_file)
-            if hardcoded_count:
-                reports["hardcoded"] = str(hardcoded_file)
-            if api_key_assessment_count:
-                reports["api_key_checklist"] = str(api_key_report_file)
-            if base64_count:
-                reports["base64"] = str(base64_file)
-            if obfuscated_map_count:
-                reports["obfuscated_string_map"] = str(obfuscated_map_file)
-            if risk_count:
-                reports["integrity_findings"] = str(risk_file)
-            if control_count:
-                reports["integrity_controls"] = str(control_file)
-            if taxonomy_tagged_count:
-                reports["masvs_mastg"] = str(taxonomy_file)
+            taxonomy_tagged_count = write_taxonomy_report(taxonomy_file, taxonomy_report)
+            reports = build_reports_map(
+                urls_file=urls_file,
+                ips_file=ips_file,
+                hardcoded_file=hardcoded_file,
+                api_key_report_file=api_key_report_file,
+                base64_file=base64_file,
+                obfuscated_map_file=obfuscated_map_file,
+                risk_file=risk_file,
+                control_file=control_file,
+                taxonomy_file=taxonomy_file,
+                url_count=url_count,
+                ip_count=ip_count,
+                hardcoded_count=hardcoded_count,
+                api_key_assessment_count=api_key_assessment_count,
+                base64_count=base64_count,
+                obfuscated_map_count=obfuscated_map_count,
+                risk_count=risk_count,
+                control_count=control_count,
+                taxonomy_tagged_count=taxonomy_tagged_count,
+            )
 
-            risk_counter = {}
-            for finding in combined_risk_findings:
-                key = f"{finding.title} ({finding.severity})"
-                risk_counter[key] = risk_counter.get(key, 0) + 1
-
-            control_counter = {}
-            for finding in control_findings:
-                key = f"{finding.title}"
-                control_counter[key] = control_counter.get(key, 0) + 1
-
-            top_risks = [f"{k}: {v}" for k, v in sorted(risk_counter.items(), key=lambda x: x[1], reverse=True)[:8]]
-            top_controls = [f"{k}: {v}" for k, v in sorted(control_counter.items(), key=lambda x: x[1], reverse=True)[:8]]
+            top_risks, top_controls = summarize_findings(combined_risk_findings, control_findings)
             scoring = self._build_severity_score(combined_risk_findings)
 
-            summary = {
-                "application": os.path.basename(application),
-                "application_sha256": hashlib.sha256(Path(application).read_bytes()).hexdigest(),
-                "platform": platform,
-                "extraction_method": extraction_method,
-                "output_directory": self.mobile_output_dir,
-                "files_scanned": self.file_count - files_skipped,
-                "files_skipped": files_skipped,
-                "bytes_scanned": bytes_scanned,
-                "url_count": url_count,
-                "ip_count": ip_count,
-                "hardcoded_count": hardcoded_count,
-                "api_key_assessment_count": api_key_assessment_count,
-                "api_key_issue_count": len(api_key_findings),
-                "base64_count": base64_count,
-                "obfuscated_string_refs_count": obfuscated_map_count,
-                "risk_count": risk_count,
-                "control_count": control_count,
-                "combined_risk_count": len(combined_risk_findings),
-                "top_risks": top_risks,
-                "top_controls": top_controls,
-                "scoring": scoring,
-                "nuclei": nuclei_meta,
-                "taxonomy_mode": self.taxonomy_mode,
-                "taxonomy_profile": self.taxonomy_profile,
-                "taxonomy_tagged_count": taxonomy_tagged_count,
-                "reports": reports,
-            }
+            summary = build_scan_summary(
+                application=Path(application),
+                platform=platform,
+                extraction_method=extraction_method,
+                output_directory=self.mobile_output_dir,
+                files_scanned=self.file_count - files_skipped,
+                files_skipped=files_skipped,
+                bytes_scanned=bytes_scanned,
+                url_count=url_count,
+                ip_count=ip_count,
+                hardcoded_count=hardcoded_count,
+                api_key_assessment_count=api_key_assessment_count,
+                api_key_issue_count=len(api_key_findings),
+                base64_count=base64_count,
+                obfuscated_string_refs_count=obfuscated_map_count,
+                risk_count=risk_count,
+                control_count=control_count,
+                combined_risk_count=len(combined_risk_findings),
+                top_risks=top_risks,
+                top_controls=top_controls,
+                scoring=scoring,
+                nuclei=nuclei_meta,
+                taxonomy_mode=self.taxonomy_mode,
+                taxonomy_profile=self.taxonomy_profile,
+                taxonomy_tagged_count=taxonomy_tagged_count,
+                reports=reports,
+            )
 
             summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 

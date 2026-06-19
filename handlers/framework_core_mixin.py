@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 
 from utils.shared.ai_assistant import PentestAI
-from utils.shared.colors import Bcolors
 from utils.shared.commands import Commands
 
 
@@ -113,6 +112,14 @@ class FrameworkCoreMixin:
 
         if self.ai is None:
             self.ai = PentestAI()
+            startup_notice = getattr(self.ai, "startup_notice", None)
+            if startup_notice:
+                level, message = startup_notice
+                if level == "warning":
+                    getattr(self, "print_warning_message")(message)
+                else:
+                    getattr(self, "print_info_message")(message)
+                self.ai.startup_notice = None
         self._attach_ai_to_domains()
 
     def check_packages(self, user_test_domain: str) -> bool:
@@ -124,7 +131,7 @@ class FrameworkCoreMixin:
         if user_test_domain not in package_supported_domains:
             return True
 
-        print(Bcolors.INFO + "[?] Checking for required packages..." + Bcolors.ENDC)
+        getattr(self, "print_info_message")("Checking for required packages...")
         if _package.is_supported_os is None:
             _package.is_supported_os = _package._check_is_supported()
             self.os = _package.operating_system

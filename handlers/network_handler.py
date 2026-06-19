@@ -2,33 +2,36 @@
 
 from __future__ import annotations
 
-import curses
 import ipaddress
 import os
 import signal
-import sys
 import threading
-from pathlib import Path
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-
-from tqdm import tqdm
+from pathlib import Path
 
 from handlers import FileHandler
 from utils.internal.network_constants import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_MAX_WORKER_CAP,
-    DEFAULT_PROGRESS_CHUNK,
     DEFAULT_WORKER_MULTIPLIER,
     INTERFACE_POLL_INTERVAL_SECONDS,
 )
 from utils.internal.network_interfaces import (
     get_active_interface as resolve_active_interface,
+)
+from utils.internal.network_interfaces import (
     get_interface_ip as resolve_interface_ip,
+)
+from utils.internal.network_interfaces import (
     get_network_interfaces as resolve_network_interfaces,
+)
+from utils.internal.network_interfaces import (
     is_interface_active,
 )
 from utils.internal.network_math import (
     calculate_remaining_hosts as get_remaining_hosts,
+)
+from utils.internal.network_math import (
     generate_ip_batches,
     get_network_info,
 )
@@ -246,27 +249,34 @@ class NetworkHandler(FileHandler, Commands):
             return f"{basename}{suffix}{extension}"
         return f"{basename}{extension}"
 
-    def scan_network(self, stdscr, mode: str, output_file: str):
+    def scan_network(self, mode: str, output_file: str):
         """Scan network hosts and update progress/output files."""
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Network Scanner - Press Ctrl+C to stop")
-        stdscr.refresh()
-        curses.curs_set(0)
-        curses.echo(False)
+        if self.progress_bar is not None:
+            self.progress_bar.configure(
+                mode=mode,
+                subnet=self.subnet,
+                interface=self.interface or resolve_active_interface() or "pending",
+            )
+            self.progress_bar.set_status_message("Preparing scan context...")
 
         if not self.interface:
             self.interface = resolve_active_interface()
+            if self.progress_bar is not None:
+                self.progress_bar.set_status_message(
+                    f"Using active interface: {self.interface or 'not found'}"
+                )
             if not self.interface:
-                stdscr.addstr(4, 0, "No active interface found.")
-                stdscr.refresh()
-                curses.napms(1000)
+                self.scan_complete = False
                 return
 
         current_ip = self.get_interface_ip(self.interface)
         if not current_ip:
-            stdscr.addstr(4, 0, f"Interface {self.interface} has no valid IP.")
-            stdscr.refresh()
-            curses.napms(1000)
+            if self.progress_bar is not None:
+                self.progress_bar.set_status_message(
+                    f"Interface {self.interface} has no valid IP."
+                )
+                self.progress_bar.mark_finished(interrupted=True)
+            self.scan_complete = False
             return
 
         self.initial_interface_ip = current_ip
@@ -279,11 +289,10 @@ class NetworkHandler(FileHandler, Commands):
             if self._shutdown_notice_displayed:
                 return
             self._shutdown_notice_displayed = True
-            try:
-                stdscr.addstr(4, 0, "Shutting down... cancelling pending hosts")
-                stdscr.refresh()
-            except curses.error:
-                pass
+            if self.progress_bar is not None:
+                self.progress_bar.set_status_message(
+                    "Shutting down... cancelling pending hosts."
+                )
 
         previous_sigint_handler = signal.getsignal(signal.SIGINT)
 
@@ -297,13 +306,7 @@ class NetworkHandler(FileHandler, Commands):
         interrupted = False
         try:
             self.mode = mode
-            total = (
-                self._calculate_resume_pending_hosts()
-                if self.mode == "resume"
-                else self.hosts
-            )
             processed = 0
-            committed_progress = 0
 
             cpu_count = os.cpu_count() or 2
             max_workers = min(
@@ -313,81 +316,69 @@ class NetworkHandler(FileHandler, Commands):
 
             self.monitor_thread = threading.Thread(
                 target=self.monitor_interface,
-                args=(stdscr,),
                 daemon=True,
             )
             self.monitor_thread.start()
 
             executor = ThreadPoolExecutor(max_workers=max_workers)
-            with tqdm(total=total, desc="Scanning", file=sys.stdout, leave=False) as pbar:
-                for ip_batch in self.generate_ip_in_batches():
+            for ip_batch in self.generate_ip_in_batches():
+                if self.shutdown_event.is_set():
+                    interrupted = True
+                    display_shutdown_notice()
+                    break
+
+                futures = {
+                    executor.submit(
+                        self.set_progressbar,
+                        mode,
+                        output_file,
+                        ip,
+                    ): ip
+                    for ip in ip_batch
+                }
+                pending = set(futures)
+
+                while pending:
                     if self.shutdown_event.is_set():
                         interrupted = True
                         display_shutdown_notice()
+                        for future in pending:
+                            future.cancel()
                         break
 
-                    futures = {
-                        executor.submit(
-                            self.set_progressbar,
-                            mode,
-                            output_file,
-                            ip,
-                            stdscr,
-                        ): ip
-                        for ip in ip_batch
-                    }
-                    pending = set(futures)
+                    done, pending = wait(
+                        pending,
+                        timeout=0.2,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        continue
 
-                    while pending:
-                        if self.shutdown_event.is_set():
-                            interrupted = True
-                            display_shutdown_notice()
-                            for future in pending:
-                                future.cancel()
-                            break
+                    for future in done:
+                        ip = futures[future]
+                        self.last_scanned_ip = ip
+                        processed += 1
+                        if self.current_scan_session and self.session_store and self.progress_bar:
+                            live_count = len(self.progress_bar.live_hosts)
+                            dead_count = len(self.progress_bar.unresponsive_hosts)
+                            self.session_store.update_checkpoint(
+                                session=self.current_scan_session,
+                                last_scanned_ip=ip,
+                                scanned_count=processed,
+                                live_count=live_count,
+                                unresponsive_count=dead_count,
+                            )
 
-                        done, pending = wait(
-                            pending,
-                            timeout=0.2,
-                            return_when=FIRST_COMPLETED,
-                        )
-                        if not done:
-                            continue
-
-                        for future in done:
-                            ip = futures[future]
-                            self.last_scanned_ip = ip
-                            processed += 1
-                            if self.current_scan_session and self.session_store:
-                                live_count = len(self.progress_bar.live_hosts)
-                                dead_count = len(self.progress_bar.unresponsive_hosts)
-                                self.session_store.update_checkpoint(
-                                    session=self.current_scan_session,
-                                    last_scanned_ip=ip,
-                                    scanned_count=processed,
-                                    live_count=live_count,
-                                    unresponsive_count=dead_count,
-                                )
-                            if (
-                                processed % DEFAULT_PROGRESS_CHUNK == 0
-                                or processed == total
-                            ):
-                                delta = processed - committed_progress
-                                if delta > 0:
-                                    pbar.update(delta)
-                                    committed_progress = processed
-
-                    if interrupted:
-                        break
-
-                if processed > committed_progress:
-                    pbar.update(processed - committed_progress)
+                if interrupted:
+                    break
 
             self.scan_complete = not self.shutdown_event.is_set()
+            if self.progress_bar is not None:
+                self.progress_bar.mark_finished(interrupted=not self.scan_complete)
         except Exception as error:
-            stdscr.addstr(4, 0, f"Error: {error}")
-            stdscr.refresh()
-            curses.napms(1000)
+            if self.progress_bar is not None:
+                self.progress_bar.set_status_message(f"Error: {error}")
+                self.progress_bar.mark_finished(interrupted=True)
             self.scan_complete = False
         finally:
             signal.signal(signal.SIGINT, previous_sigint_handler)
@@ -400,7 +391,6 @@ class NetworkHandler(FileHandler, Commands):
                 )
             if self.shutdown_event.is_set():
                 display_shutdown_notice()
-                curses.napms(250)
             self.shutdown_event.set()
             if self.monitor_thread:
                 self.monitor_thread.join(timeout=2)
@@ -423,17 +413,32 @@ class NetworkHandler(FileHandler, Commands):
                 self.session_store.mark_status(self.current_scan_session, final_status)
 
     def get_live_ips(self, output: str) -> int:
-        """Run the curses scanner and return discovered live host count."""
+        """Run the OpenTUI scanner and return discovered live host count."""
         try:
-            curses.wrapper(self.scan_network, self.mode, output)
+            from handlers.screen import ScreenHandler
+
+            if self.progress_bar is None:
+                return 0
+
+            ScreenHandler.show_progress_viewer(
+                title="Internal Network Progress",
+                prompt="Responsive and unresponsive hosts update live while the scan runs.",
+                subtitle="Internal scan/resume workflow with OpenTUI progress tracking",
+                snapshot_getter=self.progress_bar.snapshot,
+                worker=lambda: self.scan_network(self.mode, output),
+                cancel=self.shutdown_event.set,
+            )
             return len(self.progress_bar.live_hosts) if self.progress_bar else 0
         except KeyboardInterrupt:
-            print("\nProgram terminated by user.")
             self.scan_complete = False
+            if self.progress_bar is not None:
+                self.progress_bar.mark_finished(interrupted=True)
             return len(self.progress_bar.live_hosts) if self.progress_bar else 0
         except Exception as error:
             self.print_error_message(exception_error=error)
             self.scan_complete = False
+            if self.progress_bar is not None:
+                self.progress_bar.mark_finished(interrupted=True)
             return 0
 
     def generate_ip_in_batches(self, batch_size: int = DEFAULT_BATCH_SIZE):
@@ -458,7 +463,7 @@ class NetworkHandler(FileHandler, Commands):
             if pending_batch:
                 yield pending_batch
 
-    def set_progressbar(self, mode, filename, ip, stdscr):
+    def set_progressbar(self, mode, filename, ip):
         """Ping host and update progress/file outputs in a critical section."""
         if self.shutdown_event.is_set():
             return
@@ -473,7 +478,6 @@ class NetworkHandler(FileHandler, Commands):
                     mode,
                     ip,
                     is_alive,
-                    stdscr,
                     self.save_to_csv,
                     self.generate_filename,
                     self.existing_unresponsive_ips,
@@ -497,38 +501,26 @@ class NetworkHandler(FileHandler, Commands):
         """Compatibility wrapper for existing callers."""
         return is_interface_active(interface, self.initial_interface_ip)
 
-    def monitor_interface(self, stdscr):
+    def monitor_interface(self):
         """Stop scan if interface drops or changes IP during execution."""
         while not self.shutdown_event.is_set():
             try:
                 active = is_interface_active(self.interface, self.initial_interface_ip)
             except Exception as error:
                 with self.lock:
-                    if stdscr:
-                        try:
-                            stdscr.addstr(
-                                5,
-                                0,
-                                f"Interface monitor failed. Stopping scan: {error}",
-                            )
-                            stdscr.refresh()
-                        except curses.error:
-                            pass
+                    if self.progress_bar is not None:
+                        self.progress_bar.set_status_message(
+                            f"Interface monitor failed. Stopping scan: {error}"
+                        )
                     self.shutdown_event.set()
                 break
 
             if not active:
                 with self.lock:
-                    if stdscr:
-                        try:
-                            stdscr.addstr(
-                                5,
-                                0,
-                                f"Interface {self.interface} dropped or changed. Stopping scan.",
-                            )
-                            stdscr.refresh()
-                        except curses.error:
-                            pass
+                    if self.progress_bar is not None:
+                        self.progress_bar.set_status_message(
+                            f"Interface {self.interface} dropped or changed. Stopping scan."
+                        )
                     self.shutdown_event.set()
                 break
             self.shutdown_event.wait(INTERFACE_POLL_INTERVAL_SECONDS)
@@ -540,7 +532,9 @@ class NetworkHandler(FileHandler, Commands):
             self.scan_thread.join()
             if self.monitor_thread:
                 self.monitor_thread.join(timeout=2)
-            print("Scan stopped.")
+            if self.progress_bar is not None:
+                self.progress_bar.mark_finished(interrupted=True)
+                self.progress_bar.set_status_message("Scan stopped by operator request.")
 
 
 def get_active_interface():

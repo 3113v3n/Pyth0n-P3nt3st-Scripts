@@ -4,6 +4,7 @@ from handlers import DisplayHandler
 from utils.internal.hash_util import HashUtil
 from utils.internal.password_output import build_password_output_path, read_passwords_from_output
 from utils.internal.test_creds import CredentialsUtil
+from utils.shared.errors import MissingRequiredFileError
 
 
 class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
@@ -26,8 +27,8 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         if candidate.is_file():
             return
         if candidate.is_dir():
-            raise ValueError(f"{label} must be a file, not a directory: {path}")
-        raise ValueError(f"{label} file does not exist: {path}")
+            raise MissingRequiredFileError(f"{label} must be a file, not a directory: {path}")
+        raise MissingRequiredFileError(f"{label} file does not exist: {path}")
 
     def generate_password_list_from_hashes(
             self,

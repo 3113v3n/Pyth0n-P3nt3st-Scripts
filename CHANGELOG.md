@@ -2,6 +2,26 @@
 
 All notable project changes should be recorded in this file.
 
+## 2026-06-19
+
+### Added
+- Added OpenTUI-powered selectors, viewers, and prompt flows across the interactive framework so workflow selection, helper views, text entry, and multiselect screens stay inside a richer terminal UI.
+- Added an OpenTUI internal network progress display that shows responsive hosts, unresponsive hosts, progress, scan metadata, and graceful-stop guidance for both scan and resume modes.
+- Added interactive output transcript capture so final module summaries can be surfaced back to the operator in TUI viewers instead of leaking as native terminal output.
+- Added focused regression coverage for OpenTUI runtime flows, progress handling, message suppression, and internal network display behavior.
+
+### Changed
+- Reworked interactive input rendering so the prompt marker is a true prefix and typed content appears after it with an inline cursor indicator.
+- Updated internal scan/resume execution to remove the legacy curses/tqdm host display path from interactive mode and route progress through OpenTUI instead.
+- Updated interactive runtime/message handling to suppress pre-TUI stdout leaks such as dependency checks and AI startup warnings while still capturing those messages for final TUI presentation.
+- Improved runtime output handling so space-recovery guidance and module summaries use TUI viewers when OpenTUI is available, while CLI argument mode remains compatible with plain terminal output.
+- Split shared handlers and helper logic into smaller modules to support the new TUI-driven workflow structure, package/runtime helpers, and expanded validation paths.
+
+### Validation
+- Verified targeted OpenTUI/runtime regression coverage with focused pytest runs for menu rendering, runtime flow, progress handling, and message suppression.
+- Verified repository test coverage with the full suite (`140 passed`).
+- Verified bundled test-data execution paths for vulnerability analysis (Nessus and Rapid7), password list generation, and mobile APK analysis, confirming output artifacts were produced successfully.
+
 ## 2026-06-15
 
 ### Added
