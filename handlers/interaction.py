@@ -618,7 +618,6 @@ class InteractionHandler:
                     "No network interface provided. Use -I/--interface explicitly "
                     "for scan mode."
                 )
-            print(interface)
             if not (ip_cidr and output):
                 raise ValueError(
                     "For Scan mode, --ip and --output are required")

@@ -294,12 +294,15 @@ class NetworkHandler(FileHandler, Commands):
                     "Shutting down... cancelling pending hosts."
                 )
 
-        previous_sigint_handler = signal.getsignal(signal.SIGINT)
+        previous_sigint_handler = None
+        manage_signals = threading.current_thread() is threading.main_thread()
 
         def signal_handler(sig, frame):
             self.shutdown_event.set()
 
-        signal.signal(signal.SIGINT, signal_handler)
+        if manage_signals:
+            previous_sigint_handler = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGINT, signal_handler)
 
         executor: ThreadPoolExecutor | None = None
         futures: dict = {}
@@ -381,7 +384,8 @@ class NetworkHandler(FileHandler, Commands):
                 self.progress_bar.mark_finished(interrupted=True)
             self.scan_complete = False
         finally:
-            signal.signal(signal.SIGINT, previous_sigint_handler)
+            if manage_signals and previous_sigint_handler is not None:
+                signal.signal(signal.SIGINT, previous_sigint_handler)
             if executor is not None:
                 for future in futures:
                     future.cancel()
@@ -413,23 +417,28 @@ class NetworkHandler(FileHandler, Commands):
                 self.session_store.mark_status(self.current_scan_session, final_status)
 
     def get_live_ips(self, output: str) -> int:
-        """Run the OpenTUI scanner and return discovered live host count."""
+        """Run the network scan and return discovered live host count."""
         try:
+            from handlers.opentui_menu import opentui_menu_enabled
             from handlers.screen import ScreenHandler
 
             if self.progress_bar is None:
                 return 0
 
-            ScreenHandler.show_progress_viewer(
-                title="Internal Network Progress",
-                prompt="Responsive and unresponsive hosts update live while the scan runs.",
-                subtitle="Internal scan/resume workflow with OpenTUI progress tracking",
-                snapshot_getter=self.progress_bar.snapshot,
-                worker=lambda: self.scan_network(self.mode, output),
-                cancel=self.shutdown_event.set,
-            )
+            if opentui_menu_enabled():
+                ScreenHandler.show_progress_viewer(
+                    title="Internal Network Progress",
+                    prompt="Responsive and unresponsive hosts update live while the scan runs.",
+                    subtitle="Internal scan/resume workflow with OpenTUI progress tracking",
+                    snapshot_getter=self.progress_bar.snapshot,
+                    worker=lambda: self.scan_network(self.mode, output),
+                    cancel=self.shutdown_event.set,
+                )
+            else:
+                self.scan_network(self.mode, output)
             return len(self.progress_bar.live_hosts) if self.progress_bar else 0
         except KeyboardInterrupt:
+            self.shutdown_event.set()
             self.scan_complete = False
             if self.progress_bar is not None:
                 self.progress_bar.mark_finished(interrupted=True)
