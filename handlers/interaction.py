@@ -19,6 +19,7 @@ from handlers.argument_validation import (
     resolve_safe_operator_tag,
 )
 from handlers.custom_parser import CustomArgumentParser, CustomHelp
+from handlers.messages import DisplayHandler
 from utils.internal.scan_session import ScanSessionStore
 from utils.shared.errors import ModuleArgumentError
 from utils.shared.validators import Validator
@@ -43,6 +44,14 @@ class InteractionHandler:
         self.runtime_options = {}
         self.validator = Validator()
         self.filehandler = None
+
+    @staticmethod
+    def _emit_status(message: str) -> None:
+        """Route setup/progress text through the shared display pipeline."""
+        text = str(message or "").strip()
+        if not text:
+            return
+        DisplayHandler._emit_message(f"\n[-] {text}")
 
     def main(self):
         """Main Program"""
@@ -448,7 +457,9 @@ class InteractionHandler:
                         "The provided directory contains multiple applications."
                     )
                 app = applications[0]
-                print(f"\n[-] Running Mobile Assessment on {app['full_path']} application")
+                self._emit_status(
+                    f"Running Mobile Assessment on {app['full_path']} application"
+                )
                 return {
                     "module": module,
                     "scan_mode": "single",
@@ -458,8 +469,8 @@ class InteractionHandler:
                     "filename": app["filename"],
                 }
 
-            print(
-                f"\n[-] Running Mobile Assessment on all applications in {path} "
+            self._emit_status(
+                f"Running Mobile Assessment on all applications in {path} "
                 f"({len(applications)} found)"
             )
             return {
@@ -481,7 +492,7 @@ class InteractionHandler:
         ):
             raise ValueError(f"File {path} is not a valid APK or IPA file")
 
-        print(f"\n[-] Running Mobile Assessment on {path} application")
+        self._emit_status(f"Running Mobile Assessment on {path} application")
         return {
             "module": module,
             "scan_mode": "single",
@@ -514,8 +525,8 @@ class InteractionHandler:
             default_tag=SAFE_OPERATOR_TAG_DEFAULT,
         )
 
-        print(
-            f"\n[-] Running External Assessment on {domain} domain "
+        self._emit_status(
+            f"Running External Assessment on {domain} domain "
             f"(phases: {', '.join(requested_phases)}, safe_mode={safe_mode})"
         )
         return {
@@ -532,7 +543,7 @@ class InteractionHandler:
         path = args.path
         file = args.output
         credentialed_check = bool(getattr(args, "credentialed_check", True))
-        print(f"\n[-] Running {scanner.title()} Vulnerability Analysis ")
+        self._emit_status(f"Running {scanner.title()} Vulnerability Analysis")
 
         if not self.validator.check_folder_exists(path):
             raise ValueError(
@@ -572,8 +583,9 @@ class InteractionHandler:
                 )
 
             # Add verbosity
-            print(
-                f"\n[-] Testing passwords from {os.path.basename(pass_file)} on Target IP: {ip} with {domain} domain"
+            self._emit_status(
+                f"Testing passwords from {os.path.basename(pass_file)} on Target IP: {ip} "
+                f"with {domain} domain"
             )
 
             return {
@@ -595,8 +607,9 @@ class InteractionHandler:
                 )
             self._validate_required_file(hashes, "Cracked hashes")
             self._validate_required_file(dump, "NTDS dump")
-            print(
-                f"\n[-] Generating Password List from {hashes} and {dump} files")
+            self._emit_status(
+                f"Generating Password List from {hashes} and {dump} files"
+            )
             return {
                 "module": module,
                 "hashes": hashes,
@@ -625,7 +638,7 @@ class InteractionHandler:
                 raise ValueError(
                     f"IP {ip_cidr} is not valid. Ensure it is a valid IP address with CIDR notation"
                 )
-            print(f"\n[-] Running Internal PT Scan on {ip_cidr} network")
+            self._emit_status(f"Running Internal PT Scan on {ip_cidr} network")
             return {
                 "module": module,
                 "action": action,
@@ -662,11 +675,11 @@ class InteractionHandler:
                         "Resume blocked: no similar active interface detected for "
                         f"{os.path.basename(resume_file)}."
                     )
-                print("\n[-] Resume metadata loaded from saved scan session")
-                print(f"[-] Using interface: {matched_interface}")
-                print(f"[-] Using subnet: {subnet}")
-                print(
-                    f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} "
+                self._emit_status("Resume metadata loaded from saved scan session")
+                self._emit_status(f"Using interface: {matched_interface}")
+                self._emit_status(f"Using subnet: {subnet}")
+                self._emit_status(
+                    f"Resuming previous scan from File: {os.path.basename(resume_file)} "
                     f"using saved subnet {subnet}"
                 )
                 return {
@@ -685,13 +698,13 @@ class InteractionHandler:
                     "For legacy files only, provide --interface and --mask."
                 )
 
-            print(
-                "[-] No saved session metadata found for this resume file. "
+            self._emit_status(
+                "No saved session metadata found for this resume file. "
                 "Falling back to legacy resume mode."
             )
-            print(interface)
-            print(
-                f"\n[-] Resuming previous scan from File: {os.path.basename(resume_file)} on /{mask} network"
+            self._emit_status(f"Using interface: {interface}")
+            self._emit_status(
+                f"Resuming previous scan from File: {os.path.basename(resume_file)} on /{mask} network"
             )
             return {
                 "module": module,

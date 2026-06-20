@@ -4,6 +4,16 @@ from .loader import Loader
 # from loader import Loader
 
 
+def _emit_runtime_message(message: str) -> None:
+    """Emit framework runtime text through shared output capture when available."""
+    try:
+        from handlers.messages import DisplayHandler
+
+        DisplayHandler._emit_message(f"\n{message}")
+    except Exception:
+        print(f"\n{message}")
+
+
 class CustomDecorators:
     """Calculate the time taken to execute a function"""
 
@@ -68,12 +78,12 @@ class CustomDecorators:
     @classmethod
     def print_total_time(cls, message="Total execution time:"):
         """Print the total time taken to execute all functions"""
-        print(f"\n{message} {cls._humanize_duration(cls.total_time)}")
+        _emit_runtime_message(f"{message} {cls._humanize_duration(cls.total_time)}")
 
     @classmethod
     def print_last_execution_time(cls, message="Execution time:"):
         """Print time taken by the most recent decorated call."""
-        print(f"\n{message} {cls._humanize_duration(cls.last_execution_time)}")
+        _emit_runtime_message(f"{message} {cls._humanize_duration(cls.last_execution_time)}")
 
     @staticmethod
     def format_time(time_in_seconds):

@@ -13,6 +13,7 @@ import os
 import re
 from pathlib import Path
 
+from handlers.messages import DisplayHandler
 from utils.shared.commands import Commands
 from utils.shared.validators import Validator
 from .tooling import available_name, which_tool
@@ -24,6 +25,10 @@ _COMMANDS = Commands()
 _AMASS_NATIVE_BIN = Path("/usr/lib/amass/amass")
 _LIBPOSTAL_SHARE_DIR = Path("/usr/share/libpostal")
 _LIBPOSTAL_VAR_DIR = Path("/var/lib/libpostal")
+
+
+def _emit_message(message: str) -> None:
+    DisplayHandler._emit_message(message)
 
 
 def _resolve_amass_executable() -> str | None:
@@ -59,7 +64,7 @@ def _amass_preflight(executable: str) -> bool:
     # Debian/Kali amass builds can link libpostal with hard-coded
     # /usr/share/libpostal paths; fail early with a clear fix message.
     if resolved == _AMASS_NATIVE_BIN and not (_LIBPOSTAL_SHARE_DIR / "transliteration").exists():
-        print(_amass_libpostal_fix_message())
+        _emit_message(_amass_libpostal_fix_message())
         return False
     return True
 
@@ -96,23 +101,23 @@ def shell_command(command: list[str], tool: str, debug: bool = False) -> list[st
         executable = which_tool(raw_executable)
     if executable is None:
         if debug:
-            print(f"[!] {tool} not installed; skipping.")
+            _emit_message(f"[!] {tool} not installed; skipping.")
         return []
     command = [executable, *command[1:]]
     try:
         if debug:
-            print(f"\nExecuting: {' '.join(command)}")
+            _emit_message(f"\nExecuting: {' '.join(command)}")
         result = _COMMANDS.stream_command(command, prefix=f"[{tool}] ")
         if result.returncode != 0:
             if tool == "amass":
                 output = str(result.stdout)
                 if "Error loading transliteration module" in output or "libpostal_setup_datadir" in output:
-                    print(_amass_libpostal_fix_message())
-            print(f"[!] {tool} failed with exit code {result.returncode}")
+                    _emit_message(_amass_libpostal_fix_message())
+            _emit_message(f"[!] {tool} failed with exit code {result.returncode}")
             return []
         return result.stdout.splitlines()
     except OSError as error:
-        print(f"[!] {tool} failed: {error}")
+        _emit_message(f"[!] {tool} failed: {error}")
         return []
 
 
@@ -206,7 +211,7 @@ class DomainRecon:
         executable = _resolve_amass_executable()
         if executable is None:
             if debug:
-                print("[!] amass not installed; skipping.")
+                _emit_message("[!] amass not installed; skipping.")
             return []
         if not _amass_preflight(executable):
             return []
@@ -225,7 +230,7 @@ class DomainRecon:
         result = _COMMANDS.stream_command(cmd, output_file=output_file, prefix="[dnsx] ")
         if result.returncode != 0:
             output_file.unlink(missing_ok=True)
-            print(f"[!] dnsx failed with exit code {result.returncode}")
+            _emit_message(f"[!] dnsx failed with exit code {result.returncode}")
 
 
 # Backwards-compatible legacy alias used previously in tests / scripts.

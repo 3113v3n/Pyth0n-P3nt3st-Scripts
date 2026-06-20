@@ -17,6 +17,8 @@ from contextlib import contextmanager
 import ldap3
 from ldap3.utils.conv import escape_filter_chars
 
+from handlers.messages import DisplayHandler
+
 
 # [Fix] Default base DN previously hardcoded inline across every function.
 # Import the centralised constant instead of repeating the literal.
@@ -50,7 +52,7 @@ def _ldap_connection(server_ip: str, port: int = 389, use_ssl: bool = False):
         # [Redundancy] Unbind logic was copy-pasted in every function — now a
         # single location handles cleanup regardless of whether an exception occurred.
         connection.unbind()
-        print("LDAP connection closed.")
+        DisplayHandler._emit_message("LDAP connection closed.")
 
 
 def fetch_ldap_server_info(server_ip: str, port: int = 389) -> None:
@@ -64,12 +66,12 @@ def fetch_ldap_server_info(server_ip: str, port: int = 389) -> None:
     """
     try:
         with _ldap_connection(server_ip, port) as connection:
-            print("LDAP server information:")
-            print(connection.server.info)
+            DisplayHandler._emit_message("LDAP server information:")
+            DisplayHandler._emit_message(str(connection.server.info))
     except ldap3.core.exceptions.LDAPException as error:
-        print(f"LDAP error fetching server info: {error}")
+        DisplayHandler._emit_message(f"LDAP error fetching server info: {error}")
     except OSError as error:
-        print(f"Network error connecting to {server_ip}:{port}: {error}")
+        DisplayHandler._emit_message(f"Network error connecting to {server_ip}:{port}: {error}")
 
 
 def fetch_ad_objects(
@@ -106,12 +108,12 @@ def fetch_ad_objects(
                 attributes="*",
             )
             entries = list(connection.entries)
-            print(f"Active Directory objects found: {len(entries)}")
+            DisplayHandler._emit_message(f"Active Directory objects found: {len(entries)}")
             for entry in entries:
-                print(f"{entry}\n")
+                DisplayHandler._emit_message(f"{entry}\n")
             return entries
     except ldap3.core.exceptions.LDAPException as error:
-        print(f"LDAP error fetching AD objects: {error}")
+        DisplayHandler._emit_message(f"LDAP error fetching AD objects: {error}")
         return []
 
 
@@ -148,9 +150,9 @@ def dump_ldap_entries(
                 attributes=["userPassword"],
             )
             entries = list(connection.entries)
-            print(f"LDAP entries found: {len(entries)}")
-            print(entries)
+            DisplayHandler._emit_message(f"LDAP entries found: {len(entries)}")
+            DisplayHandler._emit_message(str(entries))
             return entries
     except ldap3.core.exceptions.LDAPException as error:
-        print(f"LDAP error dumping entries: {error}")
+        DisplayHandler._emit_message(f"LDAP error dumping entries: {error}")
         return []

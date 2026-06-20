@@ -8,6 +8,7 @@ from handlers.navigation import BackToMainMenu, BackToPreviousMenu
 from handlers.opentui_menu import (
     MenuModel,
     MenuOption,
+    _compute_text_viewer_state,
     _event_name,
     build_menu_lines,
     build_menu_options,
@@ -80,17 +81,48 @@ def test_build_menu_lines_highlights_selected_option_and_summary():
         title="Main Menu",
         prompt="Choose one",
         options=[
-            MenuOption("Internal", "internal", "Internal network workflows", badge="1"),
-            MenuOption("Mobile", "mobile", "APK and IPA analysis", badge="2"),
+            MenuOption("Internal", "internal", description="Run internal tests", badge="1"),
+            MenuOption("Mobile", "mobile", description="Run mobile workflow", badge="2"),
         ],
         selected_index=1,
     )
 
     lines = build_menu_lines(model)
 
-    assert any("❯ [2] Mobile — APK and IPA analysis" in line for line in lines)
+    assert any(line.startswith("✦ Main Menu") for line in lines)
+    assert any("❯ [2] Mobile" in line for line in lines)
     assert any("Selected: [2] Mobile" in line for line in lines)
 
+
+def test_compute_text_viewer_state_allocates_most_space_to_content():
+    body = "\n".join(f"line {index}" for index in range(1, 61))
+
+    state = _compute_text_viewer_state(
+        body=body,
+        renderer_width=120,
+        renderer_height=40,
+        requested_offset=0,
+    )
+
+    assert state.content_width >= 100
+    assert state.visible_lines >= 24
+    assert len(state.body_lines) == 60
+    assert state.max_scroll == len(state.body_lines) - state.visible_lines
+
+
+def test_compute_text_viewer_state_clamps_requested_offset_to_scroll_range():
+    body = "\n".join(f"row {index}" for index in range(1, 31))
+
+    state = _compute_text_viewer_state(
+        body=body,
+        renderer_width=100,
+        renderer_height=20,
+        requested_offset=999,
+    )
+
+    assert state.current_offset == state.max_scroll
+    assert state.line_end == len(state.body_lines)
+    assert state.scroll_ratio == 1.0
 
 def test_run_opentui_menu_falls_back_on_runtime_error(monkeypatch):
     import handlers.opentui_menu as opentui_menu

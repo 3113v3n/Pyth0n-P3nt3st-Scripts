@@ -1,4 +1,5 @@
 from handlers.framework_runtime_mixin import FrameworkRuntimeMixin
+from handlers.messages import DisplayHandler
 from handlers.navigation import BackToMainMenu
 from handlers.opentui_menu import OpenTUIMenuRequired
 
@@ -128,6 +129,32 @@ def test_space_recovery_hint_uses_tui_viewer_when_available(monkeypatch):
 
     assert harness.classes["user"].viewer_calls[0]["title"] == "Space Recovery"
     assert "output_directory/Mobile/report.txt" in harness.classes["user"].viewer_calls[0]["body"]
+
+
+def test_space_recovery_hint_routes_fallback_output_to_transcript_when_stdout_is_suppressed(monkeypatch, capsys):
+    import handlers.screen as screen_module
+
+    harness = _RuntimeHarness()
+    monkeypatch.setattr(harness, "_can_render_interactive_tui", lambda: False)
+    monkeypatch.setattr(
+        harness,
+        "_collect_space_recovery_paths",
+        lambda module, run_started_at: ["output_directory/Mobile/report.txt"],
+    )
+
+    screen_module.ScreenHandler.clear_output_transcript()
+    DisplayHandler.set_stdout_suppressed(True)
+    try:
+        harness._print_space_recovery_hint("mobile", 0.0)
+    finally:
+        DisplayHandler.set_stdout_suppressed(False)
+
+    captured = capsys.readouterr()
+    transcript = screen_module.ScreenHandler.consume_output_transcript()
+
+    assert captured.out == ""
+    assert "To free up space" in transcript
+    assert "output_directory/Mobile/report.txt" in transcript
 
 
 def test_show_module_output_transcript_uses_tui_viewer(monkeypatch):

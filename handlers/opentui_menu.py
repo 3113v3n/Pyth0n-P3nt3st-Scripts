@@ -56,6 +56,18 @@ class MenuModel:
         self.selected_index = (self.selected_index + 1) % len(self.options)
 
 
+@dataclass(frozen=True)
+class TextViewerState:
+    content_width: int
+    visible_lines: int
+    body_lines: tuple[str, ...]
+    max_scroll: int
+    current_offset: int
+    line_start: int
+    line_end: int
+    scroll_ratio: float
+
+
 def opentui_menu_enabled() -> bool:
     """Return True when OpenTUI should be used for interactive menus."""
     raw = os.environ.get("PENTEST_USE_OPENTUI", "1").strip().lower()
@@ -467,6 +479,35 @@ def _wrap_viewer_lines(value: Any, *, width: int) -> list[str]:
     return wrapped_lines or [""]
 
 
+def _compute_text_viewer_state(
+    *,
+    body: str,
+    renderer_width: int,
+    renderer_height: int,
+    requested_offset: int,
+) -> TextViewerState:
+    safe_width = max(72, int(renderer_width or 120))
+    safe_height = max(18, int(renderer_height or 40))
+    content_width = max(56, safe_width - 8)
+    visible_lines = max(12, safe_height - 10)
+    body_lines = tuple(_wrap_viewer_lines(body, width=content_width))
+    max_scroll = max(0, len(body_lines) - visible_lines)
+    current_offset = max(0, min(int(requested_offset or 0), max_scroll))
+    line_start = current_offset + 1 if body_lines else 0
+    line_end = min(current_offset + visible_lines, len(body_lines))
+    scroll_ratio = 1.0 if max_scroll == 0 else current_offset / max_scroll
+    return TextViewerState(
+        content_width=content_width,
+        visible_lines=visible_lines,
+        body_lines=body_lines,
+        max_scroll=max_scroll,
+        current_offset=current_offset,
+        line_start=line_start,
+        line_end=line_end,
+        scroll_ratio=scroll_ratio,
+    )
+
+
 async def _render_opentui_text_viewer(
     *,
     title: str,
@@ -507,12 +548,13 @@ async def _render_opentui_text_viewer(
     def App():
         renderer_ref["value"] = use_renderer()
         renderer = renderer_ref["value"]
-        layout_direction = "row" if getattr(renderer, "width", 120) >= 110 else "column"
-        content_width = max(42, getattr(renderer, "width", 120) - (44 if layout_direction == "row" else 8))
-        body_lines = _wrap_viewer_lines(body, width=content_width)
-        visible_lines = max(8, getattr(renderer, "height", 40) - 18)
-        max_scroll = max(0, len(body_lines) - visible_lines)
-        current_offset = min(scroll_offset(), max_scroll)
+        viewer_state = _compute_text_viewer_state(
+            body=body,
+            renderer_width=getattr(renderer, "width", 120),
+            renderer_height=getattr(renderer, "height", 40),
+            requested_offset=scroll_offset(),
+        )
+        current_offset = viewer_state.current_offset
         if current_offset != scroll_offset():
             scroll_offset.set(current_offset)
 
@@ -523,83 +565,45 @@ async def _render_opentui_text_viewer(
                 event.stop()
                 return
             if key in up_keys:
-                _clamp_scroll(current_offset - 1, max_scroll=max_scroll)
+                _clamp_scroll(current_offset - 1, max_scroll=viewer_state.max_scroll)
                 event.stop()
                 return
             if key in down_keys:
-                _clamp_scroll(current_offset + 1, max_scroll=max_scroll)
+                _clamp_scroll(current_offset + 1, max_scroll=viewer_state.max_scroll)
                 event.stop()
                 return
             if key in page_up_keys:
-                _clamp_scroll(current_offset - visible_lines, max_scroll=max_scroll)
+                _clamp_scroll(current_offset - viewer_state.visible_lines, max_scroll=viewer_state.max_scroll)
                 event.stop()
                 return
             if key in page_down_keys:
-                _clamp_scroll(current_offset + visible_lines, max_scroll=max_scroll)
+                _clamp_scroll(current_offset + viewer_state.visible_lines, max_scroll=viewer_state.max_scroll)
                 event.stop()
                 return
             if key in home_keys:
-                _clamp_scroll(0, max_scroll=max_scroll)
+                _clamp_scroll(0, max_scroll=viewer_state.max_scroll)
                 event.stop()
                 return
             if key in end_keys:
-                _clamp_scroll(max_scroll, max_scroll=max_scroll)
+                _clamp_scroll(viewer_state.max_scroll, max_scroll=viewer_state.max_scroll)
                 event.stop()
 
         use_keyboard(handle_key)
 
-        visible_slice = body_lines[current_offset: current_offset + visible_lines]
-        line_start = current_offset + 1 if body_lines else 0
-        line_end = min(current_offset + visible_lines, len(body_lines))
+        visible_slice = viewer_state.body_lines[
+            current_offset: current_offset + viewer_state.visible_lines
+        ]
+        progress_percent = int(round(viewer_state.scroll_ratio * 100))
 
         content_panel = Box(
             *[Text(line or " ", fg="#E2E8F0") for line in visible_slice],
             border=True,
             border_style="rounded",
             border_color="#1D4ED8",
-            title="Content",
+            title=f"Content • lines {viewer_state.line_start}-{viewer_state.line_end} of {len(viewer_state.body_lines)}",
             padding=1,
             gap=0,
             flex_grow=1,
-        )
-
-        detail_panel = Box(
-            Text("Viewer Inspector", fg="#A78BFA", bold=True),
-            Text(f"Lines {line_start}-{line_end} of {len(body_lines)}", fg="#4ADE80", bold=True),
-            Text(f"Scroll offset: {current_offset}", fg="#94A3B8"),
-            Text(normalize_menu_text(prompt), fg="#FCD34D"),
-            Box(
-                Text("Hotkeys", fg="#F472B6", bold=True),
-                Text("↑/↓ or j/k • scroll", fg="#CBD5E1"),
-                Text("PgUp/PgDn • page", fg="#CBD5E1"),
-                Text("Home/End • jump", fg="#CBD5E1"),
-                Text("Enter/Esc/q • close", fg="#CBD5E1"),
-                border=True,
-                border_style="rounded",
-                border_color="#4C1D95",
-                background_color="#1E1B4B",
-                padding=1,
-                gap=1,
-            ),
-            Box(
-                Text("Navigation", fg="#22D3EE", bold=True),
-                Text("Use the left pane as the reading surface.", fg="#CBD5E1"),
-                Text("Scroll to inspect longer helper or summary text.", fg="#CBD5E1"),
-                Text("Press Enter or Esc/q when you are ready to return.", fg="#CBD5E1"),
-                border=True,
-                border_style="rounded",
-                border_color="#0F766E",
-                background_color="#042F2E",
-                padding=1,
-                gap=1,
-            ),
-            border=True,
-            border_style="rounded",
-            border_color="#166534",
-            background_color="#052E16",
-            padding=1,
-            gap=1,
-            min_width=36,
         )
 
         return Box(
@@ -611,7 +615,14 @@ async def _render_opentui_text_viewer(
                     fg="#C4B5FD",
                 ),
                 Text(lambda: normalize_menu_text(prompt), fg="#67E8F9"),
-                Text(lambda: f"{len(body_lines)} lines available", fg="#E2E8F0", bold=True),
+                Text(
+                    lambda: (
+                        f"Scrollable viewer • {len(viewer_state.body_lines)} wrapped lines • "
+                        f"width {viewer_state.content_width} cols"
+                    ),
+                    fg="#E2E8F0",
+                    bold=True,
+                ),
                 border=True,
                 border_style="rounded",
                 border_color="#7C3AED",
@@ -619,18 +630,14 @@ async def _render_opentui_text_viewer(
                 padding=1,
                 gap=1,
             ),
-            Box(
-                content_panel,
-                detail_panel,
-                flex_direction=layout_direction,
-                gap=1,
-                flex_grow=1,
-                align_items="stretch",
-            ),
+            content_panel,
             Box(
                 Text(lambda: normalize_menu_text(footer), fg="#CBD5E1"),
                 Text(
-                    lambda: f"Ready → line {line_start}/{max(1, len(body_lines))}",
+                    lambda: (
+                        f"Scroll {progress_percent}% • line {viewer_state.line_start}/"
+                        f"{max(1, len(viewer_state.body_lines))} • Home/End jump"
+                    ),
                     fg="#4ADE80",
                     bold=True,
                 ),

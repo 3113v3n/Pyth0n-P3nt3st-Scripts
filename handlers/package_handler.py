@@ -303,7 +303,7 @@ class PackageHandler(Config, DisplayHandler, Commands):
             return True
 
         if not venv_dir.exists():
-            print("[Bootstrap] First run detected. Creating project virtualenv...")
+            cls._emit_message("[Bootstrap] First run detected. Creating project virtualenv...")
             try:
                 subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
                 if venv_python.exists():
@@ -312,19 +312,23 @@ class PackageHandler(Config, DisplayHandler, Commands):
                         check=False,
                     )
                     if req_file.exists():
-                        print("[Bootstrap] Installing Python requirements into project virtualenv...")
+                        cls._emit_message(
+                            "[Bootstrap] Installing Python requirements into project virtualenv..."
+                        )
                         cls._install_requirements_into_venv(venv_python, req_file, venv_dir)
             except Exception as error:
-                print(f"[Bootstrap] Virtualenv setup failed: {error}")
+                cls._emit_message(f"[Bootstrap] Virtualenv setup failed: {error}")
                 return False
         elif venv_python.exists() and req_file.exists():
             # Retry requirements install when previous bootstrap failed or deps changed.
             if not cls._requirements_stamp_matches(venv_dir, req_file):
-                print("[Bootstrap] Completing/refreshing project requirements in virtualenv...")
+                cls._emit_message(
+                    "[Bootstrap] Completing/refreshing project requirements in virtualenv..."
+                )
                 try:
                     cls._install_requirements_into_venv(venv_python, req_file, venv_dir)
                 except Exception as error:
-                    print(f"[Bootstrap] Virtualenv setup failed: {error}")
+                    cls._emit_message(f"[Bootstrap] Virtualenv setup failed: {error}")
                     return False
 
         if venv_python.exists():

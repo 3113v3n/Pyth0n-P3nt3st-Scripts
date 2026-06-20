@@ -21,7 +21,9 @@ python3 main.py
 
 By default, the script starts in interactive mode. In non-interactive environments such as CI, cron, pipes, or redirected stdin, use `-M cli_args`.
 
-Interactive mode now prefers an OpenTUI-powered menu/selection experience when the terminal supports it. To force the classic prompt-based interface, disable it for a run with:
+Interactive mode now prefers an OpenTUI-powered workflow when the terminal supports it. Recent interactive updates moved module selection, file pickers, multiselect prompts, progress displays, helper views, and final run summaries into a richer terminal UI instead of plain prompt/curses output.
+
+To force the classic prompt-based interface for a run, disable OpenTUI with:
 
 ```sh
 export PENTEST_USE_OPENTUI=0
@@ -73,6 +75,16 @@ Security-Tests: <commands/results>
 
 See [SECURITY.md](SECURITY.md) and [docs/commit_runbook.md](docs/commit_runbook.md) for the project security and commit-tracking workflow.
 
+## Development Validation
+
+The repository now ships with a pytest-based regression suite and CI coverage for the refactored interactive/runtime flows.
+
+Run the local test suite with:
+
+```sh
+pytest
+```
+
 ## Module Overview
 
 | Module | Status | Summary |
@@ -89,6 +101,8 @@ The internal module enumerates hosts in a target CIDR and writes two CSV artifac
 
 - live hosts
 - unresponsive hosts for later resume
+
+Interactive scan and resume flows now use an OpenTUI progress viewer that keeps host counts, subnet/interface context, status messages, and graceful-stop guidance inside the terminal UI.
 
 ![Internal CLI options](images/docs/internal_cli.png)
 
@@ -116,7 +130,7 @@ python main.py -M cli_args internal \
   -r output_directory/Internal/internal_scan_unresponsive_hosts.csv
 ```
 
-Resume mode uses saved scan-session metadata to recover the subnet and matching active interface automatically, so normal CLI resume does not require `-I/--interface` or `-m/--mask`. Session metadata is stored under `output_directory/Internal/.scan_state/` to support safer continuation. Legacy unresponsive-host files without metadata can still be resumed by passing `-I/--interface` and `-m/--mask`.
+Resume mode uses saved scan-session metadata to recover the subnet and matching active interface automatically, so normal CLI resume does not require `-I/--interface` or `-m/--mask`. Session metadata is stored under `output_directory/Internal/.scan_state/` to support safer continuation. Resume runs also reload previously recorded live and unresponsive hosts so already-scanned IPs are skipped before the next pass begins. Legacy unresponsive-host files without metadata can still be resumed by passing `-I/--interface` and `-m/--mask`.
 
 ## Vulnerability Analysis
 
@@ -135,6 +149,7 @@ Current report behavior:
 - Normalizes Nessus `CVSS Vector` output from available vector variants
 - Supports credentialed and uncredentialed Nessus processing
 - Builds an executive summary sheet before detailed category sheets
+- Prioritizes easy network-exploitable RCE findings in the `Remote Code Execution` sheet and adds an `RCE Exploitability Focus` column based on CVSS3 vector traits such as `AV:N/AC:L/PR:N/A:N`
 - Produces category sheets such as RCE, missing patches, unsupported software, SSL/SSH/web issues, compliance, and unfiltered findings
 
 ![Vulnerability analysis CLI options](images/docs/va_cli.png)

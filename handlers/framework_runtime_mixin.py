@@ -63,7 +63,7 @@ class FrameworkRuntimeMixin:
                         footer="↑/↓ or j/k navigate • Enter confirms • Esc exits gracefully",
                     )
                 else:
-                    print(
+                    DisplayHandler._emit_message(
                         f"\n{Bcolors.MUTED}[Navigation] Up/Down=history | Ctrl+C=exit gracefully{Bcolors.ENDC}"
                     )
 
@@ -200,18 +200,18 @@ class FrameworkRuntimeMixin:
         border = "*" * border_width
         spacer = f"** {'':<{body_width}} **"
 
-        print("\n" + border)
-        print(border)
-        print(spacer)
+        DisplayHandler._emit_message("\n" + border)
+        DisplayHandler._emit_message(border)
+        DisplayHandler._emit_message(spacer)
         for line in textwrap.wrap(summary_lines[0], width=body_width):
-            print(f"**  {line:<{body_width}}**")
-        print(spacer)
+            DisplayHandler._emit_message(f"**  {line:<{body_width}}**")
+        DisplayHandler._emit_message(spacer)
         for entry in cleanup_paths:
             for line in textwrap.wrap(f"- {entry}", width=body_width):
-                print(f"**  {line:<{body_width}}**")
-        print(spacer)
-        print(border)
-        print(border)
+                DisplayHandler._emit_message(f"**  {line:<{body_width}}**")
+        DisplayHandler._emit_message(spacer)
+        DisplayHandler._emit_message(border)
+        DisplayHandler._emit_message(border)
 
     def _clear_module_output_transcript(self) -> None:
         try:

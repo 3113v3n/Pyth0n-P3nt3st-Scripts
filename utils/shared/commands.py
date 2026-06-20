@@ -48,6 +48,36 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() not in {"0", "false", "no", "off"}
 
 
+def _display_handler_suppressed() -> bool:
+    """Return True when interactive output should be captured instead of printed."""
+    try:
+        from handlers.messages import DisplayHandler
+
+        return DisplayHandler.stdout_suppressed()
+    except Exception:
+        return False
+
+
+def _note_screen_output(message: str) -> None:
+    """Best-effort bridge to the shared transcript used by TUI viewers."""
+    try:
+        from handlers.screen import ScreenHandler
+
+        ScreenHandler.note_output_rendered(message)
+    except Exception:
+        pass
+
+
+def _emit_display_message(message: str) -> None:
+    """Emit runtime text through shared output capture when available."""
+    try:
+        from handlers.messages import DisplayHandler
+
+        DisplayHandler._emit_message(message)
+    except Exception:
+        print(message)
+
+
 class StrictModeViolation(RuntimeError):
     """Raised when strict project mode blocks a risky operation."""
 
@@ -348,7 +378,10 @@ class Commands:
             for line in process.stdout:
                 captured.append(line)
                 text = f"{prefix}{line}" if prefix else line
-                print(text, end="", flush=True)
+                if _display_handler_suppressed():
+                    _note_screen_output(text.rstrip("\n"))
+                else:
+                    print(text, end="", flush=True)
                 if file_handle is not None:
                     file_handle.write(Commands.strip_ansi(line))
                     file_handle.flush()
@@ -457,17 +490,17 @@ class Commands:
             True if the command succeeded, False otherwise.
         """
         try:
-            print(f"Running command:\n{' '.join(git_command)}\n")
+            _emit_display_message(f"Running command:\n{' '.join(git_command)}\n")
             subprocess.run(
                 git_command,
                 check=True,
                 shell=False,
                 env=Commands._with_project_tmp_env(),
             )
-            print("Command completed successfully.")
+            _emit_display_message("Command completed successfully.")
             return True
         except subprocess.CalledProcessError as error:
-            print(f"Command failed: {error}")
+            _emit_display_message(f"Command failed: {error}")
             return False
 
     @staticmethod
@@ -512,7 +545,7 @@ class Commands:
             )
             proc.communicate(b"\n")  # Simulate pressing Enter
         except (TypeError, OSError) as error:
-            print(f"auto_enter_commands failed: {error}")
+            _emit_display_message(f"auto_enter_commands failed: {error}")
 
     # ------------------------------------------------------------------
     # Network utilities
@@ -546,7 +579,7 @@ class Commands:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return False
         except Exception as error:
-            print(error)
+            _emit_display_message(str(error))
             return False
 
     @staticmethod
@@ -589,7 +622,7 @@ class Commands:
             is_alive = loop.run_until_complete(self.async_host_ping(ip))
             return is_alive
         except Exception as error:
-            print(f"Async ping failed for {ip}: {error}")
+            _emit_display_message(f"Async ping failed for {ip}: {error}")
             return False
 
     # ------------------------------------------------------------------

@@ -14,6 +14,8 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+
+from handlers.messages import DisplayHandler
 from ..shared import Commands
 from ..shared.colors import Bcolors
 from .password_output import parse_credentials_from_output
@@ -79,7 +81,7 @@ class CredentialsUtil(Bcolors):
         try:
             return parse_credentials_from_output(self.creds_file)
         except FileNotFoundError:
-            print(f"[!] Credentials file not found: {self.creds_file}")
+            DisplayHandler._emit_message(f"[!] Credentials file not found: {self.creds_file}")
             return {}
 
     def test_credentials(
@@ -112,13 +114,13 @@ class CredentialsUtil(Bcolors):
             f"\nStarting credential test against {self.target} "
             f"on protocol {self._protocol} at {date}\n"
         )
-        print(start_message)
+        DisplayHandler._emit_message(start_message)
 
         with self._open_private_output(f"{save_dir}/{self.log_file}", append=True) as log_file:
             log_file.write(f"{start_message}\n")
 
         if not user_pass_list:
-            print("[-] No valid credentials found to test.")
+            DisplayHandler._emit_message("[-] No valid credentials found to test.")
             return
 
         for username, password in user_pass_list.items():
@@ -130,7 +132,7 @@ class CredentialsUtil(Bcolors):
             self.tested_accounts[username] = True
 
         if self._nxc_schema_mismatch_seen:
-            print(
+            DisplayHandler._emit_message(
                 "[!] NetExec SMB database schema mismatch detected. "
                 "Credential testing stopped to avoid repeating the same error."
             )
@@ -200,12 +202,12 @@ class CredentialsUtil(Bcolors):
                     output = output.decode("utf-8", errors="replace")
                 for line in str(output).splitlines():
                     logfile.write(f"{line}\n")
-                    print(self.format_text_output(line.strip()))
+                    DisplayHandler._emit_message(self.format_text_output(line.strip()))
                 message = (
                     f"[!] nxc timed out after {self.NXC_COMMAND_TIMEOUT_SECONDS}s "
                     f"for user '{user}' against {self.target}; continuing."
                 )
-                print(message)
+                DisplayHandler._emit_message(message)
                 logfile.write(f"{message}\n")
                 return
 
@@ -214,7 +216,7 @@ class CredentialsUtil(Bcolors):
                 if self._is_nxc_schema_mismatch(line):
                     self._nxc_schema_mismatch_seen = True
                     logfile.write(f"{line}\n")
-                    print(
+                    DisplayHandler._emit_message(
                         "[!] NetExec reported an SMB DB schema mismatch. "
                         "The module-local NetExec home will be reset; retry the "
                         "password test."
@@ -223,7 +225,7 @@ class CredentialsUtil(Bcolors):
                     break
 
                 formatted_line = self.format_text_output(line)
-                print(formatted_line)
+                DisplayHandler._emit_message(formatted_line)
 
                 if self.SUCCESS_DECORATOR in line:
                     with self._open_private_output(self.output_file, append=True) as success_file:
@@ -234,7 +236,7 @@ class CredentialsUtil(Bcolors):
         if completed.returncode != 0:
             if self._nxc_schema_mismatch_seen:
                 return
-            print(f"[!] nxc exited with error code {completed.returncode}")
+            DisplayHandler._emit_message(f"[!] nxc exited with error code {completed.returncode}")
 
     @staticmethod
     def get_string_from_list(word_list: list, sentence: str) -> bool:

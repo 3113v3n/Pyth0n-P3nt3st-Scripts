@@ -41,7 +41,7 @@ class PasswordModule(DisplayHandler, HashUtil, CredentialsUtil):
         :param generate_filename: function that generates a unique output file name
         """
         if domain_variables["hashes"]:
-            print("Getting cracked hashes")
+            self.print_info_message("Getting cracked hashes")
             self.cracked_hashes = domain_variables["hashes"]
             self.dumped_hashes = domain_variables["dumps"]
             self._require_input_file(self.cracked_hashes, "Cracked hashes")

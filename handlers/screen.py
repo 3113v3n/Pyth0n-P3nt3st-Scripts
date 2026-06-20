@@ -72,8 +72,6 @@ class ScreenHandler(DisplayHandler):
             sanitized = state_cls._ansi_escape_re.sub("", str(text_or_line_count or "")).strip()
             if sanitized:
                 state_cls._output_transcript.append(sanitized)
-                if len(state_cls._output_transcript) > 400:
-                    state_cls._output_transcript = state_cls._output_transcript[-400:]
         if not state_cls._nav_hint_visible:
             return
         if isinstance(text_or_line_count, int):
@@ -110,7 +108,7 @@ class ScreenHandler(DisplayHandler):
         if not force and state_cls._nav_hint_visible:
             return
         hint_line = f"[Navigation] {state_cls.NAVIGATION_HINT}"
-        print(f"\n{state_cls.MUTED}{hint_line}{state_cls.ENDC}")
+        state_cls._emit_message(f"\n{state_cls.MUTED}{hint_line}{state_cls.ENDC}")
         state_cls._nav_hint_visible = True
         state_cls._lines_since_nav_hint = state_cls._estimate_rendered_lines(hint_line) + 1
 

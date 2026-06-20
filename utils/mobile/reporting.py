@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .models import Finding
+from handlers.messages import DisplayHandler
 from utils.shared.text_formatting import section_header, wrap_text_block
 
 
@@ -654,9 +655,9 @@ class MobileReportingMixin:
         if summary["top_risks"]:
             self.print_info_message("Top risk findings:")
             for row in summary["top_risks"]:
-                print(f"  - {row}")
+                DisplayHandler._emit_message(f"  - {row}")
 
         if summary["top_controls"]:
             self.print_info_message("Detected integrity/security controls:")
             for row in summary["top_controls"]:
-                print(f"  - {row}")
+                DisplayHandler._emit_message(f"  - {row}")

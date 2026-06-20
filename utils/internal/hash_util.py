@@ -73,7 +73,11 @@ class HashUtil:
                     hash_val, password = line.strip().split(":", 1)
                     cracked_hashes[hash_val] = password
                 except ValueError:
-                    print(f"[-] Skipping malformed line in {cracked_hashes_file}: {line.strip()}")
+                    from handlers.messages import DisplayHandler
+
+                    DisplayHandler._emit_message(
+                        f"[-] Skipping malformed line in {cracked_hashes_file}: {line.strip()}"
+                    )
         return cracked_hashes
 
     def compare_hash_from_dump(
@@ -96,7 +100,11 @@ class HashUtil:
             Tuple of (total_matches_found, enabled_users_written).
         """
         cracked_hashes = self.get_hashes(hash2compare)
-        print(f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
+        from handlers.messages import DisplayHandler
+
+        DisplayHandler._emit_message(
+            f"\n[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes"
+        )
 
         matches_found = 0
         enabled_users = 0
@@ -133,14 +141,18 @@ class HashUtil:
                 enabled_users += 1
 
                 if emit_match_logs:
-                    print(
+                    from handlers.messages import DisplayHandler
+
+                    DisplayHandler._emit_message(
                         f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
                         f"{Bcolors.OKCYAN}{formatted_username}{Bcolors.ENDC}:"
                         f"{Bcolors.WARNING}{password}{Bcolors.ENDC}"
                     )
 
         if malformed_lines:
-            print(
+            from handlers.messages import DisplayHandler
+
+            DisplayHandler._emit_message(
                 f"{Bcolors.WARNING}[-]{Bcolors.ENDC} Skipped "
                 f"{malformed_lines} malformed dump lines"
             )
@@ -161,7 +173,11 @@ class HashUtil:
     ) -> tuple[int, int, list[str]]:
         """Compare hashes, write enabled user:password lines, and return matched passwords."""
         cracked_hashes = self.get_hashes(hash2compare)
-        print(f"[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes")
+        from handlers.messages import DisplayHandler
+
+        DisplayHandler._emit_message(
+            f"\n[*] Loaded {Bcolors.BOLD}{len(cracked_hashes)}{Bcolors.ENDC} cracked hashes"
+        )
 
         matches_found = 0
         enabled_users = 0
@@ -201,14 +217,18 @@ class HashUtil:
                 enabled_users += 1
 
                 if emit_match_logs:
-                    print(
+                    from handlers.messages import DisplayHandler
+
+                    DisplayHandler._emit_message(
                         f"{Bcolors.OKGREEN}[+]{Bcolors.ENDC} Match found: "
                         f"{Bcolors.OKCYAN}{formatted_username}{Bcolors.ENDC}:"
                         f"{Bcolors.WARNING}{password}{Bcolors.ENDC}"
                     )
 
         if malformed_lines:
-            print(
+            from handlers.messages import DisplayHandler
+
+            DisplayHandler._emit_message(
                 f"{Bcolors.WARNING}[-]{Bcolors.ENDC} Skipped "
                 f"{malformed_lines} malformed dump lines"
             )

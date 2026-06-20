@@ -390,7 +390,10 @@ class FileHandler(FileSelectionMixin, Validator, DisplayHandler):
                 **kwargs
             )
         except Exception as e:
-            print(f"Error reading excel file: {e}")
+            DisplayHandler.print_error_message(
+                message="Error reading excel file",
+                exception_error=e,
+            )
             raise
 
     @staticmethod

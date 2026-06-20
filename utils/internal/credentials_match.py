@@ -1,3 +1,6 @@
+from handlers.messages import DisplayHandler
+
+
 def match_credentials(file1_path, file2_path, output_path):
     # Read usernames from file1 into a set for efficient lookup
     with open(file1_path, 'r') as f1:
@@ -23,15 +26,19 @@ def match_credentials(file1_path, file2_path, output_path):
                     # Write in username:password format
                     out.write(f"{username}:{password}\n")
 
-# Example usage
-if __name__ == "__main__":
+
+def main():
     try:
         username_path = input("Enter path to your username file: ").strip()
         credential_path = input("Path to your Creds file: ").strip()
 
         match_credentials(username_path, credential_path, "matched.txt")
-        print("Processing complete. Results written to matched.txt")
+        DisplayHandler._emit_message("Processing complete. Results written to matched.txt")
     except FileNotFoundError as e:
-        print(f"Error: One of the input files was not found - {e}")
+        DisplayHandler._emit_message(f"Error: One of the input files was not found - {e}")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        DisplayHandler._emit_message(f"An error occurred: {e}")
+
+
+if __name__ == "__main__":
+    main()

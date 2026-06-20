@@ -1,9 +1,30 @@
 from itertools import cycle
 from shutil import get_terminal_size
-from threading import Thread, Event
+from threading import Event, Thread
 from time import sleep
 from typing import Optional
+
 from .colors import Bcolors
+
+
+def _display_handler_suppressed() -> bool:
+    """Return True when interactive output should be captured instead of printed."""
+    try:
+        from handlers.messages import DisplayHandler
+
+        return DisplayHandler.stdout_suppressed()
+    except Exception:
+        return False
+
+
+def _note_screen_output(message: str) -> None:
+    """Best-effort bridge to the shared transcript used by TUI viewers."""
+    try:
+        from handlers.screen import ScreenHandler
+
+        ScreenHandler.note_output_rendered(message)
+    except Exception:
+        pass
 
 
 class Loader:
@@ -47,9 +68,18 @@ class Loader:
         self._cols = get_terminal_size((80, 20)).columns
         self.timer = timer
         self.continuous = continuous
+        self._suppressed_capture = False
+        self._suppressed_end_recorded = False
 
     def start(self):
         """Start Animation"""
+        if _display_handler_suppressed():
+            self._suppressed_capture = True
+            self._suppressed_end_recorded = False
+            if self.desc:
+                _note_screen_output(self.desc)
+            return
+
         if self._thread is None or not self._thread.is_alive():
             self._done.clear()
             self._thread = Thread(target=self._animate, daemon=True)
@@ -88,6 +118,14 @@ class Loader:
 
     def stop(self):
         """Stop Animation"""
+        if self._suppressed_capture:
+            self._done.set()
+            if self.end and not self._suppressed_end_recorded:
+                _note_screen_output(self.end)
+                self._suppressed_end_recorded = True
+            self._suppressed_capture = False
+            return
+
         self._done.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=self.timeout * 2)

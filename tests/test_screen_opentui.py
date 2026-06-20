@@ -1,5 +1,6 @@
 import pytest
 
+from handlers.messages import DisplayHandler
 from handlers.navigation import BackToPreviousMenu
 from handlers.opentui_menu import MenuOption
 from handlers.screen import ScreenHandler
@@ -35,6 +36,37 @@ def test_create_menu_selection_uses_scanner_alias_as_description(monkeypatch):
         ("Nessus Scanner", "nessus", "1"),
         ("Rapid7 Scanner", "rapid", "2"),
     ]
+
+
+def test_show_navigation_hint_routes_output_to_transcript_when_stdout_is_suppressed(capsys):
+    ScreenHandler.note_screen_cleared()
+    ScreenHandler.clear_output_transcript()
+    DisplayHandler.set_stdout_suppressed(True)
+    try:
+        ScreenHandler.show_navigation_hint(force=True)
+    finally:
+        DisplayHandler.set_stdout_suppressed(False)
+
+    captured = capsys.readouterr()
+    transcript = ScreenHandler.consume_output_transcript()
+
+    assert captured.out == ""
+    assert "[Navigation]" in transcript
+    assert "back=previous menu" in transcript
+
+
+def test_output_transcript_retains_long_histories_for_tui_viewers():
+    ScreenHandler.clear_output_transcript()
+    try:
+        for index in range(450):
+            ScreenHandler.note_output_rendered(f"line {index}")
+        transcript = ScreenHandler.consume_output_transcript()
+    finally:
+        ScreenHandler.clear_output_transcript()
+
+    assert "line 0" in transcript
+    assert "line 399" in transcript
+    assert "line 449" in transcript
 
 
 def test_create_menu_selection_uses_uppercase_labels_for_plain_options(monkeypatch):
