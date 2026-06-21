@@ -5,6 +5,7 @@ from handlers.package_handler import PackageHandler
 from handlers.framework_assessment_mixin import FrameworkAssessmentMixin
 from handlers.framework_core_mixin import FrameworkCoreMixin
 from handlers.framework_runtime_mixin import FrameworkRuntimeMixin
+from handlers.messages import DisplayHandler
 from handlers.screen import ScreenHandler
 from utils.shared.commands import Commands
 
@@ -21,7 +22,7 @@ class PentestFramework(
         super().__init__()
         # Refactor note: state remains in the root class so mixins stay stateless.
         self.ai = None
-        self.use_ai = True
+        self.use_ai = False
         self.classes = self.initialize_classes()
         self.exit_menu = False
         self.debug = False
@@ -36,7 +37,7 @@ def main():
     from handlers.interaction import InteractionHandler
 
     if not PackageHandler.ensure_project_virtualenv():
-        print("\n[!] Critical error: project virtualenv bootstrap failed")
+        DisplayHandler.print_error_message("Critical error: project virtualenv bootstrap failed")
         sys.exit(1)
 
     _interaction = InteractionHandler()
@@ -66,7 +67,7 @@ def main():
         _interaction.arguments["use_args"] = use_cmdline_args
         framework.run_program_interactively(_interaction.arguments)
     except Exception as error:
-        print(f"\n[!] Critical error: {error}")
+        DisplayHandler.print_error_message("Critical error", exception_error=error)
         sys.exit(1)
 
 

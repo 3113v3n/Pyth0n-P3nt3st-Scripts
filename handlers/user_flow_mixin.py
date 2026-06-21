@@ -479,7 +479,7 @@ class UserFlowMixin(FileHandler):
             if _nh._is_interface_active(iface) and not iface.startswith(("br-", "docker", "veth", "lo"))
         ]
         if self.debug:
-            print(f"DEBUG: Available active interfaces={valid_interfaces}")
+            self.print_debug_message(f"Available active interfaces={valid_interfaces}")
 
         while True:
             try:

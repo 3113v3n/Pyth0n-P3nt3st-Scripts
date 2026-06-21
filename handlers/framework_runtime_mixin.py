@@ -141,14 +141,21 @@ class FrameworkRuntimeMixin:
         add_wildcard_if_nonempty(module_output_dir, f"{self._module_output_dir(module)}/*")
         add_wildcard_if_nonempty(test_data_dir, "test-data/*")
 
+        # Cap the walk so a module that dumped thousands of artifacts into
+        # .tmp/output can't block the TUI from showing the cleanup viewer.
+        max_files_scanned = 2000
         scan_roots = [tmp_dir, module_output_dir]
         recent_files: list[tuple[float, str]] = []
+        files_scanned = 0
         for root in scan_roots:
             if not root.exists() or not root.is_dir():
                 continue
             for artifact in root.rglob("*"):
+                if files_scanned >= max_files_scanned:
+                    break
                 if not artifact.is_file():
                     continue
+                files_scanned += 1
                 try:
                     stat_info = artifact.stat()
                 except OSError:
