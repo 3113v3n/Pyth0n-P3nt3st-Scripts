@@ -63,6 +63,10 @@ class VAConfigs:
         "Affected IPs",
         "Plugin IDs Grouped",
         "Finding Rows",
+        "Critical",
+        "High",
+        "Medium",
+        "Low",
     ]
     SUMMARY_SHEET_HEADERS = [
         "S.No",
@@ -166,7 +170,7 @@ class VAConfigs:
         r"\bWeb\b|\bweb server\b|\bHTTP\b|\bHSTS\b|\bHTTPS\b|\bIIS\b|\bASP.NET|XSS")
     UNIVERSAL_IGNORE_FILTER = "[Uu]pgrade|[Uu]pdate|[Pp]atch"
     WEB_IGNORE_FILTER = "TLS|SSL"
-    RISK_RATING_STRINGS = "Critical|High|Medium"
+    RISK_RATING_STRINGS = "Critical|High|Medium|Low"
     COMPLIANCE_STRINGS = "FAILED|WARNING|Fail"
     CVSS_NETWORK_VECTOR = r"(?:CVSS:\d(?:\.\d)?/[^\s),;]*AV:N(?:/|$)|(?:^|[\s,;])AV:N/)"
     CVSS3_NETWORK_VECTOR = r"(?:CVSS:3(?:\.\d)?/[^\s),;]*AV:N(?:/|$)|(?:^|[\s,;])AV:N/)"
